@@ -76,7 +76,7 @@ function mkPairs(names: string[], pairs: PairResult[], alpha: number): OutcomePa
 }
 
 export function describeGroups(names: string[], groups: number[][]) {
-  return groups.map((g, i) => ({ name: names[i]!, n: g.length, median: median(g), mean: mean(g), sd: g.length > 1 ? sd(g) : NaN }));
+  return groups.map((g, i) => ({ group: names[i]!, n: g.length, median: median(g), mean: mean(g), sd: g.length > 1 ? sd(g) : NaN }));
 }
 
 /** Karar motorunun önerdiği testi çalıştırır. Desteklenmeyen ad ya da uyumsuz girdi için hata fırlatır. */

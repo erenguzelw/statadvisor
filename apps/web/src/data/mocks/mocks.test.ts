@@ -1,6 +1,6 @@
 import { groupResiduals, levene, shapiroWilk } from '@statadvisor/shared';
 import { recommendTest } from '@statadvisor/shared';
-import { buildReport, REPORT_SECTION_IDS } from '@statadvisor/shared';
+import { buildReport, reportFromSummary, REPORT_SECTION_IDS } from '@statadvisor/shared';
 import { analysis } from './analysis';
 import { apaSummary, citation, reportSections, snippets } from './code';
 import { getModelReport, SESSION_TEST_COUNT } from './models';
@@ -90,11 +90,11 @@ describe('veri kalitesi', () => {
 describe('rapor', () => {
   it('arayüzdeki içerik listesindeki her bölümü içerir ve girdileri kaçırır', () => {
     expect(reportSections.map((s) => s.id)).toEqual([...REPORT_SECTION_IDS]);
-    const html = buildReport({ analysis, apaSummary, citation: `${citation} <script>x</script>`, date: '1.1.2026' }, 'html');
+    const html = buildReport(reportFromSummary(analysis, apaSummary, [`${citation} <script>x</script>`], '1.1.2026'), 'html');
     for (const id of REPORT_SECTION_IDS) expect(html).toContain(`data-section="${id}"`);
     expect(html).not.toContain('<script>x');
     expect(html).toContain('&lt;script&gt;');
     expect(html).not.toContain('print()');
-    expect(buildReport({ analysis, apaSummary, citation, date: 'x' }, 'print')).toContain('print()');
+    expect(buildReport(reportFromSummary(analysis, apaSummary, [citation], 'x'), 'print')).toContain('print()');
   });
 });

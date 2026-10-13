@@ -8,7 +8,7 @@ import { useApp } from '@/context/AppContext';
 import { useCodeReport } from '@/data/queries';
 import type { ReportFormat } from '@statadvisor/shared';
 import { downloadText, openHtml, toNotebook } from '@/lib/download';
-import { buildReport } from '@statadvisor/shared';
+import { buildReport, reportFromSummary } from '@statadvisor/shared';
 import { effectLabel, formatP } from '@statadvisor/shared';
 
 const formatIcons = { html: Globe, print: FileText, word: FileType2 } as const;
@@ -28,7 +28,7 @@ export function CodeReportPage() {
         const t = analysis.testStatistic;
         const shapiro = analysis.assumptions.find((a) => a.id === 'shapiro');
         const date = new Date().toLocaleDateString('tr-TR');
-        const reportInput = { analysis, apaSummary, citation, date };
+        const reportInput = reportFromSummary(analysis, apaSummary, [citation], date);
         const html = buildReport(reportInput, 'html');
         const size = new Blob([html]).size;
 
