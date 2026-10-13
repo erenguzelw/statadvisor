@@ -1,7 +1,8 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import multipart from '@fastify/multipart';
+import fastifyStatic from '@fastify/static';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import {
@@ -35,6 +36,8 @@ export interface AppOptions {
   maxUploadBytes?: number;
   maxRows?: number;
   maxColumns?: number;
+  /** Derlenmiş arayüzün klasörü; verilirse sunucu arayüzü de sunar (tek komutla çalışma). */
+  webDir?: string;
   /** İzin verilen tarayıcı kökenleri (CSRF koruması). */
   allowedOrigins?: string[];
   appVersion?: string;
@@ -467,6 +470,15 @@ export function buildApp(opts: AppOptions): FastifyInstance {
     const { row, csv } = parsed(a.datasetId);
     return generateAnalysisCode(fileInfo(row, csv), a.request as AnalysisSpec, a.result);
   });
+
+  if (opts.webDir && existsSync(join(opts.webDir, 'index.html'))) {
+    app.register(fastifyStatic, { root: opts.webDir });
+    // Tarayıcı yönlendirmesi (SPA): /api dışındaki bilinmeyen GET istekleri arayüze gider.
+    app.setNotFoundHandler((req, reply) => {
+      if (req.method === 'GET' && !req.url.startsWith('/api/')) return reply.sendFile('index.html');
+      return reply.status(404).send({ error: { code: 'not_found', message: 'Bulunamadı.' } });
+    });
+  }
 
   app.get('/api/health', async () => ({ ok: true, engine: engineInfo() }));
 

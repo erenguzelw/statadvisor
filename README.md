@@ -1,38 +1,45 @@
 # StatAdvisor AI
 
-Akıllı hipotez testi ve model seçim danışmanının arayüzü. Tasarım kaynakları `ui/` klasöründedir; React uygulaması `apps/web` altındadır.
+Akıllı hipotez testi ve model seçim danışmanı. Verinizi yükleyin; uygulama veri kalitesini denetler, doğru istatistiksel testi önerir, hesaplar, Python kodunu ve raporu (HTML, PDF, DOCX) üretir. **Her şey bu bilgisayarda çalışır; veriniz dışarı gönderilmez.**
+
+## Gereksinimler
+
+- Node.js 24 veya üstü (geliştirme Node 26'da yapıldı; `node:sqlite` ve doğrudan TypeScript çalıştırma gerekir)
+- PDF raporu için (isteğe bağlı): `npx playwright install chromium`
+- Python yalnızca referans doğrulama için gerekir (`tools/reference/README.md`)
 
 ## Çalıştırma
 
 ```bash
 npm install
-npm run dev          # http://localhost:5173
+npm start            # arayüzü derler ve http://127.0.0.1:3001 adresinde sunar
+npm run dev          # geliştirme: API 3001, arayüz http://localhost:5173
 ```
+
+## Komutlar
 
 | Komut | Ne yapar |
 |---|---|
-| `npm run build` | Tip denetimi + üretim derlemesi (`apps/web/dist`) |
-| `npm run preview` | Derlemeyi yerelde sunar |
-| `npm run typecheck` / `npm run lint` | TypeScript ve ESLint |
-| `npm test` | Vitest birim testleri |
-| `npm run e2e` | Playwright uçtan uca + axe erişilebilirlik testleri (ilk seferde `npx playwright install chromium`) |
+| `npm run check` | Tip denetimi + lint + tüm birim testleri |
+| `npm run e2e` | Playwright uçtan uca + erişilebilirlik testleri |
+| `npm run backup` | Veritabanının tutarlı yedeğini `apps/api/backups/` altına yazar |
+| `npm run reset-data` | Yedek alır, sonra tüm yerel veriyi siler (sunucu kapalıyken) |
 
-Uygulama çalışırken internet gerekmez: yazı tipleri (`@fontsource`) ve ikonlar (`lucide-react`) pakete gömülüdür.
+## Mimari
 
-## Yapı
+- `packages/shared`: istatistik motoru (testler, varsayımlar, karar kuralları), veri temizleme, kod ve rapor üretimi. SciPy/statsmodels/scikit-learn ile üretilmiş 1094 referans vakayla doğrulanır.
+- `apps/api`: Fastify sunucusu + SQLite. Yalnızca `127.0.0.1` dinler; Host ve Origin denetimi yapar.
+- `apps/web`: React + Tailwind arayüzü (`ui/` klasöründeki tasarımlardan).
+- `docs/`: gereksinimler, uygulama planı, risk ve fırsat raporu, gizlilik notu.
 
-```
-apps/web/src/
-  styles/tokens.css     Tasarım tokenları (renk, tip ölçeği, köşe, gölge) — DESIGN.md'den
-  components/ui/        Ürünü bilmeyen jenerik bileşenler (Button, Panel, Tabs, CodeBlock, DataTable…)
-  components/layout/    AppShell, Sidebar, TopBar, PageHeader
-  components/charts/    SVG grafikler (histogram + normal eğri, kutu grafiği, ROC)
-  components/domain/    StatAdvisor'a özgü bileşenler (varsayım kartı, model kartı, kırmızı bayrak…)
-  features/             Dört sayfa: karar-sihirbazi, model-karsilastirma, veri-kalitesi, kod-rapor
-  data/                 Domain tipleri, örnek veri (mocks) ve TanStack Query hook'ları
-  context/AppContext    Yeni Başlayan / Uzman seviyesi ve seçili veri seti
-```
+## Veri nerede?
 
-- Sayfalar veriye yalnızca `data/queries.ts` içindeki hook'larla erişir. Node/SQLite API eklendiğinde yalnızca bu dosyadaki `mock()` çağrıları gerçek istekle değişir.
-- Geliştirme ortamında `/bilesenler` adresi tüm jenerik bileşenlerin varyantlarını gösterir.
-- Sınıf birleştirmek için `cn()` kullanın (`lib/cn.ts`); çakışan Tailwind sınıflarını doğru çözer.
+`apps/api/.data/` (SQLite). `STATADVISOR_DATA` ile değiştirilir. Yedek ve silme için komutlara bakın. Ayrıntı: `docs/gizlilik.md`.
+
+## Sınırlamalar
+
+- Model karşılaştırma sayfası gerçek verinize bağlı değildir; tarayıcıda eğitilen sentetik veriyle çalışır.
+- Tukey HSD / Games-Howell yok (yerine ikili Welch + Holm); tekrarlı ölçümlü ANOVA'da Greenhouse-Geisser düzeltmesi yok.
+- R kodu üretilmez; yalnızca doğrulanabilen Python kodu üretilir.
+- DOCX raporu grafik içermez (HTML/PDF içerir).
+- Kaynakça künyeleri yayın öncesi doğrulanmalıdır; bağımsız bir istatistikçi incelemesi önerilir.
