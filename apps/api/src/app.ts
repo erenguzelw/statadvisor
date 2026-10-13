@@ -9,10 +9,18 @@ import {
   analyzeQuality,
   AnalysisError,
   buildReport,
+  cleanColumns,
+  generateAnalysisCode,
+  generateCleaningCode,
+  columnsToCsv,
   ENGINE,
   reportFromResult,
+  sampleDataset,
+  SAMPLE_KINDS,
   type AnalysisRequest,
   type AnalysisResult,
+  type AnalysisSpec,
+  type ImputeMethod,
   type NumericColumn,
   type TextColumn,
 } from '@statadvisor/shared';
@@ -148,26 +156,25 @@ export function buildApp(opts: AppOptions): FastifyInstance {
     rows: number;
     columns_json: string;
     created_at: string;
+    parent_id: string | null;
+    operations_json: string | null;
   }
   const columnSummary = (c: ParsedColumn) => ({ name: c.name, type: c.type, numeric: c.numeric, unique: c.unique, missing: c.missing, examples: c.examples, likelyId: c.likelyId, warnings: c.warnings });
-  const datasetJson = (r: DatasetRow) => ({ id: r.id, name: r.name, size: r.size, rows: r.rows, columns: JSON.parse(r.columns_json) as unknown[], createdAt: r.created_at });
+  const datasetJson = (r: DatasetRow) => ({ id: r.id, name: r.name, size: r.size, rows: r.rows, columns: JSON.parse(r.columns_json) as unknown[], createdAt: r.created_at, parentId: r.parent_id, operations: r.operations_json ? (JSON.parse(r.operations_json) as unknown) : null });
 
   /* ---------- Veri setleri ---------- */
-  app.post('/api/datasets', async (req, reply) => {
-    const part = await req.file();
-    if (!part) throw new ApiError(400, 'no_file', 'Dosya gönderilmedi.');
-    const buf = await part.toBuffer();
-    if (part.file.truncated) throw new ApiError(413, 'too_large', `Dosya çok büyük (en fazla ${Math.round(maxUpload / 1024 / 1024)} MB).`);
+  /** Bir CSV içeriğini veri seti olarak kaydeder; aynı içerik varsa mevcut kayıt döner. */
+  function ingest(buf: Buffer, rawName: string, provenance?: { parentId: string; operations: unknown }) {
     const csv = parseCsv(buf, limits);
     const hash = sha256(buf);
     const existing = db.prepare('SELECT * FROM datasets WHERE sha256 = ?').get(hash) as DatasetRow | undefined;
-    if (existing) return reply.status(200).send({ ...datasetJson(existing), duplicate: true });
+    if (existing) return { dataset: datasetJson(existing), created: false };
     // Özgün dosya adı yalnızca etiket olarak saklanır; diskte hiçbir zaman kullanılmaz.
-    const name = [...(part.filename || 'veri.csv')].filter((ch) => ch.charCodeAt(0) >= 32 && ch !== '<' && ch !== '>').join('').slice(0, 200) || 'veri.csv';
+    const name = [...(rawName || 'veri.csv')].filter((ch) => ch.charCodeAt(0) >= 32 && ch !== '<' && ch !== '>').join('').slice(0, 200) || 'veri.csv';
     const id = hash.slice(0, 16);
     writeFile(hash, buf);
     const now = new Date().toISOString();
-    db.prepare('INSERT INTO datasets (id, name, sha256, size, rows, columns_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)').run(
+    db.prepare('INSERT INTO datasets (id, name, sha256, size, rows, columns_json, created_at, parent_id, operations_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
       id,
       name,
       hash,
@@ -175,9 +182,56 @@ export function buildApp(opts: AppOptions): FastifyInstance {
       csv.rows,
       JSON.stringify(csv.columns.map(columnSummary)),
       now,
+      provenance?.parentId ?? null,
+      provenance ? JSON.stringify(provenance.operations) : null,
     );
     cache.set(id, csv);
-    return reply.status(201).send({ id, name, size: buf.length, rows: csv.rows, columns: csv.columns.map(columnSummary), createdAt: now, duplicate: false });
+    return { dataset: datasetJson(db.prepare('SELECT * FROM datasets WHERE id = ?').get(id) as unknown as DatasetRow), created: true };
+  }
+
+  app.post('/api/datasets', async (req, reply) => {
+    const part = await req.file();
+    if (!part) throw new ApiError(400, 'no_file', 'Dosya gönderilmedi.');
+    const buf = await part.toBuffer();
+    if (part.file.truncated) throw new ApiError(413, 'too_large', `Dosya çok büyük (en fazla ${Math.round(maxUpload / 1024 / 1024)} MB).`);
+    const { dataset, created } = ingest(buf, part.filename);
+    return reply.status(created ? 201 : 200).send({ ...dataset, duplicate: !created });
+  });
+
+  /** Yerleşik örnek veri setlerinden birini sıradan bir yükleme gibi kaydeder. */
+  app.get('/api/samples', async () => ({
+    samples: SAMPLE_KINDS.map((k) => {
+      const s = sampleDataset(k);
+      return { kind: s.kind, title: s.title, description: s.description, fileName: s.fileName };
+    }),
+  }));
+  app.post('/api/samples/:kind', async (req, reply) => {
+    const { kind } = req.params as { kind: string };
+    if (!(SAMPLE_KINDS as string[]).includes(kind)) throw new ApiError(404, 'not_found', 'Örnek veri seti bulunamadı.');
+    const s = sampleDataset(kind as (typeof SAMPLE_KINDS)[number]);
+    const { dataset, created } = ingest(Buffer.from(s.csv, 'utf8'), s.fileName);
+    return reply.status(created ? 201 : 200).send({ ...dataset, duplicate: !created });
+  });
+
+  /** Temizleme: yeni bir veri sürümü üretir; ham veri değişmez. */
+  const CleanBody = z.object({
+    outlierColumns: z.array(colName).max(200).default([]),
+    impute: z.enum(['none', 'median', 'knn']).default('none'),
+  });
+  app.post('/api/datasets/:id/clean', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const body = CleanBody.parse(req.body ?? {});
+    if (body.outlierColumns.length === 0 && body.impute === 'none') throw new ApiError(422, 'nothing_to_do', 'Uygulanacak bir işlem seçilmedi.');
+    const { row, csv } = parsed(id);
+    const result = cleanColumns(
+      csv.columns.map((c) => ({ name: c.name, numeric: c.numeric, values: c.values, skip: c.likelyId })),
+      body,
+    );
+    if (result.columns[0]!.values.length < 3) throw new ApiError(422, 'too_few_rows', 'Temizlikten sonra analiz için yeterli satır kalmıyor.');
+    const buf = Buffer.from(columnsToCsv(result.columns), 'utf8');
+    const operations = { ...body, removedRows: result.removedRows, imputedCells: result.imputedCells, log: result.log };
+    const { dataset, created } = ingest(buf, `${row.name.replace(/\.csv$/i, '')} (temizlenmiş).csv`, { parentId: row.id, operations });
+    return reply.status(created ? 201 : 200).send({ ...dataset, duplicate: !created });
   });
 
   app.get('/api/datasets', async () => {
@@ -199,6 +253,34 @@ export function buildApp(opts: AppOptions): FastifyInstance {
     removeFile(row.sha256);
     cache.delete(id);
     return reply.status(204).send();
+  });
+
+  /** Ham CSV'yi olduğu gibi indirir (üretilen kodun okuduğu dosya). */
+  app.get('/api/datasets/:id/download', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const { row } = parsed(id);
+    const ascii = [...row.name].map((ch) => (ch.charCodeAt(0) >= 32 && ch.charCodeAt(0) <= 126 && ch !== '"' && ch !== '\\' ? ch : '_')).join('');
+    reply.header('Content-Type', 'text/csv; charset=utf-8');
+    reply.header('Content-Disposition', `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(row.name)}`);
+    return readFile(row.sha256);
+  });
+
+  const fileInfo = (row: DatasetRow, csv: ParsedCsv) => ({ fileName: row.name, delimiter: csv.delimiter, decimalComma: csv.decimalComma });
+
+  /** Temizleme işleminin Python karşılığı. */
+  app.get('/api/datasets/:id/cleaning-code', async (req) => {
+    const { id } = req.params as { id: string };
+    const q = z.object({ clean: z.string().max(4000).optional(), impute: z.enum(['none', 'median', 'knn']).default('none') }).parse(req.query);
+    const { row, csv } = parsed(id);
+    const clean = q.clean ? q.clean.split(',').map((s) => s.trim()).filter(Boolean) : [];
+    for (const n of clean) if (!csv.columns.some((c) => c.name === n)) throw new ApiError(422, 'unknown_column', `“${n}” adlı sütun bulunamadı.`);
+    return generateCleaningCode(fileInfo(row, csv), {
+      numericColumns: csv.columns.filter((c) => c.numeric).map((c) => c.name),
+      categoricalColumns: csv.columns.filter((c) => !c.numeric).map((c) => c.name),
+      idColumns: csv.columns.filter((c) => c.likelyId).map((c) => c.name),
+      outlierColumns: clean,
+      impute: q.impute as ImputeMethod,
+    });
   });
 
   /* ---------- Veri kalitesi ---------- */
@@ -259,6 +341,7 @@ export function buildApp(opts: AppOptions): FastifyInstance {
 
   app.post('/api/analyses', async (req, reply) => {
     const body = normalizeBody(AnalysisBody.parse(req.body));
+    const save = (req.query as { save?: string }).save !== 'false';
     const { row, csv } = parsed(body.datasetId);
     const request = toRequest(body, csv, row.name);
     const result = analyze(request);
@@ -266,6 +349,7 @@ export function buildApp(opts: AppOptions): FastifyInstance {
     const createdAt = new Date().toISOString();
     const inputHash = sha256(`${row.sha256}\n${canonical(body)}`);
     const engine = engineInfo();
+    if (!save) return reply.status(200).send({ id: null, datasetId: row.id, createdAt, inputHash, engine, result });
     db.prepare(
       'INSERT INTO analyses (id, dataset_id, created_at, request_json, result_json, input_hash, engine_json, test, p, significant) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
     ).run(id, row.id, createdAt, JSON.stringify(body), JSON.stringify(result), inputHash, JSON.stringify(engine), result.outcome.test, result.outcome.p, result.outcome.significant ? 1 : 0);
@@ -333,11 +417,30 @@ export function buildApp(opts: AppOptions): FastifyInstance {
       ['Referans doğrulama', `SciPy ${eng.referenceSuite.scipy}, ${eng.referenceSuite.cases} vaka`],
       ['Çalışma ortamı', `Node ${eng.node}`],
     ];
+    const ds = db.prepare('SELECT * FROM datasets WHERE id = ?').get(a.datasetId) as DatasetRow | undefined;
+    if (ds) {
+      audit.unshift(['Veri seti', `${ds.name} (SHA-256 ${ds.sha256.slice(0, 16)}…, ${ds.rows} satır)`]);
+      if (ds.parent_id) {
+        const parent = db.prepare('SELECT name FROM datasets WHERE id = ?').get(ds.parent_id) as { name: string } | undefined;
+        audit.splice(1, 0, ['Veri sürümü', `Temizlenmiş sürüm (kaynak: ${parent?.name ?? 'silinmiş veri seti'})`]);
+        const ops = ds.operations_json ? (JSON.parse(ds.operations_json) as { log?: string[] }) : {};
+        for (const line of ops.log ?? []) audit.splice(2, 0, ['Temizlik işlemi', line]);
+      } else {
+        audit.splice(1, 0, ['Veri sürümü', 'Ham veri (değiştirilmemiş)']);
+      }
+    }
     const html = buildReport(reportFromResult(a.result, date, audit), format);
     reply.header('Content-Type', format === 'word' ? 'application/msword; charset=utf-8' : 'text/html; charset=utf-8');
     if (format === 'word') reply.header('Content-Disposition', 'attachment; filename="rapor.doc"');
     reply.header('Content-Security-Policy', format === 'print' ? "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'" : "default-src 'none'; style-src 'unsafe-inline'");
     return html;
+  });
+
+  /** Analizin Python karşılığı; betik, beklenen çıktıyla birebir aynı satırları yazdırır. */
+  app.get('/api/analyses/:id/code', async (req) => {
+    const a = analysisJson(getAnalysis((req.params as { id: string }).id));
+    const { row, csv } = parsed(a.datasetId);
+    return generateAnalysisCode(fileInfo(row, csv), a.request as AnalysisSpec, a.result);
   });
 
   app.get('/api/health', async () => ({ ok: true, engine: engineInfo() }));
