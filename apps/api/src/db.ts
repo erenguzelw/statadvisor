@@ -26,6 +26,9 @@ const MIGRATIONS: string[] = [
      significant INTEGER NOT NULL
    );
    CREATE INDEX analyses_dataset ON analyses(dataset_id, created_at DESC);`,
+  // Temizleme ile türetilen veri sürümlerinin kaynağı ve uygulanan işlemler
+  `ALTER TABLE datasets ADD COLUMN parent_id TEXT REFERENCES datasets(id) ON DELETE SET NULL;
+   ALTER TABLE datasets ADD COLUMN operations_json TEXT;`,
 ];
 
 export function openDb(path: string): DatabaseSync {

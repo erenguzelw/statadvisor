@@ -19,6 +19,8 @@ export interface ParsedCsv {
   columns: ParsedColumn[];
   rows: number;
   delimiter: string;
+  /** Sayısal sütunlarda ondalık ayracı virgül olan en az bir değer var. */
+  decimalComma: boolean;
   /** İlk satırların ham metni (önizleme). */
   preview: string[][];
 }
@@ -35,6 +37,8 @@ export interface CsvLimits {
 
 const MISSING = new Set(['', 'na', 'n/a', 'nan', 'null', 'none', '-', '?', '#n/a']);
 const DELIMITERS = [',', ';', '\t', '|'] as const;
+/** Ondalık ayracı virgül olan sayı belirteci, ör. "3,5". */
+const DECIMAL_COMMA = /^-?\d+,\d+$/;
 
 function detectDelimiter(text: string): string {
   const lines = text.split(/\r?\n/).filter((l) => l.trim() !== '').slice(0, 8);
@@ -72,7 +76,7 @@ function uniqueNames(raw: string[]): string[] {
 function toNumber(token: string, decimalComma: boolean): number | null {
   const t = token.trim();
   if (t === '' || /^0x/i.test(t)) return null;
-  const s = decimalComma && /^-?\d+,\d+$/.test(t) ? t.replace(',', '.') : t;
+  const s = decimalComma && DECIMAL_COMMA.test(t) ? t.replace(',', '.') : t;
   if (!/^[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?$/.test(s)) return null;
   const n = Number(s);
   return Number.isFinite(n) ? n : null;
@@ -99,6 +103,7 @@ export function parseCsv(buffer: Buffer, limits: CsvLimits): ParsedCsv {
 
   const names = uniqueNames(header);
   const decimalComma = delimiter !== ',';
+  let usedDecimalComma = false;
   const columns: ParsedColumn[] = names.map((name, c) => {
     const tokens = body.map((r) => (r[c] ?? '').trim());
     const present = tokens.filter((t) => !MISSING.has(t.toLowerCase()));
@@ -108,6 +113,7 @@ export function parseCsv(buffer: Buffer, limits: CsvLimits): ParsedCsv {
     const warnings: string[] = [];
     let values: (number | string | null)[];
     if (numeric) {
+      if (decimalComma && present.some((t, i) => nums[i] !== null && DECIMAL_COMMA.test(t))) usedDecimalComma = true;
       values = tokens.map((t) => (MISSING.has(t.toLowerCase()) ? null : toNumber(t, decimalComma)));
       const invalid = present.length - nums.filter((n) => n !== null).length;
       if (invalid > 0) warnings.push(`${invalid} sayısal olmayan değer eksik sayıldı.`);
@@ -134,5 +140,5 @@ export function parseCsv(buffer: Buffer, limits: CsvLimits): ParsedCsv {
     };
   });
 
-  return { columns, rows: body.length, delimiter, preview: records.slice(0, 21) };
+  return { columns, rows: body.length, delimiter, decimalComma: usedDecimalComma, preview: records.slice(0, 21) };
 }

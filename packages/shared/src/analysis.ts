@@ -52,6 +52,8 @@ export interface AnalysisResult {
   notes: string[];
   /** Gösterimde kullanılan değişken adları. */
   variables: string[];
+  /** Kategorik analizlerde çapraz tablo ve etiket sırası. */
+  table?: { rowNames: string[]; colNames: string[]; table: number[][] };
 }
 
 const collator = new Intl.Collator('tr', { numeric: true });
@@ -159,9 +161,9 @@ export function leveneAssumption(groups: number[][], alpha: number): { test: Ass
 export function shapiroSubsample(values: number[], notes: string[]): number[] {
   if (values.length <= SHAPIRO_MAX) return values;
   const sorted = [...values].sort((a, b) => a - b);
-  const step = sorted.length / SHAPIRO_MAX;
   notes.push(`Shapiro-Wilk en fazla ${SHAPIRO_MAX} gözlemle çalışır; ${values.length} gözlemden eşit aralıklı ${SHAPIRO_MAX} gözlemlik bir alt örnek kullanıldı.`);
-  return Array.from({ length: SHAPIRO_MAX }, (_, i) => sorted[Math.floor(i * step)]!);
+  // numpy ile aynı biçim: floor(i·n / 5000) (üretilen Python kodu bunu birebir kullanır)
+  return Array.from({ length: SHAPIRO_MAX }, (_, i) => sorted[Math.floor((i * sorted.length) / SHAPIRO_MAX)]!);
 }
 
 /** Eşleşmiş tasarımda normallik, farklar (2 koşul) ya da iki yönlü kalıntılar (3+ koşul) üzerinden aranır. */
@@ -351,6 +353,7 @@ export function analyze(req: AnalysisRequest): AnalysisResult {
     descriptives,
     outcome,
     interpretation: interpretOutcome(outcome),
+    table: input.kind === 'table' ? { rowNames: input.rowNames, colNames: input.colNames, table: input.table } : undefined,
     apaSummary: apaSentence(outcome, assumptions),
     references: referencesFor(outcome, usedShapiro, groupsForLevene !== undefined),
     notes,

@@ -42,6 +42,9 @@ describe('CSV ayrıştırma', () => {
   it('ayraç ve ondalık virgülü algılar, türleri çıkarır', () => {
     const p = parseCsv(Buffer.from(csv(';', ',')), { maxRows: 1000, maxColumns: 20 });
     expect(p.delimiter).toBe(';');
+    expect(p.decimalComma).toBe(true);
+    expect(parseCsv(Buffer.from(csv(',', '.')), { maxRows: 1000, maxColumns: 20 }).decimalComma).toBe(false);
+    expect(parseCsv(Buffer.from(csv(';', '.')), { maxRows: 1000, maxColumns: 20 }).decimalComma).toBe(false);
     const byName = Object.fromEntries(p.columns.map((c) => [c.name, c]));
     expect(byName.biyobelirtec!.type).toBe('continuous');
     expect(byName.biyobelirtec!.values[0]).toBe(2.6);
@@ -260,5 +263,80 @@ describe('kalıcılık', () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe('örnek veri, temizleme ve önizleme', () => {
+  it('yerleşik örnekleri listeler ve sıradan bir veri seti olarak yükler', async () => {
+    const list = (await app.inject({ url: '/api/samples' })).json().samples;
+    expect(list.map((s: { kind: string }) => s.kind)).toEqual(['klinik', 'tedavi', 'anket']);
+    const klinik = await app.inject({ method: 'POST', url: '/api/samples/klinik' });
+    expect(klinik.statusCode).toBe(201);
+    expect(klinik.json().rows).toBe(1420);
+    const types = Object.fromEntries(klinik.json().columns.map((c: { name: string; type: string }) => [c.name, c.type]));
+    expect(types).toMatchObject({ grup: 'categorical', yas: 'continuous', kan_basinci: 'continuous', gelir_duzeyi: 'continuous' });
+    expect(klinik.json().columns.find((c: { name: string }) => c.name === 'gelir_duzeyi').missing).toBe(60);
+    expect((await app.inject({ method: 'POST', url: '/api/samples/klinik' })).statusCode).toBe(200);
+    const anket = (await app.inject({ method: 'POST', url: '/api/samples/anket' })).json();
+    expect(anket.columns.find((c: { name: string }) => c.name === 'memnuniyet').type).toBe('ordinal');
+    expect((await app.inject({ method: 'POST', url: '/api/samples/yok' })).statusCode).toBe(404);
+  });
+
+  it('örnek verilerde üç tasarım da uçtan uca çalışır', async () => {
+    const klinik = (await app.inject({ method: 'POST', url: '/api/samples/klinik' })).json();
+    const a = await app.inject({ method: 'POST', url: '/api/analyses', payload: { datasetId: klinik.id, goal: 'compare', design: 'independent', target: 'continuous', value: 'kan_basinci', group: 'grup' } });
+    expect(a.statusCode).toBe(201);
+    expect(a.json().result.outcome.n).toBe(1420);
+    const tedavi = (await app.inject({ method: 'POST', url: '/api/samples/tedavi' })).json();
+    const p = await app.inject({ method: 'POST', url: '/api/analyses', payload: { datasetId: tedavi.id, goal: 'compare', design: 'paired', target: 'continuous', conditions: ['baslangic', 'ay_1', 'ay_3'] } });
+    expect(p.statusCode).toBe(201);
+    expect(p.json().result.outcome.significant).toBe(true);
+    const anket = (await app.inject({ method: 'POST', url: '/api/samples/anket' })).json();
+    const c = await app.inject({ method: 'POST', url: '/api/analyses', payload: { datasetId: anket.id, goal: 'compare', design: 'independent', target: 'ordinal', value: 'memnuniyet', group: 'bolum' } });
+    expect(c.json().result.decision.finalTest).toBe('Kruskal-Wallis H testi');
+  });
+
+  it('kaydetmeden önizleme: save=false veritabanına yazmaz', async () => {
+    const id = (await upload()).json().id;
+    const r = await app.inject({ method: 'POST', url: '/api/analyses?save=false', payload: kruskalBody(id) });
+    expect(r.statusCode).toBe(200);
+    expect(r.json().id).toBeNull();
+    expect(r.json().result.outcome.test).toBe('Kruskal-Wallis H testi');
+    expect((await app.inject({ url: '/api/analyses' })).json().analyses).toHaveLength(0);
+  });
+
+  it('temizleme yeni bir veri sürümü üretir; ham veri değişmez, kaynağı kayıtlıdır ve rapora yansır', async () => {
+    const raw = (await app.inject({ method: 'POST', url: '/api/samples/klinik' })).json();
+    const r = await app.inject({ method: 'POST', url: `/api/datasets/${raw.id}/clean`, payload: { outlierColumns: ['kan_basinci', 'biyobelirtec_x'], impute: 'median' } });
+    expect(r.statusCode).toBe(201);
+    const clean = r.json();
+    expect(clean.id).not.toBe(raw.id);
+    expect(clean.parentId).toBe(raw.id);
+    expect(clean.rows).toBeLessThan(1420);
+    expect(clean.columns.find((c: { name: string }) => c.name === 'gelir_duzeyi').missing).toBe(0);
+    expect(clean.operations.removedRows).toBe(1420 - clean.rows);
+    expect(clean.operations.log.join(' ')).toContain('Tukey');
+    expect((await app.inject({ url: `/api/datasets/${raw.id}` })).json().rows).toBe(1420);
+    // aynı işlem tekrarlanırsa aynı sürüm döner
+    const again = await app.inject({ method: 'POST', url: `/api/datasets/${raw.id}/clean`, payload: { outlierColumns: ['kan_basinci', 'biyobelirtec_x'], impute: 'median' } });
+    expect(again.statusCode).toBe(200);
+    expect(again.json().id).toBe(clean.id);
+    // temizlenmiş sürümde analiz ve rapor
+    const a = (await app.inject({ method: 'POST', url: '/api/analyses', payload: { datasetId: clean.id, goal: 'compare', design: 'independent', target: 'continuous', value: 'kan_basinci', group: 'grup' } })).json();
+    const html = (await app.inject({ url: `/api/analyses/${a.id}/report` })).body;
+    expect(html).toContain('Temizlenmiş sürüm');
+    expect(html).toContain('Temizlik işlemi');
+    // hatalı istekler
+    expect((await app.inject({ method: 'POST', url: `/api/datasets/${raw.id}/clean`, payload: {} })).statusCode).toBe(422);
+    expect((await app.inject({ method: 'POST', url: `/api/datasets/${raw.id}/clean`, payload: { outlierColumns: ['grup'] } })).statusCode).toBe(422);
+    expect((await app.inject({ method: 'POST', url: `/api/datasets/${raw.id}/clean`, payload: { outlierColumns: ['yok'] } })).statusCode).toBe(422);
+  });
+
+  it('kaynak veri silinince türetilmiş sürüm korunur', async () => {
+    const raw = (await app.inject({ method: 'POST', url: '/api/samples/klinik' })).json();
+    const clean = (await app.inject({ method: 'POST', url: `/api/datasets/${raw.id}/clean`, payload: { impute: 'median' } })).json();
+    expect((await app.inject({ method: 'DELETE', url: `/api/datasets/${raw.id}` })).statusCode).toBe(204);
+    const kept = (await app.inject({ url: `/api/datasets/${clean.id}` })).json();
+    expect(kept.parentId).toBeNull();
   });
 });
