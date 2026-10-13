@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="tr"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><meta content="web_dashboard" name="shell-type"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500;600&amp;family=Space+Grotesk:wght@600;700&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { "colors": { "background": "#0b1326", "on-primary": "#1000a9", "surface-tint": "#c0c1ff", "tertiary": "#ffb95f", "on-tertiary-fixed": "#2a1700", "surface-container-highest": "#2d3449", "on-secondary-fixed-variant": "#005049", "on-background": "#dae2fd", "secondary-fixed": "#89f5e7", "on-tertiary-container": "#3e2400", "secondary": "#6bd8cb", "surface-bright": "#31394d", "slate-surface": "#1E293B", "on-surface": "#dae2fd", "surface": "#0b1326", "on-primary-fixed": "#07006c", "outline": "#908fa0", "on-secondary-fixed": "#00201d", "on-error-container": "#ffdad6", "primary-fixed": "#e1e0ff", "on-secondary": "#003732", "surface-dim": "#0b1326", "primary-container": "#8083ff", "surface-container-low": "#131b2e", "status-info": "#38BDF8", "primary-fixed-dim": "#c0c1ff", "on-surface-variant": "#c7c4d7", "tertiary-container": "#ca8100", "status-warning": "#F59E0B", "error": "#ffb4ab", "tertiary-fixed": "#ffddb8", "surface-container": "#171f33", "secondary-fixed-dim": "#6bd8cb", "surface-variant": "#2d3449", "code-canvas": "#090D16", "outline-variant": "#464554", "inverse-primary": "#494bd6", "status-danger": "#EF4444", "primary": "#c0c1ff", "on-secondary-container": "#00302b", "on-tertiary-fixed-variant": "#653e00", "slate-border": "#475569", "status-success": "#10B981", "on-primary-fixed-variant": "#2f2ebe", "surface-container-lowest": "#060e20", "surface-container-high": "#222a3d", "error-container": "#93000a", "secondary-container": "#29a195", "on-tertiary": "#472a00", "on-error": "#690005", "inverse-surface": "#dae2fd", "slate-surface-elevated": "#334155", "accent-teal": "#14B8A6", "on-primary-container": "#0d0096", "inverse-on-surface": "#283044", "tertiary-fixed-dim": "#ffb95f" }, "borderRadius": { "DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem" }, "spacing": { "space-xl": "2.5rem", "margin-mobile": "1rem", "gutter": "1.25rem", "gutter-mobile": "0.75rem", "space-md": "1rem", "space-lg": "1.5rem", "space-sm": "0.5rem", "margin": "2rem", "space-xs": "0.25rem" }, "fontFamily": { "headline-xl": [ "Space Grotesk" ], "body-sm": [ "Inter" ], "headline-xl-mobile": [ "Space Grotesk" ], "body-lg": [ "Inter" ], "headline-sm": [ "Space Grotesk" ], "body-md": [ "Inter" ], "headline-lg": [ "Space Grotesk" ], "label-lg": [ "JetBrains Mono" ], "headline-md": [ "Space Grotesk" ], "label-md": [ "JetBrains Mono" ], "label-sm": [ "JetBrains Mono" ], "code-inline": [ "JetBrains Mono" ], "headline-lg-mobile": [ "Space Grotesk" ] }, "fontSize": { "headline-xl": [ "40px", { "lineHeight": "48px", "letterSpacing": "-0.02em", "fontWeight": "700" } ], "body-sm": [ "12px", { "lineHeight": "18px", "fontWeight": "400" } ], "headline-xl-mobile": [ "30px", { "lineHeight": "38px", "letterSpacing": "-0.01em", "fontWeight": "700" } ], "body-lg": [ "16px", { "lineHeight": "24px", "fontWeight": "400" } ], "headline-sm": [ "18px", { "lineHeight": "26px", "fontWeight": "600" } ], "body-md": [ "14px", { "lineHeight": "20px", "fontWeight": "400" } ], "headline-lg": [ "32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "600" } ], "label-lg": [ "14px", { "lineHeight": "20px", "fontWeight": "500" } ], "headline-md": [ "24px", { "lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600" } ], "label-md": [ "12px", { "lineHeight": "16px", "letterSpacing": "0.04em", "fontWeight": "500" } ], "label-sm": [ "11px", { "lineHeight": "14px", "letterSpacing": "0.06em", "fontWeight": "500" } ], "code-inline": [ "13px", { "lineHeight": "18px", "fontWeight": "400" } ], "headline-lg-mobile": [ "24px", { "lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600" } ] } } } };</script></head><body class="bg-background font-body-md text-body-md text-on-surface antialiased"><aside class="fixed left-0 top-0 h-full w-72 bg-surface-container-low shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-50 flex flex-col justify-between py-6"><div class="flex flex-col gap-6 px-4"><div class="flex items-center gap-3 px-3 py-1"><div class="w-2 h-2 rounded-full bg-secondary animate-pulse"></div><span class="font-label-sm text-label-sm tracking-wider uppercase text-outline">İstatistik Çekirdeği v4.2</span></div><nav class="flex flex-col gap-1.5" data-active-classes="bg-primary-container text-on-primary-container font-semibold rounded-lg"><a class="flex items-center gap-3 px-3.5 py-3 rounded-lg font-body-md text-body-md text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" data-path="karar-sihirbazi-varsayim-kontrolu" href="#"><span class="material-symbols-outlined text-xl text-primary">account_tree</span><span>Karar Sihirbazı &amp; Varsayım</span></a><a aria-current="page" class="flex items-center gap-3 px-3.5 py-3 transition-all bg-primary-container text-on-primary-container font-semibold rounded-lg" data-path="model-karsilastirma-paneli" href="#"><span class="material-symbols-outlined text-xl text-secondary">compare_arrows</span><span>Model Karşılaştırma</span></a><a class="flex items-center gap-3 px-3.5 py-3 rounded-lg font-body-md text-body-md text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" data-path="veri-kalitesi-aykiri-degerler" href="#"><span class="material-symbols-outlined text-xl text-tertiary">analytics</span><span>Veri Kalitesi &amp; Aykırılık</span></a><a class="flex items-center gap-3 px-3.5 py-3 rounded-lg font-body-md text-body-md text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" data-path="kod-rapor-merkezi" href="#"><span class="material-symbols-outlined text-xl text-status-info">code</span><span>Kod &amp; Rapor Merkezi</span></a></nav></div><div class="px-4 flex flex-col gap-3"><div class="bg-surface-container-lowest p-3.5 rounded-lg"><div class="flex items-center justify-between mb-1.5"><span class="font-label-sm text-label-sm text-outline">Doğrulama Durumu</span><span class="inline-flex items-center gap-1 font-label-sm text-label-sm text-status-success"><span class="w-1.5 h-1.5 rounded-full bg-status-success"></span>Geçerli</span></div><p class="font-body-sm text-body-sm text-on-surface-variant">Normallik (Shapiro-Wilk) ve Levene testleri senkronize edildi.</p></div><div class="flex items-center justify-between px-2 pt-2 text-outline font-label-sm text-label-sm"><span>PyTorch / SciPy Stats</span><span class="material-symbols-outlined text-base">verified</span></div></div></aside><div class="pl-72"><header class="fixed top-0 left-72 right-0 h-16 bg-surface/80 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-40 flex items-center justify-between px-8"><div class="flex items-center gap-4"><img alt="StatAdvisor Logo" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1Xxk2bhqBn9A3-AR6f7W3FPccefdxTfuGr1C_TRR3Cy3D2OTDh0KR-3KOKeIzYMRAfqUboRsM7WXQqD9QKOHnP2v1i-Q2klSjJHqhr7miHCRNdxSKpjoQZrhrUkI_khprrri9O3xZ_KnyCMSGZbzhCr42_gwV4H6LcC-vg8ymUNGeJO5hDGMBA73zQZoNljDQBdluBNtIKa6WU9xuimiyYRMdT1S_1iol8MS6Cb95sc7KI5zrMI702OoNN-"/><div class="flex flex-col"><span class="font-headline-sm text-headline-sm tracking-tight text-on-surface font-semibold">StatAdvisor AI</span></div><div class="h-5 w-px bg-outline-variant mx-1"></div><div class="flex items-center gap-2 bg-surface-container px-3 py-1.5 rounded-lg"><span class="material-symbols-outlined text-secondary text-base">folder_open</span><span class="font-label-sm text-label-sm text-on-surface font-medium">Klinik_Veri_Faz3.csv</span><span class="material-symbols-outlined text-outline text-sm">unfold_more</span></div></div><div class="flex items-center gap-5"><div class="flex items-center bg-surface-container-lowest p-1 rounded-full"><button class="px-3 py-1 rounded-full font-label-sm text-label-sm font-medium bg-surface-container-high text-on-surface transition-colors shadow-sm" type="button">Yeni Başlayan</button><button class="px-3 py-1 rounded-full font-label-sm text-label-sm text-on-surface-variant hover:text-on-surface transition-colors" type="button">Uzman</button></div><div class="flex items-center gap-3 pl-2"><button class="flex items-center justify-center w-9 h-9 rounded-lg bg-surface-container-low text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors" type="button"><span class="material-symbols-outlined text-lg">notifications</span></button><button class="flex items-center justify-center w-9 h-9 rounded-lg bg-surface-container-low text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors" type="button"><span class="material-symbols-outlined text-lg">terminal</span></button><img alt="Profile" class="w-8 h-8 rounded-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB2OM69fmJ9Elp5ggTDYb1IaKH3_ARRmfmQUNQ2CIklLD1YYUYGtMDseMTCqCsO_difwVfUKfW-4sfeQfi6aS72taJUcDdY2PWyURxaI6hHlcQmbbSKsjJR1E4ILBbJbpmmVrXPDLs9YgqICqElhjoicKHzr9Uogx5-Y7_xWk3uJv1vJDHi3VT3ZRxV6EwJtTyRPaB2DK85LPGeVGZ_BYPSf6NhL3nL1OyKVd1ITjt67zC3dIlAHBAbeg"/></div></div></header><main class="relative pt-16 bg-background w-full min-h-screen px-8 py-6"><div class="flex flex-col w-full">
+<!-- Dynamic Notification / Top Breadcrumb Bar -->
+<section class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 pb-6">
+<div class="flex flex-col gap-1">
+<div class="flex items-center gap-2">
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-secondary flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-secondary"></span>
+          Özellik 06 &amp; 07 Değerlendirme Çekirdeği
+        </span>
+<span class="text-outline-variant font-label-sm text-label-sm">/</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant font-mono">Klinik_Faz3_Sonuc.parquet</span>
+</div>
+<h1 class="font-headline-lg text-headline-lg text-on-surface tracking-tight">
+        Model Karşılaştırma &amp; Analitik Tuzak Radarı
+      </h1>
+<p class="font-body-md text-body-md text-on-surface-variant max-w-2xl">
+        Tek bir mutlak doğru model yoktur. Yorumlanabilirlik, hız ve hata toleransı dengesini değerlendirin; veri kümenizdeki kritik istatistiksel tuzakları kırmızı bayraklarla eleyin.
+      </p>
+</div>
+<div class="flex items-center gap-3">
+<div class="bg-surface-container-low p-2 rounded-lg flex items-center gap-2 shadow-sm">
+<span class="material-symbols-outlined text-status-warning text-lg">flag</span>
+<div class="flex flex-col pr-2">
+<span class="font-label-sm text-label-sm text-outline">Aktif Tuzak Riski</span>
+<span class="font-label-md text-label-md text-status-warning font-semibold">3 Kritik Kırmızı Bayrak</span>
+</div>
+</div>
+<button class="flex items-center gap-2 bg-primary-container text-on-primary-container px-4 py-2.5 rounded-lg font-label-md text-label-md transition-all shadow-md hover:opacity-90 active:scale-95" id="runAllAuditBtn" type="button">
+<span class="material-symbols-outlined text-base">auto_fix_high</span>
+<span>Otomatik Düzeltmeleri Uygula</span>
+</button>
+</div>
+</section>
+<!-- Human Language AI Diagnostic Callout (Özellik 03 & 06 Sentezi) -->
+<section class="mb-6 relative overflow-hidden bg-gradient-to-r from-surface-container-high via-surface-container to-surface-container-high rounded-xl p-5 shadow-lg">
+<div class="absolute -right-12 -top-12 w-48 h-48 bg-tertiary-container/10 rounded-full blur-2xl pointer-events-none"></div>
+<div class="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5 relative z-10">
+<div class="flex items-start gap-4">
+<div class="flex items-center justify-center w-12 h-12 rounded-xl bg-tertiary/15 text-tertiary shrink-0">
+<span class="material-symbols-outlined text-2xl">neurology</span>
+</div>
+<div class="flex flex-col gap-1">
+<div class="flex items-center gap-2">
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-tertiary font-semibold">İnsan Dilinde Analitik Yorum</span>
+<span class="px-2 py-0.5 rounded text-[10px] font-label-sm bg-error-container/40 text-error font-medium">Kritik Sınıf Zayıflığı</span>
+</div>
+<p class="font-headline-sm text-headline-sm text-on-surface font-semibold tracking-tight">
+            “F1 (azınlık) = 0.42: Modeliniz azınlık sınıfını tahmin etmekte zorlanıyor.”
+          </p>
+<p class="font-body-sm text-body-sm text-on-surface-variant max-w-3xl">
+            Genel doğruluk (%89 - %91) yanıltıcıdır. Hedef etiketiniz %92 / %8 oranında dengesiz olduğundan, model negatif grubu tahmin etmeye aşırı odaklanmış ve klinik açıdan hayati olan pozitif vakaları kaçırmaktadır.
+          </p>
+</div>
+</div>
+<div class="flex items-center gap-3 shrink-0 self-end lg:self-center">
+<div class="bg-surface-container-lowest px-3 py-2 rounded-lg flex flex-col text-right">
+<span class="font-label-sm text-label-sm text-outline">Azınlık Sınıf Desteği</span>
+<span class="font-label-md text-label-md text-error font-mono font-bold">142 / 1.775 Vaka</span>
+</div>
+<a class="bg-surface-bright text-on-surface px-4 py-2.5 rounded-lg font-label-md text-label-md flex items-center gap-2 hover:bg-surface-variant transition-colors" href="#pitfalls-section">
+<span>Tuzakları Çöz</span>
+<span class="material-symbols-outlined text-sm">arrow_downward</span>
+</a>
+</div>
+</div>
+</section>
+<!-- Section 1: Karşılaştırmalı Model Paneli (Özellik 07) -->
+<section class="mb-8 flex flex-col gap-4">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-3">
+<span class="flex items-center justify-center w-7 h-7 rounded-lg bg-primary/10 text-primary font-headline-sm text-headline-sm">07</span>
+<div>
+<h2 class="font-headline-md text-headline-md text-on-surface">Karşılaştırmalı Model Paneli</h2>
+<span class="font-body-sm text-body-sm text-on-surface-variant">“Tek bir en iyi yok: artılar ve eksiler yan yana”</span>
+</div>
+</div>
+<div class="flex items-center gap-2 bg-surface-container-low px-3 py-1.5 rounded-lg">
+<span class="material-symbols-outlined text-outline text-base">tune</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Optimizasyon Hedefi:</span>
+<span class="font-label-sm text-label-sm text-secondary font-semibold">Dengeli F1 &amp; Yorumlanabilirlik</span>
+</div>
+</div>
+<!-- Triple Model Cards Grid -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+<!-- Card 1: Lojistik Regresyon -->
+<div class="bg-surface-container rounded-xl p-5 flex flex-col justify-between shadow-md hover:shadow-xl transition-all relative overflow-hidden group">
+<div class="flex flex-col gap-4">
+<div class="flex items-start justify-between">
+<div>
+<span class="font-label-sm text-label-sm text-outline uppercase font-mono">Parametrik Temel</span>
+<h3 class="font-headline-sm text-headline-sm text-on-surface font-bold">Lojistik Regresyon</h3>
+</div>
+<span class="px-2.5 py-1 rounded-full font-label-sm text-label-sm bg-surface-container-highest text-on-surface-variant font-mono">
+              Doğruluk: %78
+            </span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+            Yüksek şeffaflık ve katsayı analizi. Tıp ve regülasyona tabi araştırmalarda ilk tercih, ancak doğrusal olmayan ilişkilerde düşük kapasite.
+          </p>
+<!-- Metrics Bars -->
+<div class="flex flex-col gap-3 pt-2">
+<div>
+<div class="flex justify-between font-label-sm text-label-sm mb-1">
+<span class="text-on-surface-variant flex items-center gap-1.5">
+<span class="material-symbols-outlined text-xs text-status-success">bolt</span>
+                  İşlem Hızı
+                </span>
+<span class="text-on-surface font-mono font-semibold">95 / 100</span>
+</div>
+<div class="w-full h-1.5 bg-surface-container-lowest rounded-full overflow-hidden">
+<div class="h-full bg-status-success rounded-full" style="width: 95%;"></div>
+</div>
+</div>
+<div>
+<div class="flex justify-between font-label-sm text-label-sm mb-1">
+<span class="text-on-surface-variant flex items-center gap-1.5">
+<span class="material-symbols-outlined text-xs text-status-info">visibility</span>
+                  Yorumlanabilirlik
+                </span>
+<span class="text-on-surface font-mono font-semibold">95 / 100</span>
+</div>
+<div class="w-full h-1.5 bg-surface-container-lowest rounded-full overflow-hidden">
+<div class="h-full bg-status-info rounded-full" style="width: 95%;"></div>
+</div>
+</div>
+<div>
+<div class="flex justify-between font-label-sm text-label-sm mb-1">
+<span class="text-on-surface-variant flex items-center gap-1.5">
+<span class="material-symbols-outlined text-xs text-tertiary">target</span>
+                  Doğruluk Skoru
+                </span>
+<span class="text-on-surface font-mono font-semibold">78 / 100 (%78)</span>
+</div>
+<div class="w-full h-1.5 bg-surface-container-lowest rounded-full overflow-hidden">
+<div class="h-full bg-tertiary rounded-full" style="width: 78%;"></div>
+</div>
+</div>
+</div>
+</div>
+<div class="pt-6 mt-4 flex items-center justify-between">
+<div class="flex items-center gap-1.5 font-label-sm text-label-sm text-outline">
+<span>ROC AUC:</span>
+<span class="text-on-surface font-mono font-bold">0.81</span>
+</div>
+<button class="px-3 py-1.5 rounded-lg bg-surface-container-high text-on-surface text-label-sm font-label-sm hover:bg-surface-bright transition-colors" type="button">
+            Katsayıları İncele
+          </button>
+</div>
+</div>
+<!-- Card 2: Random Forest (Önerilen) -->
+<div class="bg-surface-container-high rounded-xl p-5 flex flex-col justify-between shadow-xl relative overflow-hidden group">
+<!-- Pinned Recommended Badge -->
+<div class="absolute top-0 right-0">
+<div class="bg-secondary text-on-secondary px-3.5 py-1 rounded-bl-lg font-label-sm text-label-sm font-semibold flex items-center gap-1 shadow-md">
+<span>★ Dengeli Seçim - Önerilen</span>
+</div>
+</div>
+<div class="flex flex-col gap-4">
+<div class="flex items-start justify-between pr-32">
+<div>
+<span class="font-label-sm text-label-sm text-secondary uppercase font-mono tracking-wider font-semibold">Topluluk (Ensemble)</span>
+<h3 class="font-headline-sm text-headline-sm text-on-surface font-bold">Random Forest</h3>
+</div>
+</div>
+<div class="inline-flex items-center gap-2 bg-surface-container-lowest/80 px-2.5 py-1 rounded-lg w-fit">
+<span class="w-2 h-2 rounded-full bg-status-success"></span>
+<span class="font-label-sm text-label-sm text-on-surface font-mono">Doğruluk: %89 · F1-Ağırlıklı: 0.88</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+            Doğrusalsızlıkları ve etkileşimleri otomatik yakalar, aşırı öğrenmeye karşı dirençlidir. Hem açıklanabilir özellik önemi (SHAP) sunar hem de yüksek kararlılık sağlar.
+          </p>
+<!-- Metrics Bars -->
+<div class="flex flex-col gap-3 pt-2">
+<div>
+<div class="flex justify-between font-label-sm text-label-sm mb-1">
+<span class="text-on-surface-variant flex items-center gap-1.5">
+<span class="material-symbols-outlined text-xs text-status-success">bolt</span>
+                  İşlem Hızı
+                </span>
+<span class="text-on-surface font-mono font-semibold">62 / 100</span>
+</div>
+<div class="w-full h-1.5 bg-surface-container-lowest rounded-full overflow-hidden">
+<div class="h-full bg-status-success/80 rounded-full" style="width: 62%;"></div>
+</div>
+</div>
+<div>
+<div class="flex justify-between font-label-sm text-label-sm mb-1">
+<span class="text-on-surface-variant flex items-center gap-1.5">
+<span class="material-symbols-outlined text-xs text-status-info">visibility</span>
+                  Yorumlanabilirlik (Gini/SHAP)
+                </span>
+<span class="text-on-surface font-mono font-semibold">48 / 100</span>
+</div>
+<div class="w-full h-1.5 bg-surface-container-lowest rounded-full overflow-hidden">
+<div class="h-full bg-status-info/80 rounded-full" style="width: 48%;"></div>
+</div>
+</div>
+<div>
+<div class="flex justify-between font-label-sm text-label-sm mb-1">
+<span class="text-on-surface-variant flex items-center gap-1.5">
+<span class="material-symbols-outlined text-xs text-secondary">target</span>
+                  Doğruluk Skoru
+                </span>
+<span class="text-secondary font-mono font-semibold">89 / 100 (%89)</span>
+</div>
+<div class="w-full h-1.5 bg-surface-container-lowest rounded-full overflow-hidden">
+<div class="h-full bg-secondary rounded-full" style="width: 89%;"></div>
+</div>
+</div>
+</div>
+</div>
+<div class="pt-6 mt-4 flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="font-label-sm text-label-sm text-outline">ROC AUC:</span>
+<span class="text-secondary font-mono font-bold text-base">0.89</span>
+<span class="text-xs px-1.5 py-0.5 rounded bg-secondary/10 text-secondary font-mono">Dengeli</span>
+</div>
+<button class="px-3.5 py-1.5 rounded-lg bg-secondary text-on-secondary text-label-sm font-label-sm font-medium hover:bg-secondary-fixed transition-colors shadow-sm" type="button">
+            Modeli Seç ve Dağıt
+          </button>
+</div>
+</div>
+<!-- Card 3: XGBoost -->
+<div class="bg-surface-container rounded-xl p-5 flex flex-col justify-between shadow-md hover:shadow-xl transition-all relative overflow-hidden group">
+<div class="flex flex-col gap-4">
+<div class="flex items-start justify-between">
+<div>
+<span class="font-label-sm text-label-sm text-outline uppercase font-mono">Gradient Boosting</span>
+<h3 class="font-headline-sm text-headline-sm text-on-surface font-bold">XGBoost</h3>
+</div>
+<span class="px-2.5 py-1 rounded-full font-label-sm text-label-sm bg-primary-container/20 text-primary font-mono font-semibold">
+              Doğruluk: %91
+            </span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+            En yüksek kestirim gücü ve Kaggle şampiyonu algoritma. Ancak aşırı öğrenmeye (overfitting) karşı hassas hiper-parametre ayarı ve düzenlileştirme gerektirir.
+          </p>
+<!-- Metrics Bars -->
+<div class="flex flex-col gap-3 pt-2">
+<div>
+<div class="flex justify-between font-label-sm text-label-sm mb-1">
+<span class="text-on-surface-variant flex items-center gap-1.5">
+<span class="material-symbols-outlined text-xs text-status-success">bolt</span>
+                  İşlem Hızı (GPU Hızlandırmalı)
+                </span>
+<span class="text-on-surface font-mono font-semibold">70 / 100</span>
+</div>
+<div class="w-full h-1.5 bg-surface-container-lowest rounded-full overflow-hidden">
+<div class="h-full bg-status-success/90 rounded-full" style="width: 70%;"></div>
+</div>
+</div>
+<div>
+<div class="flex justify-between font-label-sm text-label-sm mb-1">
+<span class="text-on-surface-variant flex items-center gap-1.5">
+<span class="material-symbols-outlined text-xs text-status-info">visibility</span>
+                  Yorumlanabilirlik (Kara Kutu)
+                </span>
+<span class="text-on-surface font-mono font-semibold">35 / 100</span>
+</div>
+<div class="w-full h-1.5 bg-surface-container-lowest rounded-full overflow-hidden">
+<div class="h-full bg-status-info/60 rounded-full" style="width: 35%;"></div>
+</div>
+</div>
+<div>
+<div class="flex justify-between font-label-sm text-label-sm mb-1">
+<span class="text-on-surface-variant flex items-center gap-1.5">
+<span class="material-symbols-outlined text-xs text-primary">target</span>
+                  Doğruluk Skoru
+                </span>
+<span class="text-primary font-mono font-semibold">91 / 100 (%91)</span>
+</div>
+<div class="w-full h-1.5 bg-surface-container-lowest rounded-full overflow-hidden">
+<div class="h-full bg-primary rounded-full" style="width: 91%;"></div>
+</div>
+</div>
+</div>
+</div>
+<div class="pt-6 mt-4 flex items-center justify-between">
+<div class="flex items-center gap-1.5 font-label-sm text-label-sm text-outline">
+<span>ROC AUC:</span>
+<span class="text-primary font-mono font-bold text-base">0.91</span>
+<span class="text-xs px-1.5 py-0.5 rounded bg-primary/10 text-primary font-mono">Zirve</span>
+</div>
+<button class="px-3 py-1.5 rounded-lg bg-surface-container-high text-on-surface text-label-sm font-label-sm hover:bg-surface-bright transition-colors" type="button">
+            Hiper-parametreler
+          </button>
+</div>
+</div>
+</div>
+<!-- Comparative Visual Matrix & ROC AUC Deep-Dive -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-5 mt-2">
+<!-- Interactive Metric Matrix Table (8 cols) -->
+<div class="lg:col-span-7 bg-surface-container rounded-xl p-5 shadow-sm flex flex-col justify-between">
+<div class="flex items-center justify-between mb-4">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary text-lg">view_column</span>
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Detaylı Performans &amp; Hata Matrisi</h3>
+</div>
+<span class="font-label-sm text-label-sm text-outline font-mono">Test Örneklemi: N=1,775</span>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left font-body-sm text-body-sm">
+<thead>
+<tr class="text-outline font-label-sm text-label-sm uppercase bg-surface-container-lowest/50 rounded-lg">
+<th class="py-2.5 px-3">Algoritma</th>
+<th class="py-2.5 px-3">Hız</th>
+<th class="py-2.5 px-3">Yorum</th>
+<th class="py-2.5 px-3">Doğruluk</th>
+<th class="py-2.5 px-3">F1-Score</th>
+<th class="py-2.5 px-3">ROC AUC</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-surface-container-high/40">
+<tr class="hover:bg-surface-container-high/30 transition-colors">
+<td class="py-3 px-3 font-medium text-on-surface flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-status-info"></span>
+                  Lojistik Regresyon
+                </td>
+<td class="py-3 px-3 font-mono text-status-success font-semibold">95</td>
+<td class="py-3 px-3 font-mono text-status-info font-semibold">95</td>
+<td class="py-3 px-3 font-mono text-on-surface">%78</td>
+<td class="py-3 px-3 font-mono text-on-surface-variant">0.74</td>
+<td class="py-3 px-3 font-mono text-on-surface-variant">0.81</td>
+</tr>
+<tr class="bg-secondary/5 hover:bg-secondary/10 transition-colors">
+<td class="py-3 px-3 font-medium text-on-surface flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-secondary"></span>
+<span>Random Forest</span>
+<span class="text-secondary text-xs">★</span>
+</td>
+<td class="py-3 px-3 font-mono text-on-surface font-semibold">62</td>
+<td class="py-3 px-3 font-mono text-on-surface font-semibold">48</td>
+<td class="py-3 px-3 font-mono text-secondary font-bold">%89</td>
+<td class="py-3 px-3 font-mono text-secondary font-bold">0.87</td>
+<td class="py-3 px-3 font-mono text-secondary font-bold">0.89</td>
+</tr>
+<tr class="hover:bg-surface-container-high/30 transition-colors">
+<td class="py-3 px-3 font-medium text-on-surface flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-primary"></span>
+                  XGBoost
+                </td>
+<td class="py-3 px-3 font-mono text-on-surface font-semibold">70</td>
+<td class="py-3 px-3 font-mono text-error font-semibold">35</td>
+<td class="py-3 px-3 font-mono text-primary font-bold">%91</td>
+<td class="py-3 px-3 font-mono text-primary font-bold">0.89</td>
+<td class="py-3 px-3 font-mono text-primary font-bold">0.91</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="mt-4 pt-3 flex flex-wrap items-center justify-between gap-2 text-outline font-label-sm text-label-sm bg-surface-container-lowest p-3 rounded-lg">
+<span class="flex items-center gap-1">
+<span class="material-symbols-outlined text-sm text-status-success">check_circle</span>
+            Veri Sızıntısı (Data Leakage) taraması: Temiz
+          </span>
+<span class="font-mono text-secondary">Ağırlıklı Karar İndeksi: Random Forest +14.2% Üstün</span>
+</div>
+</div>
+<!-- ROC AUC Interactive Curve Chart (5 cols) -->
+<div class="lg:col-span-5 bg-surface-container rounded-xl p-5 shadow-sm flex flex-col justify-between">
+<div class="flex items-center justify-between mb-2">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-lg">query_stats</span>
+<h3 class="font-headline-sm text-headline-sm text-on-surface">ROC Eğrisi Önizlemesi</h3>
+</div>
+<span class="px-2 py-0.5 rounded font-label-sm text-label-sm bg-primary/10 text-primary font-mono font-bold">
+            AUC = 0.91
+          </span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mb-3">
+          XGBoost ve Random Forest, tüm Yanlış Pozitif Oranlarında (FPR) Lojistik Regresyon taban çizgisini domine ediyor.
+        </p>
+<!-- Inline SVG ROC Chart -->
+<div class="relative w-full h-44 bg-code-canvas rounded-lg p-2 flex items-center justify-center">
+<svg class="w-full h-full text-outline-variant overflow-visible" viewbox="0 0 320 180">
+<!-- Grid lines -->
+<line stroke="currentColor" stroke-opacity="0.3" stroke-width="1" x1="35" x2="35" y1="20" y2="155"></line>
+<line stroke="currentColor" stroke-opacity="0.3" stroke-width="1" x1="35" x2="305" y1="155" y2="155"></line>
+<line stroke="currentColor" stroke-dasharray="3,3" stroke-opacity="0.15" x1="35" x2="305" y1="88" y2="88"></line>
+<line stroke="currentColor" stroke-dasharray="3,3" stroke-opacity="0.15" x1="170" x2="170" y1="20" y2="155"></line>
+<!-- Random Guess Diagonal (AUC = 0.50) -->
+<line stroke="currentColor" stroke-dasharray="4,4" stroke-opacity="0.25" stroke-width="1.2" x1="35" x2="305" y1="155" y2="20"></line>
+<!-- Logistic Regression Curve (AUC = 0.81) -->
+<path d="M 35 155 Q 70 70, 130 50 T 305 20" fill="none" stroke="#38BDF8" stroke-opacity="0.75" stroke-width="1.8"></path>
+<!-- Random Forest Curve (AUC = 0.89) -->
+<path d="M 35 155 Q 50 45, 110 32 T 305 20" fill="none" stroke="#6bd8cb" stroke-width="2.2"></path>
+<!-- XGBoost Curve (AUC = 0.91) -->
+<path d="M 35 155 Q 42 32, 95 25 T 305 20" fill="none" stroke="#c0c1ff" stroke-dasharray="5,2" stroke-width="2.2"></path>
+<!-- Point Marker for Optimal Operating Threshold -->
+<circle class="animate-pulse" cx="95" cy="25" fill="#c0c1ff" r="4"></circle>
+<text fill="#c0c1ff" font-family="JetBrains Mono" font-size="9" font-weight="600" x="105" y="24">Thr: 0.44</text>
+<!-- Axis Labels -->
+<text fill="#908fa0" font-family="JetBrains Mono" font-size="9" x="35" y="172">0.0 (FPR)</text>
+<text fill="#908fa0" font-family="JetBrains Mono" font-size="9" x="270" y="172">1.0</text>
+<text fill="#908fa0" font-family="JetBrains Mono" font-size="9" x="12" y="25">1.0</text>
+<text fill="#908fa0" font-family="JetBrains Mono" font-size="9" x="12" y="155">0.0</text>
+</svg>
+</div>
+<!-- Legend -->
+<div class="flex items-center justify-between pt-3 font-label-sm text-label-sm text-outline">
+<div class="flex items-center gap-1.5">
+<span class="w-2.5 h-0.5 bg-status-info"></span>
+<span>Lojistik (0.81)</span>
+</div>
+<div class="flex items-center gap-1.5">
+<span class="w-2.5 h-0.5 bg-secondary"></span>
+<span class="text-secondary font-medium">RF (0.89)</span>
+</div>
+<div class="flex items-center gap-1.5">
+<span class="w-2.5 h-0.5 bg-primary"></span>
+<span class="text-primary font-medium">XGB (0.91)</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Section 2: Tuzak Uyarıları & Kırmızı Bayraklar (Özellik 05 & 06) -->
+<section class="mb-8 flex flex-col gap-4" id="pitfalls-section">
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-2">
+<div class="flex items-center gap-3">
+<span class="flex items-center justify-center w-7 h-7 rounded-lg bg-status-danger/15 text-error font-headline-sm text-headline-sm">06</span>
+<div>
+<h2 class="font-headline-md text-headline-md text-on-surface">Tuzak Uyarıları &amp; Kırmızı Bayraklar</h2>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Doğru görselleştirme, istatistiksel geçerlilik kontrolleri ve zamanında müdahale</span>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<span class="px-2.5 py-1 rounded-full font-label-sm text-label-sm bg-error-container/30 text-error flex items-center gap-1.5 font-medium">
+<span class="w-2 h-2 rounded-full bg-error animate-ping"></span>
+          Kritik Hata Seviyesi: Yüksek
+        </span>
+</div>
+</div>
+<!-- Red Flag Cards Stack -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+<!-- Tuzak 1: Çoklu Karşılaştırma Riski -->
+<div class="bg-surface-container rounded-xl p-5 flex flex-col justify-between shadow-md relative overflow-hidden transition-all duration-300" id="card-bonferroni">
+<div class="flex flex-col gap-3">
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-2">
+<span class="text-xl">🚩</span>
+<span class="font-label-sm text-label-sm text-error uppercase font-bold tracking-wider">Kırmızı Bayrak 01</span>
+</div>
+<span class="px-2 py-0.5 rounded text-[11px] font-label-sm bg-surface-container-highest text-outline font-mono">Tip I Hata Riski</span>
+</div>
+<h3 class="font-headline-sm text-headline-sm text-on-surface font-semibold">
+            Çoklu Karşılaştırma Riski (p-hacking)
+          </h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+            Aynı veri seti üzerinde eş zamanlı 14 alt grup hipotez testi yürütülüyor. Düzeltilmemiş α = 0.05 değeriyle yanlış pozitif (Family-wise Error) bulma olasılığınız <strong>%51.2</strong> seviyesine ulaştı.
+          </p>
+<div class="bg-surface-container-lowest p-3 rounded-lg flex items-center gap-3">
+<span class="material-symbols-outlined text-secondary text-lg">lightbulb</span>
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm text-outline">Önerilen Çözüm:</span>
+<span class="font-body-sm text-body-sm text-on-surface font-medium">α / k Bonferroni veya Holm-Bonferroni düzeltmesi uygula</span>
+</div>
+</div>
+</div>
+<div class="pt-5 mt-4">
+<button class="w-full flex items-center justify-center gap-2 bg-primary text-on-primary py-2.5 px-4 rounded-lg font-label-md text-label-md hover:bg-primary-fixed transition-all active:scale-98" id="applyBonferroniBtn" type="button">
+<span class="material-symbols-outlined text-base">rule</span>
+<span id="bonferroniBtnText">Bonferroni Düzeltmesi Uygula</span>
+</button>
+</div>
+</div>
+<!-- Tuzak 2: Dengesiz Veri Seti -->
+<div class="bg-surface-container rounded-xl p-5 flex flex-col justify-between shadow-md relative overflow-hidden transition-all duration-300" id="card-smote">
+<div class="flex flex-col gap-3">
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-2">
+<span class="text-xl">🚩</span>
+<span class="font-label-sm text-label-sm text-error uppercase font-bold tracking-wider">Kırmızı Bayrak 02</span>
+</div>
+<span class="px-2 py-0.5 rounded text-[11px] font-label-sm bg-surface-container-highest text-outline font-mono">Sınıf Dengesizliği</span>
+</div>
+<h3 class="font-headline-sm text-headline-sm text-on-surface font-semibold">
+            Dengesiz Veri Seti (%92 / %8)
+          </h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+            Sınıflar arasındaki sert dengesizlik modelin azınlık sınıfını tamamen yok sayarak %92 yalancı doğruluğa ulaşmasına yol açıyor. F1 azınlık skoru 0.42 seviyesinde kilitlenmiştir.
+          </p>
+<div class="bg-surface-container-lowest p-3 rounded-lg flex items-center gap-3">
+<span class="material-symbols-outlined text-secondary text-lg">science</span>
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm text-outline">Önerilen Çözüm:</span>
+<span class="font-body-sm text-body-sm text-on-surface font-medium">SMOTE veya ADASYN ile sentetik yeniden örnekleme</span>
+</div>
+</div>
+</div>
+<div class="pt-5 mt-4">
+<button class="w-full flex items-center justify-center gap-2 bg-secondary text-on-secondary py-2.5 px-4 rounded-lg font-label-md text-label-md hover:bg-secondary-fixed transition-all active:scale-98" id="applySmoteBtn" type="button">
+<span class="material-symbols-outlined text-base">balance</span>
+<span id="smoteBtnText">SMOTE ile Sınıfları Dengele</span>
+</button>
+</div>
+</div>
+<!-- Tuzak 3: Aşırı Öğrenme (Overfitting) -->
+<div class="bg-surface-container rounded-xl p-5 flex flex-col justify-between shadow-md relative overflow-hidden transition-all duration-300" id="card-kfold">
+<div class="flex flex-col gap-3">
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-2">
+<span class="text-xl">🚩</span>
+<span class="font-label-sm text-label-sm text-error uppercase font-bold tracking-wider">Kırmızı Bayrak 03</span>
+</div>
+<span class="px-2 py-0.5 rounded text-[11px] font-label-sm bg-surface-container-highest text-outline font-mono">Genellenebilirlik</span>
+</div>
+<h3 class="font-headline-sm text-headline-sm text-on-surface font-semibold">
+            Aşırı Öğrenme (Overfitting) İhtimali
+          </h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+            Eğitim Doğruluğu: <strong>%99.1</strong> | Test Doğruluğu: <strong>%79.4</strong>. Aradaki %19.7 uçurum, modelin gürültüyü ezberlediğini ve yeni hastalarda genellenemeyeceğini kanıtlıyor.
+          </p>
+<div class="bg-surface-container-lowest p-3 rounded-lg flex items-center gap-3">
+<span class="material-symbols-outlined text-secondary text-lg">restart_alt</span>
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm text-outline">Önerilen Çözüm:</span>
+<span class="font-body-sm text-body-sm text-on-surface font-medium">5-Katlı Tabakalı Çapraz Doğrulama (Stratified K-Fold CV)</span>
+</div>
+</div>
+</div>
+<div class="pt-5 mt-4">
+<button class="w-full flex items-center justify-center gap-2 bg-primary-container text-on-primary-container py-2.5 px-4 rounded-lg font-label-md text-label-md hover:opacity-90 transition-all active:scale-98" id="applyKfoldBtn" type="button">
+<span class="material-symbols-outlined text-base">shuffle</span>
+<span id="kfoldBtnText">5-Katlı Çapraz Doğrulama Çalıştır</span>
+</button>
+</div>
+</div>
+</div>
+</section>
+<!-- Interactive Live Simulation & Code Synthesis Preview Panel -->
+<section class="bg-surface-container-low rounded-xl p-6 shadow-md mb-8 flex flex-col gap-6">
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+<div class="flex items-center gap-3">
+<div class="w-3 h-3 rounded-full bg-status-success animate-pulse"></div>
+<div>
+<h3 class="font-headline-sm text-headline-sm text-on-surface font-semibold">Düzeltme &amp; Karar Simülasyon Çekirdeği</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Kırmızı bayraklar çözüldükçe canlı metrik sapması ve Scikit-learn işlem boru hattı</p>
+</div>
+</div>
+<!-- Real-time dynamic status badge -->
+<div class="flex items-center gap-2 bg-surface-container-lowest px-4 py-2 rounded-lg" id="sim-status-banner">
+<span class="material-symbols-outlined text-status-warning text-base">warning</span>
+<span class="font-label-sm text-label-sm text-on-surface font-mono">Düzeltmeler Bekleniyor: 0 / 3 Uygulandı</span>
+</div>
+</div>
+<!-- Code Synthesis Frame -->
+<div class="bg-code-canvas rounded-lg overflow-hidden shadow-inner flex flex-col">
+<div class="bg-surface-container-high px-4 py-2.5 flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></span>
+<span class="w-2.5 h-2.5 rounded-full bg-amber-500/80"></span>
+<span class="w-2.5 h-2.5 rounded-full bg-emerald-500/80"></span>
+<span class="font-label-sm text-label-sm text-outline font-mono ml-2">pipeline_model_auditor.py</span>
+</div>
+<div class="flex items-center gap-3">
+<span class="font-label-sm text-label-sm text-secondary font-mono">Python 3.11 · Scikit-Learn · Imbalanced-Learn</span>
+<button class="flex items-center gap-1.5 px-2.5 py-1 rounded bg-surface-bright text-on-surface hover:text-secondary text-label-sm font-label-sm transition-colors" id="copyCodeBtn" type="button">
+<span class="material-symbols-outlined text-sm">content_copy</span>
+<span id="copyBtnText">Kodu Kopyala</span>
+</button>
+</div>
+</div>
+<pre class="p-4 overflow-x-auto text-on-surface font-code-inline text-code-inline leading-relaxed"><code id="codeBlockText"><span class="text-outline"># 1. Aşama: Veri Dengesizliğini Çöz (SMOTE) &amp; Stratified 5-Fold</span>
+<span class="text-secondary">from</span> imblearn.over_sampling <span class="text-secondary">import</span> SMOTE
+<span class="text-secondary">from</span> sklearn.model_selection <span class="text-secondary">import</span> StratifiedKFold, cross_val_score
+<span class="text-secondary">from</span> statsmodels.stats.multitest <span class="text-secondary">import</span> multipletests
+
+<span class="text-outline"># Kırmızı Bayrak 02 Çözümü: Sentetik Azınlık Dengeleme</span>
+smote = SMOTE(sampling_strategy=<span class="text-tertiary">0.5</span>, random_state=<span class="text-tertiary">42</span>)
+X_resampled, y_resampled = smote.fit_resample(X_train, y_train)
+
+<span class="text-outline"># Kırmızı Bayrak 01 Çözümü: Bonferroni p-düzeltmesi</span>
+reject, pvals_corrected, _, _ = multipletests(p_values, alpha=<span class="text-tertiary">0.05</span>, method=<span class="text-primary-container">'bonferroni'</span>)
+
+<span class="text-outline"># Kırmızı Bayrak 03 Çözümü: K-Fold Çapraz Doğrulama Skoru</span>
+cv = StratifiedKFold(n_splits=<span class="text-tertiary">5</span>, shuffle=<span class="text-tertiary">True</span>, random_state=<span class="text-tertiary">42</span>)
+scores = cross_val_score(rf_model, X_resampled, y_resampled, cv=cv, scoring=<span class="text-primary-container">'f1_weighted'</span>)
+<span class="text-status-info">print</span>(f<span class="text-secondary-fixed">"Sağlamlaştırılmış CV F1-Skoru: {scores.mean():.3f} (± {scores.std():.3f})"</span>)</code></pre>
+</div>
+</section>
+<!-- Contextual Footer Actions -->
+<section class="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2 pb-6 text-on-surface-variant font-body-sm text-body-sm">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-base text-status-success">verified_user</span>
+<span>Tüm algoritmik modeller ve varsayım testleri IEEE / APA Klinik Standartlarına uygundur.</span>
+</div>
+<div class="flex items-center gap-3">
+<button class="px-3.5 py-1.5 rounded-lg bg-surface-container text-on-surface hover:bg-surface-bright transition-colors font-label-sm text-label-sm" type="button">
+        Raporu PDF Olarak İndir (APA)
+      </button>
+<button class="px-4 py-1.5 rounded-lg bg-primary-container text-on-primary-container hover:opacity-90 transition-opacity font-label-sm text-label-sm font-semibold" type="button">
+        Modeli Üretime Aktar
+      </button>
+</div>
+</section>
+</div>
+<script>
+  // Micro-interactions and real-time state simulation
+  let fixes = {
+    bonferroni: false,
+    smote: false,
+    kfold: false
+  };
+
+  const bonferroniBtn = document.getElementById('applyBonferroniBtn');
+  const smoteBtn = document.getElementById('applySmoteBtn');
+  const kfoldBtn = document.getElementById('applyKfoldBtn');
+  const runAllBtn = document.getElementById('runAllAuditBtn');
+  const statusBanner = document.getElementById('sim-status-banner');
+  const copyBtn = document.getElementById('copyCodeBtn');
+
+  function updateStatusBanner() {
+    const total = Object.values(fixes).filter(Boolean).length;
+    if (total === 3) {
+      statusBanner.innerHTML = `
+        <span class="material-symbols-outlined text-status-success text-base">check_circle</span>
+        <span class="font-label-sm text-label-sm text-status-success font-mono font-bold">Tüm Riskler Çözüldü: 3 / 3 Uygulandı (Sağlamlaştı)</span>
+      `;
+    } else {
+      statusBanner.innerHTML = `
+        <span class="material-symbols-outlined text-status-warning text-base">warning</span>
+        <span class="font-label-sm text-label-sm text-on-surface font-mono">Düzeltmeler Bekleniyor: ${total} / 3 Uygulandı</span>
+      `;
+    }
+  }
+
+  bonferroniBtn?.addEventListener('click', () => {
+    fixes.bonferroni = true;
+    bonferroniBtn.classList.remove('bg-primary', 'text-on-primary');
+    bonferroniBtn.classList.add('bg-status-success', 'text-on-secondary');
+    bonferroniBtn.innerHTML = '<span class="material-symbols-outlined text-base">done</span><span>Uygulandı (α = 0.0035)</span>';
+    const card = document.getElementById('card-bonferroni');
+    if (card) {
+      card.classList.add('bg-surface-container-high');
+    }
+    updateStatusBanner();
+  });
+
+  smoteBtn?.addEventListener('click', () => {
+    fixes.smote = true;
+    smoteBtn.classList.remove('bg-secondary', 'text-on-secondary');
+    smoteBtn.classList.add('bg-status-success', 'text-on-secondary');
+    smoteBtn.innerHTML = '<span class="material-symbols-outlined text-base">done</span><span>Dengelendi (F1: 0.42 → 0.81)</span>';
+    const card = document.getElementById('card-smote');
+    if (card) {
+      card.classList.add('bg-surface-container-high');
+    }
+    updateStatusBanner();
+  });
+
+  kfoldBtn?.addEventListener('click', () => {
+    fixes.kfold = true;
+    kfoldBtn.classList.remove('bg-primary-container', 'text-on-primary-container');
+    kfoldBtn.classList.add('bg-status-success', 'text-on-secondary');
+    kfoldBtn.innerHTML = '<span class="material-symbols-outlined text-base">done</span><span>K-Fold Doğrulandı (Skor: 0.882)</span>';
+    const card = document.getElementById('card-kfold');
+    if (card) {
+      card.classList.add('bg-surface-container-high');
+    }
+    updateStatusBanner();
+  });
+
+  runAllBtn?.addEventListener('click', () => {
+    bonferroniBtn?.click();
+    smoteBtn?.click();
+    kfoldBtn?.click();
+  });
+
+  copyBtn?.addEventListener('click', () => {
+    const code = document.getElementById('codeBlockText')?.innerText || '';
+    navigator.clipboard?.writeText(code).then(() => {
+      const btnText = document.getElementById('copyBtnText');
+      if (btnText) btnText.textContent = 'Kopyalandı!';
+      setTimeout(() => {
+        if (btnText) btnText.textContent = 'Kodu Kopyala';
+      }, 2000);
+    }).catch(() => {
+      const btnText = document.getElementById('copyBtnText');
+      if (btnText) btnText.textContent = 'Kopyalandı!';
+    });
+  });
+</script></main></div></body></html>
