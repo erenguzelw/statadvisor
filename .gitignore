@@ -8,5 +8,5 @@ tools/reference/.venv/
 tools/reference/.install.log
 __pycache__/
 *.pyc
-data/
+apps/api/.data/
 !packages/shared/fixtures/
