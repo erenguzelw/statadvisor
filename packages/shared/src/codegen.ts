@@ -9,6 +9,10 @@ export interface DatasetFile {
   fileName: string;
   delimiter: string;
   decimalComma: boolean;
+  /** "2:Etiket" biçiminde kodlu sütunlar; betik baştaki sayıyı alır. */
+  prefixCoded?: string[];
+  /** Aralık etiketli sıralı sütunlar: ad → küçükten büyüğe etiketler (betik sıra numarasına çevirir). */
+  rankCoded?: Record<string, string[]>;
 }
 
 /** Sunucuya gönderilen (normalleştirilmiş) analiz isteği. */
@@ -50,7 +54,21 @@ const sym = (s: string) => ASCII_SYMBOL[s] ?? s;
 const NA_VALUES = ['', 'na', 'NA', 'n/a', 'N/A', 'nan', 'NaN', 'NAN', 'null', 'NULL', 'none', 'None', '-', '?', '#N/A'];
 
 export function readCsvLine(file: DatasetFile): string {
-  return `df = pd.read_csv(${py(file.fileName)}, sep=${py(file.delimiter)}, decimal=${py(file.decimalComma ? ',' : '.')}, na_values=NA_DEGERLERI, keep_default_na=False)`;
+  const read = `df = pd.read_csv(${py(file.fileName)}, sep=${py(file.delimiter)}, decimal=${py(file.decimalComma ? ',' : '.')}, na_values=NA_DEGERLERI, keep_default_na=False)`;
+  const lines = [read];
+  if (file.prefixCoded?.length) {
+    lines.push(
+      `KODLU = ${pyList(file.prefixCoded)}  # "2:Bazen katılıyorum" gibi etiketlerin baştaki sayısı alınır`,
+      'for s in KODLU:',
+      '    df[s] = pd.to_numeric(df[s].astype("string").str.extract(r"^\\s*(-?\\d+)\\s*:")[0], errors="coerce")',
+    );
+  }
+  const ranks = Object.entries(file.rankCoded ?? {});
+  if (ranks.length) {
+    lines.push(`SIRALI = {${ranks.map(([k, v]) => `${py(k)}: ${pyList(v)}`).join(', ')}}  # aralık etiketleri küçükten büyüğe sıra numarası alır`);
+    lines.push('for s, etiketler in SIRALI.items():', '    df[s] = df[s].astype("string").str.strip().map({e: i for i, e in enumerate(etiketler)})');
+  }
+  return lines.join('\n');
 }
 
 const naBlock = `NA_DEGERLERI = ${pyList(NA_VALUES)}  # uygulamanın eksik saydığı değerler`;
