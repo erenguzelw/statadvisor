@@ -6,13 +6,18 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "npm run dev -w apps/web",
+    "dev": "concurrently -k -n api,web -c cyan,magenta \"npm run dev -w @statadvisor/api\" \"npm run dev -w @statadvisor/web\"",
     "build": "npm run build -w apps/web",
     "preview": "npm run preview -w apps/web",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "e2e": "npm run e2e -w apps/web",
-    "check": "npm run typecheck && npm run lint && npm run test"
+    "check": "npm run typecheck && npm run lint && npm run test",
+    "dev:api": "npm run dev -w @statadvisor/api",
+    "dev:web": "npm run dev -w @statadvisor/web"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.6"
   }
 }

@@ -1,6 +1,6 @@
 import type { AnalysisResult } from './analysis.ts';
-import { effectLabel, formatP } from './stats.ts';
-import type { AnalysisSummary, AssumptionTest, DecisionPath, GroupDescriptive } from './types.ts';
+import { formatP, pText } from './stats.ts';
+import type { AssumptionTest, DecisionPath, GroupDescriptive } from './types.ts';
 
 export type ReportMode = 'html' | 'print' | 'word';
 
@@ -35,28 +35,11 @@ export function reportFromResult(r: AnalysisResult, date: string, audit?: [strin
     descriptives: r.descriptives,
     assumptions: r.assumptions,
     decision: r.decision,
-    resultLine: `${o.statisticText}, p = ${formatP(o.p, true)}, ${o.effect.symbol} = ${o.effect.value.toFixed(2)} (${o.effect.magnitude} etki), N = ${o.n}`,
+    resultLine: `${o.statisticText}, ${pText(o.p)}, ${o.effect.symbol} = ${o.effect.value.toFixed(2)} (${o.effect.magnitude} etki), N = ${o.n}`,
     apaSummary: r.apaSummary,
     references: r.references,
     notes: r.notes,
     audit,
-  };
-}
-
-/** Örnek analiz özetinden (arayüzdeki gösterim verisi) rapor verisi üretir. */
-export function reportFromSummary(a: AnalysisSummary, apaSummary: string, references: string[], date: string): ReportData {
-  const t = a.testStatistic;
-  return {
-    title: 'Hipotez testi raporu',
-    datasetName: a.dataset.fileName,
-    date,
-    descriptives: a.descriptives,
-    assumptions: a.assumptions,
-    decision: a.decision,
-    resultLine: `${t.name}(${t.df}) = ${t.value.toFixed(2)}, p = ${formatP(t.p, true)}, ${t.effect} = ${t.effectValue.toFixed(2)} (${effectLabel(t.effectValue)} etki), N = ${t.n}`,
-    apaSummary,
-    references,
-    notes: [],
   };
 }
 

@@ -3,7 +3,7 @@
  * gerekiyorsa post-hoc karşılaştırmaları hesaplar ve sonucu Yeni Başlayan / Uzman dillerinde yorumlar.
  */
 import { mean, median } from './assumptions.ts';
-import { effectLabel, formatP, kruskalWallis } from './stats.ts';
+import { effectLabel, kruskalWallis, pText } from './stats.ts';
 import {
   anovaOneWay,
   anovaRepeated,
@@ -344,7 +344,7 @@ export function interpretOutcome(o: TestOutcome): Interpretation {
   const dirSentence = o.direction ? ` İlişki ${o.direction}: ${o.direction === 'pozitif' ? 'biri arttıkça diğeri de artma' : 'biri arttıkça diğeri azalma'} eğiliminde.` : '';
   const noviceSig = `${s.same[0]!.toUpperCase()}${s.same.slice(1)}, örneğimizdeki kadar belirgin bir ${isRel ? 'ilişki' : 'fark'} görme ihtimali ${pPhrase(o.p)} olurdu. ${effectSentence}${dirSentence} Bu sonuç, nedenini göstermez.`;
   const noviceNs = `Bu veride gördüğümüz ${isRel ? 'ilişki' : 'fark'}, ${s.same.replace('olsaydı', 'olsa bile')} sık rastlanan bir düzeyde (ihtimal ${pPhrase(o.p)}). Bu, “${isRel ? 'ilişki' : 'fark'} yok” demek değildir: etki küçük ya da örneklem yetersiz olabilir. ${effectSentence}`;
-  const stat = `${o.test}: ${o.statisticText}, p = ${formatP(o.p, true)}, ${o.effect.symbol} = ${n2(o.effect.value)} (${o.effect.magnitude}), N = ${o.n}`;
+  const stat = `${o.test}: ${o.statisticText}, ${pText(o.p)}, ${o.effect.symbol} = ${n2(o.effect.value)} (${o.effect.magnitude}), N = ${o.n}`;
   const ci = o.ci ? ` ${o.ci.label}: [${n2(o.ci.low)}, ${n2(o.ci.high)}].` : '';
 
   const sigPairs = o.postHoc?.pairs.filter((p) => p.significant) ?? [];
@@ -352,7 +352,7 @@ export function interpretOutcome(o: TestOutcome): Interpretation {
     ? sigPairs.length
       ? {
           label: 'Post-hoc sonucu',
-          text: `${o.postHoc.method}: anlamlı çiftler: ${sigPairs.map((p) => `${p.a} – ${p.b} (p = ${formatP(p.pAdj, true)})`).join('; ')}.`,
+          text: `${o.postHoc.method}: anlamlı çiftler: ${sigPairs.map((p) => `${p.a} – ${p.b} (${pText(p.pAdj)})`).join('; ')}.`,
         }
       : { label: 'Post-hoc sonucu', text: `${o.postHoc.method}: düzeltmeden sonra anlamlı çift bulunamadı.` }
     : o.significant && o.kind === 'groups'
@@ -361,7 +361,7 @@ export function interpretOutcome(o: TestOutcome): Interpretation {
 
   return {
     id: o.test,
-    metric: `p = ${formatP(o.p)}`,
+    metric: `${pText(o.p, false)}`,
     threshold: `α = ${o.alpha}`,
     verdict: o.significant ? 'H₀ reddedildi' : 'H₀ reddedilemedi',
     significant: o.significant,

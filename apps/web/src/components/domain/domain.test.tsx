@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ExpertiseToggle } from '@/components/layout/ExpertiseToggle';
-import { analysis } from '@/data/mocks/analysis';
+import { analysisResult } from '@/test/fixtures';
 import { getModelReport } from '@/data/mocks/models';
 import { defaultAnswers, type WizardAnswers } from '@statadvisor/shared';
 import { renderWithApp } from '@/test/render';
@@ -36,7 +36,7 @@ describe('InterpretationCard + ExpertiseToggle', () => {
     renderWithApp(
       <>
         <ExpertiseToggle />
-        <InterpretationCard result={analysis.result} />
+        <InterpretationCard result={analysisResult.interpretation} />
       </>,
     );
     expect(screen.getByText(/binde 3/)).toBeInTheDocument();
@@ -66,7 +66,7 @@ describe('RedFlagCard', () => {
 describe('AssumptionTestCard', () => {
   it('gerçek istatistiği gösterir ve "Bu ne demek?" açıklamasını seviyeye göre değiştirir', async () => {
     const user = userEvent.setup();
-    const shapiro = analysis.assumptions.find((a) => a.id === 'shapiro')!;
+    const shapiro = analysisResult.assumptions.find((a) => a.name === 'Shapiro-Wilk')!;
     renderWithApp(
       <>
         <ExpertiseToggle />

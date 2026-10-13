@@ -1,158 +1,183 @@
 import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Activity, Languages, RefreshCw, Scale, SquareTerminal, TriangleAlert, Wand2 } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Database, FlaskConical, Save, TriangleAlert, Wand2 } from 'lucide-react';
+import type { WizardAnswers } from '@statadvisor/shared';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { QueryView } from '@/components/layout/PageStatus';
-import { ExpertiseToggle } from '@/components/layout/ExpertiseToggle';
-import { Button, Callout, CodeBlock, Panel, SectionHeader } from '@/components/ui';
-import { ChartLegend, HistogramWithNormal } from '@/components/charts';
-import {
-  AssumptionTestCard,
-  DecisionPath,
-  DecisionWizard,
-  InterpretationCard,
-  ModelComparisonTable,
-  RecommendationNotes,
-  RerouteBanner,
-} from '@/components/domain';
-import { useApp } from '@/context/AppContext';
-import { useAnalysis, useCodeReport, useModelComparison } from '@/data/queries';
-import { recommendTest, type WizardAnswers } from '@statadvisor/shared';
+import { Button, Callout, CheckboxGroup, Panel, SectionHeader, Select, StatusLine, Tag } from '@/components/ui';
+import { DecisionPath, DecisionWizard, RecommendationNotes } from '@/components/domain';
+import { useActiveDataset } from '@/context/AppContext';
+import type { ColumnInfo, DatasetInfo } from '@/data/api';
+import { useAnalysisPreview, useSaveAnalysis } from '@/data/hooks';
+import { useDebounced } from '@/lib/useDebounced';
+import { buildBody, columnTypeLabel, defaultPicks, groupColumns, missingHint, numericColumns, typeOf, type Answers, type Picks } from '@/lib/variables';
+import { AnalysisView } from './AnalysisView';
+
+const opt = (c: ColumnInfo) => ({ value: c.name, label: `${c.name} · ${columnTypeLabel[c.type]}` });
+
+function EmptyDataset() {
+  return (
+    <>
+      <PageHeader features={['Özellik 01–03']} title="Hipotez Testi ve Model Danışmanı" description="Sorularınızı yanıtlayın; kural motoru varsayım testlerinin sonucuna göre uygun testi önerir ve sonucu sade bir dille anlatır." />
+      <Callout tone="info" icon={Database} title="Önce bir veri seti seçin" actions={<Link className="rounded-control bg-primary-strong px-4 py-2 font-semibold text-on-primary-strong" to="/veri">Veri setlerine git</Link>}>
+        Analiz için bir CSV dosyası yükleyin ya da örnek bir veri setiyle başlayın.
+      </Callout>
+    </>
+  );
+}
 
 export function DecisionWizardPage() {
-  const { datasetId } = useApp();
-  const navigate = useNavigate();
-  const analysis = useAnalysis(datasetId);
-  const models = useModelComparison(datasetId);
-  const code = useCodeReport(datasetId);
-  const [answers, setAnswers] = useState<WizardAnswers | null>(null);
-  const [selectedModel, setSelectedModel] = useState<string | null>(null);
+  const { dataset, loading, error } = useActiveDataset();
+  if (loading) return <p className="text-fg-muted">Yükleniyor…</p>;
+  if (error) return <StatusLine status="danger">{error.message}</StatusLine>;
+  if (!dataset) return <EmptyDataset />;
+  // Veri seti değişince seçimler sıfırlanır.
+  return <Wizard key={dataset.id} dataset={dataset} />;
+}
 
-  const current = answers ?? analysis.data?.defaultAnswers;
-  const rec = useMemo(
-    () => (current && analysis.data ? recommendTest(current, analysis.data.assumptionInput) : null),
-    [current, analysis.data],
-  );
+function Wizard({ dataset }: { dataset: DatasetInfo }) {
+  const navigate = useNavigate();
+  const cols = dataset.columns;
+  const init = useMemo(() => defaultPicks(cols), [cols]);
+  const [answers, setAnswers] = useState<Answers>({ goal: 'compare', design: 'unknown', target: init.target });
+  const [picks, setPicks] = useState<Picks>(init.picks);
+  const save = useSaveAnalysis();
+
+  const body = useMemo(() => buildBody(dataset.id, cols, answers, picks), [dataset.id, cols, answers, picks]);
+  const settled = useDebounced(body, 350);
+  const preview = useAnalysisPreview(settled);
+  const result = preview.data?.result;
+  const stale = body !== settled || preview.isFetching;
+
+  const nums = numericColumns(cols);
+  const groups = groupColumns(cols);
+  const setPick = (patch: Partial<Picks>) => setPicks((p) => ({ ...p, ...patch }));
+  const setAnswer = (next: WizardAnswers | Answers) => setAnswers({ goal: next.goal, design: next.design, target: next.target });
+  const onValue = (name: string) => {
+    setPick({ value: name });
+    const t = typeOf(cols, name);
+    if (t) setAnswers((a) => (a.goal === 'compare' && a.target !== 'categorical' ? { ...a, target: t === 'categorical' ? 'categorical' : t } : a));
+  };
+
+  const fieldsFor = () => {
+    if (answers.goal === 'predict') return null;
+    if (answers.goal === 'relate') {
+      return answers.target === 'categorical' ? (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Select label="Birinci kategorik sütun" value={picks.rowVar} onChange={(v) => setPick({ rowVar: v })} options={groups.map(opt)} />
+          <Select label="İkinci kategorik sütun" value={picks.colVar} onChange={(v) => setPick({ colVar: v })} options={groups.map(opt)} />
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Select label="Birinci sayısal sütun (x)" value={picks.x} onChange={(v) => setPick({ x: v })} options={nums.map(opt)} />
+          <Select label="İkinci sayısal sütun (y)" value={picks.y} onChange={(v) => setPick({ y: v })} options={nums.map(opt)} />
+        </div>
+      );
+    }
+    if (answers.design === 'paired' && answers.target !== 'categorical') {
+      return (
+        <CheckboxGroup
+          legend="Karşılaştırılacak sütunlar (aynı kişilerin ölçümleri; seçim sırası önemlidir)"
+          options={nums.map((c) => ({ value: c.name, label: c.name, hint: columnTypeLabel[c.type] }))}
+          values={picks.conditions}
+          onChange={(v) => setPick({ conditions: v })}
+          hint="En az 2 sütun seçin. Her satır aynı denekle ilgili olmalıdır."
+        />
+      );
+    }
+    return answers.target === 'categorical' ? (
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <Select label="Grup sütunu" value={picks.group} onChange={(v) => setPick({ group: v })} options={groups.map(opt)} hint="2–12 farklı değer içermeli." />
+        <Select label="Sonuç sütunu (kategorik)" value={picks.value} onChange={(v) => setPick({ value: v })} options={groups.map(opt)} />
+      </div>
+    ) : (
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <Select label="Sonuç sütunu (sayısal)" value={picks.value} onChange={onValue} options={nums.map(opt)} />
+        <Select label="Grup sütunu" value={picks.group} onChange={(v) => setPick({ group: v })} options={groups.map(opt)} hint="2–12 farklı değer içermeli." />
+      </div>
+    );
+  };
+
+  const saveAndOpen = () => {
+    if (!body) return;
+    save.mutate(body, { onSuccess: (r) => navigate(`/kod-rapor?analiz=${r.id}`) });
+  };
 
   return (
-    <QueryView query={analysis}>
-      {(a) => {
-        const active = current ?? a.defaultAnswers;
-        const r = rec ?? recommendTest(active, a.assumptionInput);
-        const path = { conditions: r.conditions, plannedTest: r.plannedTest, finalTest: r.finalTest, rerouteReason: r.rerouteReason };
-        const shapiro = a.assumptions.find((t) => t.id === 'shapiro');
-        return (
-          <>
-            <PageHeader
-              features={['Özellik 01–03']}
-              context="Parametrik ve non-parametrik dönüşüm"
-              title="Hipotez Testi ve Model Danışmanı"
-              description="Sorularınızı yanıtlayın; kural motoru varsayım testlerinin sonucuna göre uygun testi önerir ve sonucu sade bir dille anlatır."
-              actions={
-                <>
-                  <Button icon={RefreshCw} onClick={() => setAnswers(null)} disabled={answers === null}>
-                    Yanıtları sıfırla
-                  </Button>
-                  <Button variant="primary" icon={SquareTerminal} onClick={() => navigate('/kod-rapor')}>
-                    Kodu çalıştır
-                  </Button>
-                </>
-              }
+    <>
+      <PageHeader
+        features={['Özellik 01–03']}
+        context={<span className="font-mono">{dataset.name}</span>}
+        title="Hipotez Testi ve Model Danışmanı"
+        description="Sorularınızı yanıtlayın ve sütunları seçin; kural motoru varsayım testlerinin sonucuna göre uygun testi önerir, çalıştırır ve sonucu sade bir dille anlatır."
+        actions={
+          <Button variant="primary" icon={Save} disabled={!result || stale || save.isPending} onClick={saveAndOpen}>
+            {save.isPending ? 'Kaydediliyor…' : 'Kaydet ve kod/rapor oluştur'}
+          </Button>
+        }
+      />
+      {save.error && <StatusLine status="danger" className="mb-4">{save.error.message}</StatusLine>}
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+        <div className="flex min-w-0 flex-col gap-6 lg:col-span-5">
+          <Panel>
+            <SectionHeader
+              icon={Wand2}
+              title="Karar sihirbazı"
+              feature="Özellik 02"
+              description="Yanıtlarınız ve seçtiğiniz sütunlar değiştikçe analiz anında güncellenir. Grup sayısı seçtiğiniz sütundan belirlenir."
             />
-
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-              <div className="flex min-w-0 flex-col gap-6 lg:col-span-5">
-                <Panel>
-                  <SectionHeader
-                    icon={Wand2}
-                    title="Karar sihirbazı"
-                    feature="Özellik 02"
-                    description="Yanıtlarınız değiştikçe test önerisi anında güncellenir. Teknik terim bilmeniz gerekmez."
-                  />
-                  <DecisionWizard answers={active} onChange={setAnswers} inferred={a.inferred} />
-                  <div className="mt-4 rounded-card border border-line/30 bg-surface-lowest p-4">
-                    <p className="mb-3 text-caption font-medium text-fg-subtle">Karar ağacında izlenen yol</p>
-                    <DecisionPath path={path} />
-                  </div>
-                </Panel>
-                <RecommendationNotes warnings={r.warnings} />
-                {r.supportedByExample && code.data?.snippets[0] && (
-                  <CodeBlock code={code.data.snippets[0].code} filename="analiz.py" runtime="SciPy Stats 1.11" maxHeight="22rem" />
-                )}
-              </div>
-
-              <div className="flex min-w-0 flex-col gap-6 lg:col-span-7">
-                <RerouteBanner path={path} />
-
-                {r.supportedByExample ? (
-                  <>
-                    <Panel>
-                      <SectionHeader icon={Activity} title="Otomatik varsayım kontrolü" feature="Özellik 01" />
-                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        {a.assumptions.map((t) => (
-                          <AssumptionTestCard key={t.id} test={t} />
-                        ))}
-                      </div>
-                      <div className="mt-4 rounded-card border border-line/30 bg-surface-lowest p-4">
-                        <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
-                          <div>
-                            <h3 className="text-body-lg font-semibold text-fg">Örneklem histogramı ve kuramsal normal eğri</h3>
-                            <p className="text-caption text-fg-subtle">
-                              Biyobelirteç X, n = <span className="font-mono">{a.distribution.n}</span> (grup başına {a.assumptionInput.minGroupN} gözlem), çarpıklık ={' '}
-                              <span className="font-mono">{a.distribution.skewness > 0 ? '+' : ''}{a.distribution.skewness}</span>.{' '}
-                              {shapiro && <>Shapiro-Wilk grup içi kalıntılara uygulandı.</>}
-                            </p>
-                          </div>
-                          <ChartLegend
-                            items={[
-                              { label: 'Gözlenen veri', swatch: 'bar', color: 'var(--color-primary-strong)' },
-                              { label: 'Beklenen normal', swatch: 'dash', color: 'var(--color-tertiary)' },
-                            ]}
-                          />
-                        </div>
-                        <HistogramWithNormal
-                          bins={a.distribution.bins}
-                          normal={{ mean: a.distribution.mean, sd: a.distribution.sd }}
-                          annotation={a.distribution.skewness > 0.5 ? 'Sağa çarpık (uzun sağ kuyruk)' : undefined}
-                          summary={`Örneklem histogramı, çarpıklık ${a.distribution.skewness}; kuramsal normal eğri ile karşılaştırılıyor.`}
-                          className="p-0!"
-                        />
-                      </div>
-                    </Panel>
-
-                    <Panel>
-                      <SectionHeader icon={Languages} title="İnsan dilinde sonuçlar" feature="Özellik 03 & 10" actions={<ExpertiseToggle />} />
-                      <InterpretationCard result={a.result} />
-                    </Panel>
-                  </>
-                ) : (
-                  <Callout tone="warning" icon={TriangleAlert} title="Bu senaryo için örnek sonuç yok">
-                    Ekrandaki örnek analiz, 3 gruplu, bağımsız ve sürekli bir hedef değişkeni için hazırlandı. Yanıtlarınıza göre kural motorunun
-                    önerisi yukarıda; varsayım testleri ve yorum yalnızca bu örnek için hesaplanır. Önerilen testi kendi verinizle çalıştırmak
-                    için “Kod &amp; Rapor” sayfasındaki kod şablonlarını uyarlayın.
-                  </Callout>
-                )}
-              </div>
+            <DecisionWizard answers={{ ...answers, groups: '3+' }} onChange={setAnswer} inferred={answers.goal === 'compare' ? ['target'] : []} hide={['groups']} />
+            <div className="mt-4 rounded-card border border-line/30 bg-surface-lowest p-4">
+              <h3 className="mb-3 text-body font-semibold text-fg">Değişkenler</h3>
+              {fieldsFor() ?? (
+                <StatusLine status="info">
+                  Tahmin için hipotez testi değil, model karşılaştırması gerekir.{' '}
+                  <Link to="/model-karsilastirma" className="font-medium text-secondary underline underline-offset-2">
+                    Model Karşılaştırma sayfasına gidin.
+                  </Link>
+                </StatusLine>
+              )}
             </div>
-
-            {models.data && (
-              <Panel className="mt-6">
-                <SectionHeader
-                  icon={Scale}
-                  title="Karşılaştırmalı model paneli"
-                  feature="Özellik 07"
-                  description="Tek bir “en iyi” yok: iş yükünüze en uygun yaklaşımı seçin. Ölçütler, tohumlu dengesiz bir veri setinde gerçekten eğitilen modellerden gelir."
-                />
-                <ModelComparisonTable
-                  models={models.data.models}
-                  selectedId={selectedModel ?? models.data.recommendedId}
-                  onSelect={setSelectedModel}
-                />
-              </Panel>
+            {result && (
+              <div className="mt-4 rounded-card border border-line/30 bg-surface-lowest p-4">
+                <p className="mb-3 text-caption font-medium text-fg-subtle">Karar ağacında izlenen yol</p>
+                <DecisionPath path={result.decision} />
+              </div>
             )}
-          </>
-        );
-      }}
-    </QueryView>
+          </Panel>
+          {result && <RecommendationNotes warnings={result.decision.warnings} />}
+        </div>
+
+        <div className="flex min-w-0 flex-col gap-6 lg:col-span-7" aria-live="polite" aria-busy={stale}>
+          {answers.goal === 'predict' ? (
+            <Callout tone="warning" icon={TriangleAlert} title="Hipotez testi uygulanmıyor">
+              Tahmin amaçlı çalışmalarda varsayım testleri yerine çapraz doğrulama ve dengesiz veriye uygun ölçütler (F1, PR-AUC) kullanılır.
+            </Callout>
+          ) : !body ? (
+            <Callout tone="neutral" icon={FlaskConical} title="Analiz için eksik bilgi">
+              {missingHint(answers)}
+            </Callout>
+          ) : preview.isError && !result ? (
+            <Callout tone="danger" icon={TriangleAlert} title="Bu seçimle analiz yapılamadı">
+              {preview.error.message}
+            </Callout>
+          ) : !result ? (
+            <p className="rounded-panel border border-line/30 bg-surface p-6 text-fg-muted">Analiz hesaplanıyor…</p>
+          ) : (
+            <div className={stale ? 'flex flex-col gap-6 opacity-60 transition-opacity' : 'flex flex-col gap-6'}>
+              {preview.isError && (
+                <Callout tone="danger" icon={TriangleAlert} title="Son seçimle analiz yapılamadı">
+                  {preview.error.message} Aşağıda önceki geçerli sonuç görünüyor.
+                </Callout>
+              )}
+              <p className="flex flex-wrap items-center gap-2 text-caption text-fg-subtle">
+                <Tag>{result.outcome.test}</Tag> hesaplandı: {result.variables.join(' · ')}
+              </p>
+              <AnalysisView result={result} />
+            </div>
+          )}
+        </div>
+      </div>
+    </>
   );
 }

@@ -130,3 +130,9 @@ export function formatP(p: number, apa = false) {
   const s = p < 0.1 ? p.toFixed(3) : p.toFixed(2);
   return apa ? s.replace(/^0/, '') : s;
 }
+
+/** "p = .003" ya da çok küçükse "p < .001" (APA). apa=false ise baştaki sıfır korunur. */
+export function pText(p: number, apa = true) {
+  const f = formatP(p, apa);
+  return f.startsWith('<') ? `p ${f}` : `p = ${f}`;
+}

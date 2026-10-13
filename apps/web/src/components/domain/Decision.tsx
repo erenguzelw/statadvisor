@@ -15,13 +15,15 @@ export interface DecisionWizardProps {
   onChange: (next: WizardAnswers) => void;
   /** Veri setinden çıkarılıp otomatik doldurulan sorular. */
   inferred: (keyof WizardAnswers)[];
+  /** Sorulmayacak sorular (ör. grup sayısı seçilen sütundan türetilir). */
+  hide?: (keyof WizardAnswers)[];
 }
 
 /** Karar sihirbazı: yanıtlar değişince test önerisi anında güncellenir. */
-export function DecisionWizard({ answers, onChange, inferred }: DecisionWizardProps) {
+export function DecisionWizard({ answers, onChange, inferred, hide = [] }: DecisionWizardProps) {
   return (
     <div className="flex flex-col gap-4">
-      {wizardQuestions.map((q) => {
+      {wizardQuestions.filter((q) => !hide.includes(q.id)).map((q) => {
         const isInferred = inferred.includes(q.id);
         return (
           <div key={q.id} className="rounded-card border border-line/30 bg-surface-lowest p-4">
@@ -76,11 +78,11 @@ export function DecisionPath({ path, compact }: { path: DecisionPathLike; compac
 }
 
 /** Yöntemsel uyarılar: ön test sınırlamaları, bağımsızlık, örneklem büyüklüğü. */
-export function RecommendationNotes({ warnings }: { warnings: string[] }) {
+export function RecommendationNotes({ warnings, title = 'Dikkat edilmesi gerekenler' }: { warnings: string[]; title?: string }) {
   if (!warnings.length) return null;
   return (
-    <section aria-label="Dikkat edilmesi gerekenler" className="rounded-card border border-line/30 bg-surface-lowest p-4">
-      <h3 className="mb-2 text-body font-semibold text-fg">Dikkat edilmesi gerekenler</h3>
+    <section aria-label={title} className="rounded-card border border-line/30 bg-surface-lowest p-4">
+      <h3 className="mb-2 text-body font-semibold text-fg">{title}</h3>
       <ul className="flex flex-col gap-2">
         {warnings.map((w) => (
           <li key={w} className="flex gap-2 text-caption text-fg-muted">

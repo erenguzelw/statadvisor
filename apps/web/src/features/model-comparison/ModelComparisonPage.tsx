@@ -7,14 +7,14 @@ import { Button, Callout, CodeBlock, Panel, SectionHeader, StatusChip, StatusLin
 import { RocCurve } from '@/components/charts';
 import { ModelCard, ModelComparisonTable, RedFlagCard, modelColors } from '@/components/domain';
 import { useApp } from '@/context/AppContext';
-import { useModelComparison } from '@/data/queries';
+import { useModelComparison } from '@/data/hooks';
 
 const pct = (x: number) => `%${(x * 100).toFixed(1)}`;
 
 export function ModelComparisonPage() {
-  const { datasetId, narrate } = useApp();
+  const { narrate } = useApp();
   const navigate = useNavigate();
-  const query = useModelComparison(datasetId);
+  const query = useModelComparison();
   const [selected, setSelected] = useState<string | null>(null);
   const [resolved, setResolved] = useState<Set<string>>(new Set());
 

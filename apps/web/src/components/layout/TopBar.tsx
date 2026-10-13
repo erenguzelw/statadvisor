@@ -1,8 +1,7 @@
 import { useId } from 'react';
 import { Bell, ChevronsUpDown, FolderOpen, Menu, SquareTerminal } from 'lucide-react';
 import { IconButton } from '@/components/ui';
-import { useApp } from '@/context/AppContext';
-import { useDatasets } from '@/data/queries';
+import { useActiveDataset, useApp } from '@/context/AppContext';
 import { ExpertiseToggle } from './ExpertiseToggle';
 
 function Logo() {
@@ -16,8 +15,8 @@ function Logo() {
 
 function DatasetPicker() {
   const id = useId();
-  const { datasetId, setDatasetId } = useApp();
-  const { data: datasets = [] } = useDatasets();
+  const { setDatasetId } = useApp();
+  const { dataset, datasets, loading } = useActiveDataset();
   return (
     <div className="relative flex min-w-0 items-center">
       <label htmlFor={id} className="sr-only">
@@ -26,13 +25,15 @@ function DatasetPicker() {
       <FolderOpen size={16} className="pointer-events-none absolute left-3 text-secondary" aria-hidden />
       <select
         id={id}
-        value={datasetId}
+        value={dataset?.id ?? ''}
+        disabled={loading || datasets.length === 0}
         onChange={(e) => setDatasetId(e.target.value)}
         className="h-10 max-w-72 min-w-0 appearance-none truncate rounded-card border border-line/40 bg-surface-low pr-8 pl-9 font-mono text-data text-fg hover:border-line-strong"
       >
+        {datasets.length === 0 && <option value="">{loading ? 'Yükleniyor…' : 'Veri seti yok'}</option>}
         {datasets.map((d) => (
           <option key={d.id} value={d.id}>
-            {d.fileName}
+            {d.name}
           </option>
         ))}
       </select>
