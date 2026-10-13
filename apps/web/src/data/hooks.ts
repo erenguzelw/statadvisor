@@ -78,6 +78,37 @@ export function useCleanDataset(datasetId: string | null) {
   return useMutation({ mutationFn: (body: CleanBody) => api.post<DatasetInfo>(`/api/datasets/${datasetId}/clean`, body), onSuccess: invalidate });
 }
 
+export interface ScaleRequest {
+  name: string;
+  items: string[];
+  reverse: string[];
+  method: 'mean' | 'sum';
+  min: number;
+  max: number;
+  minValidShare: number;
+}
+
+export interface ScaleResultInfo {
+  name: string;
+  alpha: number | null;
+  nAlpha: number;
+  nValid: number;
+  mean: number | null;
+  notes: string[];
+}
+
+export function useCreateScales(datasetId: string) {
+  const invalidate = useInvalidateDatasets();
+  return useMutation({
+    mutationFn: (scales: ScaleRequest[]) => api.post<DatasetInfo & { scaleResults: ScaleResultInfo[] }>(`/api/datasets/${datasetId}/scales`, { scales }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useScalesCode(datasetId: string) {
+  return useMutation({ mutationFn: (scales: ScaleRequest[]) => api.post<CodeResponse>(`/api/datasets/${datasetId}/scales-code`, { scales }) });
+}
+
 /** Kaydetmeden önizleme: istek tamamsa çalışır, aynı istek için önbellekten döner. */
 export function useAnalysisPreview(body: AnalysisBody | null) {
   return useQuery({

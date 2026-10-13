@@ -90,6 +90,23 @@ test('örnek veri yüklenir, etkin yapılır ve silinebilir', async ({ page }) =
   await expect(page.getByText('Henüz veri seti yok')).toBeVisible();
 });
 
+test('ölçek puanı: alt boyut elle tanımlanır, alfa gösterilir, yeni sürüm etkin olur ve puan sütunu listelenir', async ({ page, request }) => {
+  await loadSample(request, 'klinik');
+  await page.goto('/veri');
+  const box = page.getByRole('group', { name: 'Ölçek 1' });
+  await box.getByLabel('Ölçek adı').fill('Bileşik puan');
+  await box.getByLabel('En küçük yanıt').fill('0');
+  await box.getByLabel('En büyük yanıt').fill('1000');
+  await page.getByRole('button', { name: 'Puanları hesapla' }).click();
+  await expect(page.getByText('en az 2 madde seçin')).toBeVisible();
+  await box.getByRole('checkbox', { name: 'kan_basinci' }).check();
+  await box.getByRole('checkbox', { name: 'biyobelirtec_x' }).check();
+  await page.getByRole('button', { name: 'Puanları hesapla' }).click();
+  await expect(page.getByText(/Cronbach α =/)).toBeVisible();
+  await expect(page.getByText('Etkin veri seti: klinik_ornek (ölçekli).csv')).toBeVisible();
+  await expect(page.getByRole('cell', { name: 'Bileşik puan' })).toBeVisible();
+});
+
 test('sihirbaz: gerçek veriden analiz hesaplar, varsayımları ve yorumu gösterir; seviye tercihi korunur', async ({ page, request }) => {
   await loadSample(request, 'klinik');
   await page.goto('/karar-sihirbazi');

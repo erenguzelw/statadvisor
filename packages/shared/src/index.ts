@@ -3,6 +3,7 @@ export * from './assumptions.ts';
 export * from './chart-svg.ts';
 export * from './clean.ts';
 export * from './sample-data.ts';
+export * from './scales.ts';
 export * from './codegen.ts';
 export * from './decision.ts';
 export * from './inference.ts';
