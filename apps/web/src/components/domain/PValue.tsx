@@ -1,5 +1,5 @@
 import { cn } from '@/lib/cn';
-import { formatP } from '@/lib/stats';
+import { formatP } from '@statadvisor/shared';
 
 export { formatP };
 

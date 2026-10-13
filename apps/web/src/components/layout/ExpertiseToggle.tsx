@@ -1,6 +1,6 @@
 import { SegmentedControl } from '@/components/ui';
 import { useApp } from '@/context/AppContext';
-import type { Expertise } from '@/data/types';
+import type { Expertise } from '@statadvisor/shared';
 
 const options: { value: Expertise; label: string }[] = [
   { value: 'novice', label: 'Yeni Başlayan' },

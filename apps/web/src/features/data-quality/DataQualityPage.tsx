@@ -23,8 +23,8 @@ import { BoxPlotGroup, HistogramWithNormal } from '@/components/charts';
 import { RawDataMatrix } from '@/components/domain';
 import { useApp } from '@/context/AppContext';
 import { useDataQuality } from '@/data/queries';
-import type { ImputationMethod } from '@/data/types';
-import { formatP } from '@/lib/stats';
+import type { ImputationMethod } from '@statadvisor/shared';
+import { formatP } from '@statadvisor/shared';
 
 const nf = new Intl.NumberFormat('tr-TR');
 const fmt1 = (x: number) => x.toFixed(1);

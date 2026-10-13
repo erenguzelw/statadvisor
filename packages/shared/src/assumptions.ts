@@ -2,7 +2,7 @@
  * Varsayım testleri ve dağılım yardımcıları: Shapiro-Wilk, Levene (Brown-Forsythe), Tukey sınırları,
  * ROC ve PR ölçütleri. Algoritmalar SciPy / R ile aynı yöntemleri izler.
  */
-import { gammaQ, lnGamma } from './stats';
+import { gammaQ, lnGamma } from './stats.ts';
 
 /* ---------- Normal dağılım ---------- */
 

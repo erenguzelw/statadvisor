@@ -1,7 +1,7 @@
-import { mean, median, shapiroWilk, tukeyFences } from '@/lib/assumptions';
-import { gaussian, mulberry32 } from '@/lib/ml';
-import { histogram } from '@/lib/stats';
-import type { BoxStats, HistogramBin, ImputationMethod, QualitySummary, RawRow } from '../types';
+import { mean, median, shapiroWilk, tukeyFences } from '@statadvisor/shared';
+import { gaussian, mulberry32 } from '@statadvisor/shared';
+import { histogram } from '@statadvisor/shared';
+import type { BoxStats, HistogramBin, ImputationMethod, QualitySummary, RawRow } from '@statadvisor/shared';
 
 export const imputationMethods: ImputationMethod[] = [
   { id: 'median', label: 'Medyan ile doldurma', hint: 'Hızlı' },

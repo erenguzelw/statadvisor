@@ -1,4 +1,4 @@
-import { defaultAnswers, recommendTest, type WizardAnswers } from './decision';
+import { defaultAnswers, recommendTest, type WizardAnswers } from './decision.ts';
 
 const base = { n: 90, minGroupN: 30 };
 const ok = { normalP: 0.4, varianceP: 0.5, ...base };

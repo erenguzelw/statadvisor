@@ -1,5 +1,5 @@
-import { median } from '@/lib/assumptions';
-import { histogram, kruskalWallis, meanSd, skewness } from '@/lib/stats';
+import { median } from '@statadvisor/shared';
+import { histogram, kruskalWallis, meanSd, skewness } from '@statadvisor/shared';
 
 export { median };
 

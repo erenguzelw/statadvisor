@@ -1,5 +1,5 @@
-import type { AnalysisSummary } from '@/data/types';
-import { effectLabel, formatP } from './stats';
+import type { AnalysisSummary } from './types.ts';
+import { effectLabel, formatP } from './stats.ts';
 
 export type ReportMode = 'html' | 'print' | 'word';
 

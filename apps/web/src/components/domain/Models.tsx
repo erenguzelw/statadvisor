@@ -1,5 +1,5 @@
 import { Brain, Gauge, Star, Zap } from 'lucide-react';
-import type { Model } from '@/data/types';
+import type { Model } from '@statadvisor/shared';
 import { cn } from '@/lib/cn';
 import { Button, DataTable, MeterBar, Tag, type Column } from '@/components/ui';
 

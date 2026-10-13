@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { ArrowRight, CheckCircle2, GitFork, Info } from 'lucide-react';
-import { wizardQuestions, type WizardAnswers } from '@/lib/decision';
+import { wizardQuestions, type WizardAnswers } from '@statadvisor/shared';
 import { Callout, RadioCardGroup, Tag } from '@/components/ui';
 
 export interface DecisionPathLike {

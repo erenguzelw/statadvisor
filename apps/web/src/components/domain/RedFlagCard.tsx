@@ -1,5 +1,5 @@
 import { Check, Flag, Lightbulb } from 'lucide-react';
-import type { RedFlag } from '@/data/types';
+import type { RedFlag } from '@statadvisor/shared';
 import { cn } from '@/lib/cn';
 import { Button, StatusChip } from '@/components/ui';
 

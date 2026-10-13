@@ -1,6 +1,6 @@
-import { groupResiduals, levene, shapiroWilk } from '@/lib/assumptions';
-import { recommendTest } from '@/lib/decision';
-import { buildReport, REPORT_SECTION_IDS } from '@/lib/report';
+import { groupResiduals, levene, shapiroWilk } from '@statadvisor/shared';
+import { recommendTest } from '@statadvisor/shared';
+import { buildReport, REPORT_SECTION_IDS } from '@statadvisor/shared';
 import { analysis } from './analysis';
 import { apaSummary, citation, reportSections, snippets } from './code';
 import { getModelReport, SESSION_TEST_COUNT } from './models';

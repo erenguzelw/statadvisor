@@ -1,7 +1,7 @@
-import { groupResiduals, levene, mean, median, shapiroWilk } from '@/lib/assumptions';
-import { defaultAnswers, recommendTest } from '@/lib/decision';
-import { effectLabel, formatP, meanSd } from '@/lib/stats';
-import type { AnalysisSummary, Dataset, GroupDescriptive } from '../types';
+import { groupResiduals, levene, mean, median, shapiroWilk } from '@statadvisor/shared';
+import { defaultAnswers, recommendTest } from '@statadvisor/shared';
+import { effectLabel, formatP, meanSd } from '@statadvisor/shared';
+import type { AnalysisSummary, Dataset, GroupDescriptive } from '@statadvisor/shared';
 import { groupList, kruskal, sampleBins, sampleGroups, sampleStats } from './sample';
 
 export const datasets: Dataset[] = [{ id: 'klinik-faz3', fileName: 'Klinik_Veri_Faz3.csv', rows: 1420, columns: 6 }];
