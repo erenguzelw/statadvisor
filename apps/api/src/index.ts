@@ -4,12 +4,15 @@ import { buildApp } from './app.ts';
 const port = Number(process.env.PORT ?? 3001);
 const dataDir = process.env.STATADVISOR_DATA ?? fileURLToPath(new URL('../.data', import.meta.url));
 
-const app = buildApp({ dataDir });
+const defaultWeb = fileURLToPath(new URL('../../web/dist', import.meta.url));
+const webDir = process.env.STATADVISOR_WEB ?? defaultWeb;
+
+const app = buildApp({ dataDir, webDir });
 
 // Yalnızca bu bilgisayardan erişilir: dış ağa açılmaz.
 app
   .listen({ host: '127.0.0.1', port })
-  .then(() => console.log(`StatAdvisor API: http://127.0.0.1:${port} (veri klasörü: ${dataDir})`))
+  .then(() => console.log(`StatAdvisor AI hazır: http://127.0.0.1:${port}  (veri klasörü: ${dataDir})`))
   .catch((e) => {
     console.error(e);
     process.exit(1);

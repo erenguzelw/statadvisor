@@ -10,3 +10,4 @@ __pycache__/
 *.pyc
 apps/api/.data/
 !packages/shared/fixtures/
+apps/api/backups/
