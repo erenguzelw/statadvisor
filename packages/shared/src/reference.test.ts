@@ -52,7 +52,8 @@ export { specs, close, fixture };
 export type { Case };
 
 describe(`referans vakalar (SciPy ${fixture.meta.scipy}, scikit-learn ${fixture.meta.sklearn})`, () => {
-  const byTest = Object.groupBy(fixture.cases, (c) => c.test) as Record<string, Case[]>;
+  const byTest: Record<string, Case[]> = {};
+  for (const c of fixture.cases) (byTest[c.test] ??= []).push(c);
 
   for (const [name, list] of Object.entries(byTest)) {
     const spec = specs[name];
