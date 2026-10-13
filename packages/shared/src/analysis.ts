@@ -5,7 +5,7 @@
 import { groupResiduals, levene, mean, shapiroWilk } from './assumptions.ts';
 import { recommendTest, type AssumptionInput, type Design, type Goal, type Target, type WizardAnswers } from './decision.ts';
 import { describeGroups, interpretOutcome, runTest, type TestInput, type TestOutcome } from './inference.ts';
-import { formatP, histogram, meanSd, skewness } from './stats.ts';
+import { histogram, meanSd, pText, skewness } from './stats.ts';
 import type { AssumptionTest, DecisionPath, DistributionSample, GroupDescriptive, Interpretation } from './types.ts';
 
 /** Çözümlenebilir bir istek biçimi hatası; kullanıcıya olduğu gibi gösterilebilir. */
@@ -128,7 +128,7 @@ export function shapiroAssumption(label: string, subject: string, values: number
       explain: {
         novice:
           'Bu test, değerlerin çan eğrisine benzeyip benzemediğine bakar. p küçükse veri çan eğrisinden belirgin biçimde sapıyor demektir. Küçük örneklemde güçsüzdür; büyük örneklemde ise çok küçük sapmalara bile uyarı verir.',
-        expert: `H₀: ${subject} normal dağılımdan gelir. W = ${r.W.toFixed(3)}, p = ${formatP(r.p, true)} (Royston, 1995). Ön test sonrası test seçimi koşullu Tip I hatayı etkileyebilir; Q-Q grafiği ve çarpıklık/basıklık ile birlikte değerlendirin.`,
+        expert: `H₀: ${subject} normal dağılımdan gelir. W = ${r.W.toFixed(3)}, ${pText(r.p)} (Royston, 1995). Ön test sonrası test seçimi koşullu Tip I hatayı etkileyebilir; Q-Q grafiği ve çarpıklık/basıklık ile birlikte değerlendirin.`,
       },
     },
   };
@@ -151,7 +151,7 @@ export function leveneAssumption(groups: number[][], alpha: number): { test: Ass
       explain: {
         novice:
           'Bu test, grupların ne kadar yayıldığının benzer olup olmadığına bakar. p küçükse yayılımlar belirgin biçimde farklıdır. Büyük p, “eşit” demek değil, “fark gösteremedik” demektir.',
-        expert: `H₀: grup varyansları eşit. Brown-Forsythe, F(${r.df1}, ${r.df2}) = ${r.F.toFixed(2)}, p = ${formatP(r.p, true)}. Anlamsız sonuç eşitliği kanıtlamaz; bu yüzden Welch yaklaşımı varsayılan olarak daha güvenlidir.`,
+        expert: `H₀: grup varyansları eşit. Brown-Forsythe, F(${r.df1}, ${r.df2}) = ${r.F.toFixed(2)}, ${pText(r.p)}. Anlamsız sonuç eşitliği kanıtlamaz; bu yüzden Welch yaklaşımı varsayılan olarak daha güvenlidir.`,
       },
     },
   };
@@ -183,15 +183,15 @@ function apaSentence(o: TestOutcome, assumptions: AssumptionTest[]): string {
   const sh = assumptions.filter((a) => a.name === 'Shapiro-Wilk');
   if (sh.length) {
     parts.push(
-      `Normallik varsayımı Shapiro-Wilk testiyle incelenmiştir (${sh.map((a) => `${a.subject}: ${a.statistic}, p = ${formatP(a.p, true)}`).join('; ')}) ve ${sh.every((a) => a.passed) ? 'karşılandığı' : 'karşılanmadığı'} görülmüştür.`,
+      `Normallik varsayımı Shapiro-Wilk testiyle incelenmiştir (${sh.map((a) => `${a.subject}: ${a.statistic}, ${pText(a.p)}`).join('; ')}) ve ${sh.every((a) => a.passed) ? 'karşılandığı' : 'karşılanmadığı'} görülmüştür.`,
     );
   }
   const lv = assumptions.find((a) => a.name === 'Levene');
-  if (lv) parts.push(`Varyansların homojenliği Levene (Brown-Forsythe) testiyle sınanmıştır, ${lv.statistic}, p = ${formatP(lv.p, true)}.`);
+  if (lv) parts.push(`Varyansların homojenliği Levene (Brown-Forsythe) testiyle sınanmıştır, ${lv.statistic}, ${pText(lv.p)}.`);
   parts.push(`Analizde ${o.test} kullanılmıştır.`);
   const rel = o.kind === 'xy' || o.kind === 'table';
   const subject = o.kind === 'groups' ? 'gruplar' : o.kind === 'paired' ? 'koşullar' : 'değişkenler';
-  const result = `${o.statisticText}, p = ${formatP(o.p, true)}, ${o.effect.symbol} = ${o.effect.value.toFixed(2)}, N = ${o.n}`;
+  const result = `${o.statisticText}, ${pText(o.p)}, ${o.effect.symbol} = ${o.effect.value.toFixed(2)}, N = ${o.n}`;
   parts.push(
     o.significant
       ? `${subject[0]!.toUpperCase()}${subject.slice(1)} arasında istatistiksel olarak anlamlı bir ${rel ? 'ilişki' : 'fark'} bulunmuştur, ${result}.`
@@ -201,7 +201,7 @@ function apaSentence(o: TestOutcome, assumptions: AssumptionTest[]): string {
   if (o.postHoc) {
     parts.push(
       sig.length
-        ? `${o.postHoc.method} sonucunda ${sig.map((p) => `${p.a}–${p.b} (p = ${formatP(p.pAdj, true)})`).join(', ')} çiftleri arasındaki fark anlamlı bulunmuştur.`
+        ? `${o.postHoc.method} sonucunda ${sig.map((p) => `${p.a}–${p.b} (${pText(p.pAdj)})`).join(', ')} çiftleri arasındaki fark anlamlı bulunmuştur.`
         : `${o.postHoc.method} sonucunda düzeltmeden sonra anlamlı çift bulunamamıştır.`,
     );
   }

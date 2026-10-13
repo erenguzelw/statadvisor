@@ -64,8 +64,8 @@ export function RadioCardGroup<T extends string>({
               <span className="min-w-0 flex-1">
                 <span className="block text-body font-semibold text-fg">{title}</span>
                 {description && <span className="mt-0.5 block text-caption text-fg-muted">{description}</span>}
+                {hint && <span className="mt-0.5 block text-caption text-secondary">{hint}</span>}
               </span>
-              {hint && <span className="text-caption text-secondary">{hint}</span>}
             </label>
           );
         })}

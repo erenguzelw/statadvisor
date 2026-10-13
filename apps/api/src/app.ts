@@ -109,7 +109,15 @@ export function buildApp(opts: AppOptions): FastifyInstance {
     if (!LOCAL_HOST.test(host)) throw new ApiError(403, 'forbidden_host', 'Bu hizmet yalnızca yerel olarak erişilebilir.');
     if (req.method !== 'GET' && req.method !== 'HEAD') {
       const origin = req.headers.origin;
-      if (origin && !origins.includes(origin)) throw new ApiError(403, 'forbidden_origin', 'İstek bu kökenden kabul edilmiyor.');
+      // Aynı köken (arayüz sunucusu isteği vekil olarak iletir ve Host'u korur) ya da açıkça izinli köken kabul edilir.
+      const sameOrigin = (() => {
+        try {
+          return origin !== undefined && new URL(origin).host === host;
+        } catch {
+          return false;
+        }
+      })();
+      if (origin && !sameOrigin && !origins.includes(origin)) throw new ApiError(403, 'forbidden_origin', 'İstek bu kökenden kabul edilmiyor.');
     }
     reply.header('X-Content-Type-Options', 'nosniff');
     reply.header('Cache-Control', 'no-store');

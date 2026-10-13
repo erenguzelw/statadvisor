@@ -2,21 +2,12 @@
  * StatAdvisor domain tipleri.
  * Sunucu aşamasında packages/shared altına taşınacak; arayüz yalnızca bu tiplere bağımlıdır.
  */
-import type { AssumptionInput, WizardAnswers } from './decision.ts';
-
 export type Expertise = 'novice' | 'expert';
 
 /** Uzmanlık seviyesine göre iki farklı anlatım. */
 export interface Narrated {
   novice: string;
   expert: string;
-}
-
-export interface Dataset {
-  id: string;
-  fileName: string;
-  rows: number;
-  columns: number;
 }
 
 export interface DecisionPath {
@@ -136,52 +127,6 @@ export interface RedFlag {
   resolvedLabel: string;
 }
 
-export interface OutlierColumn {
-  column: 'bloodPressure' | 'biomarker';
-  label: string;
-  count: number;
-  lower: number;
-  upper: number;
-}
-
-export interface QualitySummary {
-  observations: number;
-  variables: number;
-  /** Sayısal hücre sayısı (satır × sayısal sütun). */
-  cells: number;
-  outliers: number;
-  outlierColumns: OutlierColumn[];
-  missing: number;
-  missingRate: number;
-  missingColumn: string;
-  /** Temiz hücre oranı (%): 1 − (aykırı + eksik) / hücre. */
-  integrityBefore: number;
-  integrityAfter: number;
-  removedRows: number;
-  cleanedRows: number;
-  removedRate: number;
-  shapiroBefore: { W: number; p: number };
-  shapiroAfter: { W: number; p: number };
-}
-
-export interface RawRow {
-  id: string;
-  group: 'A' | 'B' | 'C';
-  age: number;
-  bloodPressure: number;
-  income: number | null;
-  biomarker: number;
-  /** Aykırı olarak işaretlenen sütun. */
-  outlierIn?: 'bloodPressure' | 'biomarker';
-  outlierNote?: string;
-}
-
-export interface ImputationMethod {
-  id: 'median' | 'knn';
-  label: string;
-  hint: string;
-}
-
 export interface BoxStats {
   group: string;
   n: number;
@@ -202,30 +147,4 @@ export interface CodeSnippet {
   language: 'python' | 'r';
   code: string;
   output: string[];
-}
-
-export interface ReportFormat {
-  id: 'html' | 'print' | 'word';
-  title: string;
-  description: string;
-  fileName: string;
-}
-
-export interface AnalysisSummary {
-  dataset: Dataset;
-  /** Sihirbazın varsayılan yanıtları ve hangilerinin veriden çıkarıldığı. */
-  defaultAnswers: WizardAnswers;
-  inferred: (keyof WizardAnswers)[];
-  decision: DecisionPath;
-  assumptions: AssumptionTest[];
-  assumptionInput: AssumptionInput;
-  distribution: DistributionSample;
-  descriptives: GroupDescriptive[];
-  result: Interpretation;
-  testStatistic: { name: string; value: number; df: number; p: number; effect: string; effectValue: number; n: number };
-}
-
-export interface ReportSection {
-  id: string;
-  label: string;
 }

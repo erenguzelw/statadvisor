@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { createBrowserRouter, Link, Navigate } from 'react-router-dom';
 import { AppShell } from '@/components/layout/AppShell';
+import { DatasetsPage } from '@/features/datasets/DatasetsPage';
 import { DecisionWizardPage } from '@/features/decision-wizard/DecisionWizardPage';
 import { ModelComparisonPage } from '@/features/model-comparison/ModelComparisonPage';
 import { DataQualityPage } from '@/features/data-quality/DataQualityPage';
@@ -26,6 +27,7 @@ export const router = createBrowserRouter([
     element: <AppShell />,
     children: [
       { index: true, element: <Navigate to="/karar-sihirbazi" replace /> },
+      { path: 'veri', element: <DatasetsPage /> },
       { path: 'karar-sihirbazi', element: <DecisionWizardPage /> },
       { path: 'model-karsilastirma', element: <ModelComparisonPage /> },
       { path: 'veri-kalitesi', element: <DataQualityPage /> },

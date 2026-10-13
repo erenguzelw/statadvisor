@@ -44,10 +44,10 @@ export function Sidebar({ onNavigate, className }: { onNavigate?: () => void; cl
       <div className="flex flex-col gap-3">
         <div className="rounded-card bg-surface-lowest p-3">
           <p className="mb-1.5 text-caption font-medium text-fg-subtle">Hesaplama</p>
-          <p className="text-caption text-fg-muted">Shapiro-Wilk, Levene ve Kruskal-Wallis, örnek veri üzerinde tarayıcıda hesaplanır.</p>
+          <p className="text-caption text-fg-muted">Tüm hesaplar bu bilgisayardaki yerel sunucuda yapılır; verileriniz dışarı gönderilmez.</p>
         </div>
         <div className="flex items-center justify-between px-1">
-          <p className="font-mono text-caption text-fg-subtle">Örnek veri, tarayıcıda hesap</p>
+          <p className="font-mono text-caption text-fg-subtle">Yerel çalışma</p>
           <IconButton icon={Settings} label="Ayarlar" className="size-8" />
         </div>
       </div>

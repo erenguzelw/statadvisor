@@ -219,6 +219,13 @@ describe('güvenlik', () => {
     expect((await app.inject({ url: '/api/health', headers: { host: '127.0.0.1:3001' } })).statusCode).toBe(200);
   });
 
+  it('aynı köken (Origin ve Host aynı) kabul edilir, farklı port ve site reddedilir', async () => {
+    const same = await app.inject({ method: 'POST', url: '/api/analyses', payload: {}, headers: { host: '127.0.0.1:4173', origin: 'http://127.0.0.1:4173' } });
+    expect(same.statusCode).toBe(400);
+    const other = await app.inject({ method: 'POST', url: '/api/analyses', payload: {}, headers: { host: '127.0.0.1:3001', origin: 'http://127.0.0.1:9999' } });
+    expect(other.statusCode).toBe(403);
+  });
+
   it('yazma isteklerinde yabancı Origin’i reddeder, izinli olanı kabul eder', async () => {
     const bad = await app.inject({ method: 'POST', url: '/api/analyses', payload: {}, headers: { origin: 'https://evil.example.com' } });
     expect(bad.statusCode).toBe(403);
