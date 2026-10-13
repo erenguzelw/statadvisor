@@ -187,7 +187,7 @@ function general(a: AssumptionInput, normal: boolean, equalVar: boolean, usesVar
     out.push(`n = ${a.n}: Shapiro-Wilk önemsiz sapmalara bile duyarlıdır. Q-Q grafiğine ve çarpıklığa da bakın.`);
   }
   if (usesVariance && normal && !equalVar) {
-    out.push('Varyanslar eşit değil: post-hoc için Games-Howell kullanın.');
+    out.push('Varyanslar eşit değil: post-hoc için ikili Welch t-testleri (Holm düzeltmeli) kullanın.');
   }
   out.push('Ön testlerle test seçmek Tip I hata oranını etkileyebilir. Seçim kuralını raporunuzda belirtin.');
   return out;

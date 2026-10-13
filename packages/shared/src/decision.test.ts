@@ -29,7 +29,7 @@ describe('recommendTest', () => {
   it('normal ama varyanslar eşit değilken Games-Howell uyarısı verir', () => {
     const r = recommendTest(answers({}), unequal);
     expect(r.finalTest).toBe('Welch ANOVA');
-    expect(r.warnings.join(' ')).toContain('Games-Howell');
+    expect(r.warnings.join(' ')).toContain('ikili Welch');
   });
 
   it('2 grup', () => {
