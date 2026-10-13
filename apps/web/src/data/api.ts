@@ -66,6 +66,8 @@ export interface ColumnInfo {
   missing: number;
   examples: string[];
   likelyId: boolean;
+  prefixCoded?: boolean;
+  rankLabels?: string[] | null;
   warnings: string[];
 }
 
@@ -75,6 +77,7 @@ export interface DatasetOperations {
   removedRows?: number;
   imputedCells?: number;
   scales?: unknown;
+  screening?: unknown;
   log: string[];
 }
 

@@ -78,6 +78,8 @@ export interface AssumptionInput {
   /** Toplam gözlem sayısı ve en küçük grubun gözlem sayısı. */
   n: number;
   minGroupN: number;
+  /** Normallik ölçütü (varsayılan Shapiro-Wilk). */
+  normality?: 'shapiro' | 'skewkurt-1.5' | 'skewkurt-2';
 }
 
 export interface Recommendation {
@@ -129,7 +131,7 @@ export function recommendTest(answers: WizardAnswers, a: AssumptionInput): Recom
       final = normal ? 'Pearson korelasyonu' : 'Spearman sıra korelasyonu';
       if (!normal) reroute = 'Normallik varsayımı sağlanmadı';
     }
-    warnings.push(...general(a, normal, equalVar, false));
+    warnings.push(...general(a, normal, equalVar, false, answers.target === 'continuous'));
     return { plannedTest: planned, finalTest: final, rerouteReason: reroute, warnings, supportedByExample: false, conditions };
   }
 
@@ -172,23 +174,27 @@ export function recommendTest(answers: WizardAnswers, a: AssumptionInput): Recom
         : 'Yayılımlar farklı olduğundan sonuç medyan karşılaştırması olarak yorumlanamaz; yalnızca stokastik üstünlük olarak okunmalıdır.',
     );
   }
-  warnings.push(...general(a, normal, equalVar, true));
+  warnings.push(...general(a, normal, equalVar, true, answers.target === 'continuous'));
 
   const supported = answers.groups === '3+' && !paired && answers.target === 'continuous';
   return { plannedTest: planned, finalTest: final, rerouteReason: reroute, warnings, supportedByExample: supported, conditions };
 }
 
-function general(a: AssumptionInput, normal: boolean, equalVar: boolean, usesVariance: boolean): string[] {
+function general(a: AssumptionInput, normal: boolean, equalVar: boolean, usesVariance: boolean, checksNormality: boolean): string[] {
   const out: string[] = [];
-  if (a.minGroupN < 20) {
+  const shapiro = checksNormality && (a.normality ?? 'shapiro') === 'shapiro';
+  if (shapiro && a.minGroupN < 20) {
     out.push(`En küçük grupta yalnızca ${a.minGroupN} gözlem var: Shapiro-Wilk bu n’de güçsüzdür, “normal” çıkması normalliği kanıtlamaz.`);
   }
-  if (a.n >= 100) {
+  if (shapiro && a.n >= 100) {
     out.push(`n = ${a.n}: Shapiro-Wilk önemsiz sapmalara bile duyarlıdır. Q-Q grafiğine ve çarpıklığa da bakın.`);
   }
   if (usesVariance && normal && !equalVar) {
     out.push('Varyanslar eşit değil: post-hoc için ikili Welch t-testleri (Holm düzeltmeli) kullanın.');
   }
-  out.push('Ön testlerle test seçmek Tip I hata oranını etkileyebilir. Seçim kuralını raporunuzda belirtin.');
+  if (checksNormality && !shapiro && a.minGroupN < 30) {
+    out.push(`En küçük grupta ${a.minGroupN} gözlem var: küçük örneklemde çarpıklık ve basıklık kararsızdır; histogramı da inceleyin.`);
+  }
+  if (checksNormality) out.push('Ön testlerle test seçmek Tip I hata oranını etkileyebilir. Seçim kuralını raporunuzda belirtin.');
   return out;
 }

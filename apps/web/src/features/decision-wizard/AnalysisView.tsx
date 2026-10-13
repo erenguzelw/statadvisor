@@ -13,6 +13,8 @@ const descColumns: Column<GroupDescriptive>[] = [
   { key: 'median', header: 'Medyan', numeric: true, align: 'right', cell: (d) => n2(d.median) },
   { key: 'mean', header: 'Ortalama', numeric: true, align: 'right', cell: (d) => n2(d.mean) },
   { key: 'sd', header: 'SS', numeric: true, align: 'right', cell: (d) => n2(d.sd) },
+  { key: 'skew', header: 'Çarpıklık', numeric: true, align: 'right', cell: (d) => n2(d.skewness) },
+  { key: 'kurt', header: 'Basıklık', numeric: true, align: 'right', cell: (d) => n2(d.kurtosis) },
 ];
 
 const pairColumns: Column<OutcomePair>[] = [

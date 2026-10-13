@@ -107,6 +107,45 @@ test('ölçek puanı: alt boyut elle tanımlanır, alfa gösterilir, yeni sürü
   await expect(page.getByRole('cell', { name: 'Bileşik puan' })).toBeVisible();
 });
 
+test('anket: düz çizgi ve Mahalanobis taraması, taranmış sürüm, ölçek puanı normalliği ve çarpıklık-basıklık ölçütü', async ({ page, request }) => {
+  const labels = ['0:Hiç', '1:Az', '2:Bazen', '3:Genellikle', '4:Tamamen'];
+  let seed = 7;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  const lines = ['cinsiyet,m1,m2,m3,m4'];
+  for (let i = 0; i < 120; i++) {
+    const base = Math.floor(rnd() * 3) + 1;
+    const vals = i % 30 === 5 ? [2, 2, 2, 2] : [0, 1, 2, 3].map(() => Math.min(4, Math.max(0, base + Math.round(rnd() * 2 - 1))));
+    lines.push([i % 2 ? 'Kadın' : 'Erkek', ...vals.map((v) => labels[v])].join(','));
+  }
+  const up = await request.post('/api/datasets', { multipart: { file: { name: 'anket.csv', mimeType: 'text/csv', buffer: Buffer.from(lines.join('\n') + '\n') } } });
+  expect(up.ok()).toBe(true);
+  await page.goto('/veri');
+  const screen = page.getByRole('region', { name: 'Anket yanıt taraması' }).or(page.locator('section', { hasText: 'Anket yanıt taraması' }).first());
+  await expect(screen.getByText('Taranacak maddeler (4 seçili)')).toBeVisible();
+  await screen.getByRole('button', { name: 'Yanıtları tara' }).click();
+  await expect(screen.getByText(/Düz çizgi: /)).toBeVisible();
+  await screen.getByRole('button', { name: /satırı çıkararak yeni sürüm oluştur/ }).click();
+  await expect(page.getByText('Etkin veri seti: anket (taranmış).csv')).toBeVisible();
+
+  const box = page.getByRole('group', { name: 'Ölçek 1' });
+  await box.getByLabel('Ölçek adı').fill('Toplam');
+  await box.getByLabel('Puan').selectOption('sum');
+  await box.getByLabel('En küçük yanıt').fill('0');
+  await box.getByLabel('En büyük yanıt').fill('4');
+  for (const m of ['m1', 'm2', 'm3', 'm4']) await box.getByRole('checkbox', { name: m, exact: true }).check();
+  await page.getByRole('button', { name: 'Puanları hesapla' }).click();
+  await expect(page.getByText(/Puanın normalliği: çarpıklık/)).toBeVisible();
+
+  await page.goto('/karar-sihirbazi');
+  await page.getByLabel('Sonuç sütunu (sayısal)').selectOption('Toplam');
+  await page.getByLabel('Grup sütunu').selectOption('cinsiyet');
+  await expect(page.getByLabel('Normallik ölçütü')).toHaveValue('skewkurt-1.5');
+  await expect(page.getByRole('heading', { name: 'Çarpıklık ve basıklık' })).toBeVisible();
+  await expect(page.getByRole('columnheader', { name: 'Basıklık' })).toBeVisible();
+  await page.getByLabel('Normallik ölçütü').selectOption('shapiro');
+  await expect(page.getByRole('heading', { name: 'Shapiro-Wilk testi' })).toBeVisible();
+});
+
 test('sihirbaz: gerçek veriden analiz hesaplar, varsayımları ve yorumu gösterir; seviye tercihi korunur', async ({ page, request }) => {
   await loadSample(request, 'klinik');
   await page.goto('/karar-sihirbazi');

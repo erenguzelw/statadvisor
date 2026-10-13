@@ -10,6 +10,7 @@ import { useDataset, useDatasets, useDeleteDataset, useLoadSample, useSamples, u
 import { cn } from '@/lib/cn';
 import { columnTypeLabel } from '@/lib/variables';
 import { ScaleBuilder } from './ScaleBuilder';
+import { ScreenPanel } from './ScreenPanel';
 
 const nf = new Intl.NumberFormat('tr-TR');
 const kb = (b: number) => (b < 1024 * 1024 ? `${(b / 1024).toFixed(1)} KB` : `${(b / 1024 / 1024).toFixed(1)} MB`);
@@ -97,7 +98,7 @@ export function DatasetsPage() {
           {d.parentId && (
             <StatusChip status="info">
               <GitBranch size={12} aria-hidden />
-              {d.operations && 'scales' in d.operations ? 'ölçekli sürüm' : 'temizlenmiş sürüm'}
+              {d.operations?.scales ? 'ölçekli sürüm' : d.operations?.screening ? 'taranmış sürüm' : 'temizlenmiş sürüm'}
             </StatusChip>
           )}
           {d.id === active?.id && <StatusChip status="success">etkin</StatusChip>}
@@ -207,6 +208,7 @@ export function DatasetsPage() {
         </QueryView>
       </Panel>
 
+      {active && <ScreenPanel datasetId={active.id} columns={active.columns} />}
       {active && <ScaleBuilder datasetId={active.id} columns={active.columns} />}
 
       {active && (

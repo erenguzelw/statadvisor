@@ -2,9 +2,10 @@
  * Python kodu üretici. Üretilen betik, kullanıcının CSV dosyasını okuyup uygulamadaki analizi yeniden yapar ve
  * `expectedOutput` ile birebir aynı satırları yazdırır. Bu eşitlik, Python bulunan ortamda otomatik testle doğrulanır.
  */
-import type { AnalysisResult } from './analysis.ts';
+import type { AnalysisResult, NormalityMethod } from './analysis.ts';
 import type { ImputeMethod } from './clean.ts';
 import type { ScaleDef, ScaleResult } from './scales.ts';
+import type { ScreenOptions, ScreenResult } from './screening.ts';
 
 export interface DatasetFile {
   fileName: string;
@@ -22,6 +23,7 @@ export interface AnalysisSpec {
   design: 'independent' | 'paired' | 'unknown';
   target: 'continuous' | 'ordinal' | 'categorical';
   alpha?: number;
+  normality?: NormalityMethod;
   value?: string;
   group?: string;
   conditions?: string[];
@@ -79,7 +81,8 @@ export function expectedLines(r: AnalysisResult): string[] {
   const o = r.outcome;
   const L: string[] = [];
   for (const a of r.assumptions) {
-    if (a.name === 'Shapiro-Wilk') L.push(`Shapiro-Wilk [${a.id.split(':')[1]}] W: ${a.statistic.replace('W = ', '')} p: ${fmt(a.p, 6)}`);
+    if (a.shape) L.push(`Carpiklik-Basiklik [${a.id.split(':')[1]}] carpiklik: ${fmt(a.shape.skewness, 3)} basiklik: ${fmt(a.shape.kurtosis, 3)}`);
+    else if (a.name === 'Shapiro-Wilk') L.push(`Shapiro-Wilk [${a.id.split(':')[1]}] W: ${a.statistic.replace('W = ', '')} p: ${fmt(a.p, 6)}`);
     else L.push(`Levene F: ${a.statistic.replace(/^F\(.*\) = /, '')} p: ${fmt(a.p, 6)}`);
   }
   L.push(`Test: ${o.test}`);
@@ -109,6 +112,15 @@ function shapiroBlock(label: string, arr: string): string[] {
     ...SHAPIRO_SUBSAMPLE.split('\n').map((l) => l.replace(/^ {4}/, '')),
     'w, p_sw = stats.shapiro(kalintilar)',
     `print(f"Shapiro-Wilk [${label}] W: {w:.3f} p: {p_sw:.6f}")`,
+  ];
+}
+
+function skewKurtBlock(label: string, arr: string): string[] {
+  return [
+    `kalintilar = ${arr}`,
+    'carp = stats.skew(kalintilar, bias=False)  # düzeltilmiş çarpıklık (SPSS ile aynı)',
+    'bas = stats.kurtosis(kalintilar, bias=False)  # düzeltilmiş fazlalık basıklık (SPSS ile aynı)',
+    `print(f"Carpiklik-Basiklik [${label}] carpiklik: {carp:.3f} basiklik: {bas:.3f}")`,
   ];
 }
 
@@ -160,6 +172,9 @@ export function generateAnalysisCode(file: DatasetFile, spec: AnalysisSpec, r: A
   const body: string[] = [];
   const names = r.descriptives.map((d) => d.group);
   const needsEtiket = spec.group || spec.rowVar || spec.colVar;
+  const limit = spec.normality === 'skewkurt-2' ? 2 : 1.5;
+  const byShape = spec.normality === 'skewkurt-1.5' || spec.normality === 'skewkurt-2';
+  const normBlock = (label: string, arr: string) => (byShape ? skewKurtBlock(label, arr) : shapiroBlock(label, arr));
 
   const head = (): string[] => [
     '# StatAdvisor AI tarafından üretildi. Veri dosyası betikle aynı klasörde olmalıdır.',
@@ -185,7 +200,8 @@ export function generateAnalysisCode(file: DatasetFile, spec: AnalysisSpec, r: A
     const hasAssumptions = r.assumptions.length > 0;
     if (hasAssumptions) {
       body.push('# Varsayım testleri: grup içi kalıntılarda normallik, gruplar arasında varyans eşitliği');
-      body.push(...shapiroBlock('residuals', 'np.concatenate([g - g.mean() for g in gruplar])'));
+      if (byShape) body.push(`# Normallik ölçütü: |çarpıklık| ve |basıklık| ≤ ${limit}`);
+      body.push(...normBlock('residuals', 'np.concatenate([g - g.mean() for g in gruplar])'));
       body.push('f_l, p_l = stats.levene(*gruplar, center="median")', 'print(f"Levene F: {f_l:.2f} p: {p_l:.6f}")', '');
     }
     body.push(`print("Test: ${o.test}")`);
@@ -259,7 +275,7 @@ export function generateAnalysisCode(file: DatasetFile, spec: AnalysisSpec, r: A
       const two = cols.length === 2;
       body.push(
         two ? '# Eşleşmiş tasarımda normallik farklar üzerinde aranır' : '# Eşleşmiş tasarımda normallik iki yönlü kalıntılar üzerinde aranır',
-        ...shapiroBlock('paired', two ? '(kosullar[0] - kosullar[1])' : '(lambda M: (M - M.mean(axis=1, keepdims=True) - M.mean(axis=0, keepdims=True) + M.mean()).ravel())(np.vstack(kosullar))'),
+        ...normBlock('paired', two ? '(kosullar[0] - kosullar[1])' : '(lambda M: (M - M.mean(axis=1, keepdims=True) - M.mean(axis=0, keepdims=True) + M.mean()).ravel())(np.vstack(kosullar))'),
         '',
       );
     }
@@ -327,7 +343,7 @@ export function generateAnalysisCode(file: DatasetFile, spec: AnalysisSpec, r: A
       '',
     );
     if (r.assumptions.length) {
-      body.push('# Normallik her değişken için ayrı sınanır', ...shapiroBlock('x', 'x'), ...shapiroBlock('y', 'y'), '');
+      body.push('# Normallik her değişken için ayrı sınanır', ...normBlock('x', 'x'), ...normBlock('y', 'y'), '');
     }
     body.push(`print("Test: ${o.test}")`);
     if (o.test === 'Pearson korelasyonu') {
@@ -431,7 +447,7 @@ export function generateCleaningCode(
 /** Ölçek puanı kodu: ters maddeleri çevirir, toplam/ortalama puanı ve Cronbach alfayı hesaplar; olcekli.csv'ye yazar. */
 export function generateScalesCode(file: DatasetFile, defs: ScaleDef[], results: ScaleResult[]): GeneratedCode {
   const L: string[] = ['# StatAdvisor AI tarafından üretildi. Veri dosyası betikle aynı klasörde olmalıdır.', ''];
-  L.push('import numpy as np', 'import pandas as pd', '', naBlock, '', readCsvLine(file), '');
+  L.push('import numpy as np', 'import pandas as pd', 'from scipy import stats', '', naBlock, '', readCsvLine(file), '');
   L.push('# Ölçekler: alt boyutlar araştırmacı tarafından tanımlanmıştır (ters maddeler: min + max - x)');
   L.push('SKALALAR = [');
   for (const d of defs) {
@@ -454,13 +470,53 @@ export function generateScalesCode(file: DatasetFile, defs: ScaleDef[], results:
     '    ort = puan.mean() if puan.notna().any() else float("nan")',
     '    print(f"Olcek [{sk[\'ad\']}] alfa: {alfa:.4f} n_alfa: {len(tam)}")',
     '    print(f"Olcek [{sk[\'ad\']}] ortalama: {ort:.4f} gecerli: {int(puan.notna().sum())}")',
+    '    v = puan.dropna().to_numpy(dtype=float)',
+    '    if len(v) >= 4 and v.std() > 0:  # puanın normalliği',
+    '        u = np.sort(v)[np.floor(np.arange(5000) * len(v) / 5000).astype(int)] if len(v) > 5000 else v',
+    '        w, p_sw = stats.shapiro(u)',
+    '        print(f"Olcek [{sk[\'ad\']}] carpiklik: {stats.skew(v, bias=False):.3f} basiklik: {stats.kurtosis(v, bias=False):.3f} Shapiro-Wilk W: {w:.3f} p: {p_sw:.6f}")',
     '',
     'df.to_csv("olcekli.csv", index=False)',
   );
   const expected = results.flatMap((r) => [
     `Olcek [${r.name}] alfa: ${r.alpha === null ? 'nan' : fmt(r.alpha, 4)} n_alfa: ${r.nAlpha}`,
     `Olcek [${r.name}] ortalama: ${r.mean === null ? 'nan' : fmt(r.mean, 4)} gecerli: ${r.nValid}`,
+    ...(r.skewness !== null && r.shapiroP !== null
+      ? [`Olcek [${r.name}] carpiklik: ${fmt(r.skewness, 3)} basiklik: ${fmt(r.kurtosis ?? NaN, 3)} Shapiro-Wilk W: ${fmt(r.shapiroW!, 3)} p: ${fmt(r.shapiroP, 6)}`]
+      : []),
   ]);
   const code = L.join('\n') + '\n';
   return { filename: 'olcek.py', code, expectedOutput: expected, requirements: requirementsOf(code) };
+}
+
+/** Anket yanıt taraması kodu: düz çizgi yanıtlar ve Mahalanobis D²; işaretli satırlar çıkarılıp taranmis.csv'ye yazılır. */
+export function generateScreeningCode(file: DatasetFile, opts: ScreenOptions, r: ScreenResult): GeneratedCode {
+  const alpha = opts.mahalanobisAlpha ?? 0.001;
+  const L: string[] = ['# StatAdvisor AI tarafından üretildi. Veri dosyası betikle aynı klasörde olmalıdır.', ''];
+  L.push('import numpy as np', 'import pandas as pd', 'from scipy import stats', '', naBlock, '', readCsvLine(file), '');
+  L.push(`MADDELER = ${pyList(opts.items)}`, 'for s in MADDELER:', '    df[s] = pd.to_numeric(df[s], errors="coerce")', 'tam = df[MADDELER].dropna()  # yalnızca tüm maddeleri yanıtlayanlar taranır', 'isaretli = set()');
+  if (opts.straightLine) {
+    L.push('', '# Düz çizgi: tüm maddelere aynı yanıt', 'duz = tam.index[tam.nunique(axis=1) == 1]', 'isaretli |= set(duz)', 'print(f"Duz cizgi: {len(duz)}")');
+  }
+  if (opts.mahalanobis) {
+    L.push(
+      '',
+      `# Mahalanobis D²: ki-kare (sd = madde sayısı), p < ${alpha} (Tabachnick ve Fidell, 2013)`,
+      'X = tam.to_numpy(dtype=float)',
+      'fark = X - X.mean(axis=0)',
+      'S_ters = np.linalg.inv(np.cov(X, rowvar=False))',
+      'd2 = np.einsum("ij,jk,ik->i", fark, S_ters, fark)',
+      'p = stats.chi2.sf(d2, df=X.shape[1])',
+      `mah = tam.index[p < ${alpha}]`,
+      'isaretli |= set(mah)',
+      'print(f"Mahalanobis: {len(mah)} en_buyuk_D2: {d2.max():.4f}")',
+    );
+  }
+  L.push('', 'print(f"Cikarilan satir: {len(isaretli)}")', 'df = df.drop(index=sorted(isaretli)).reset_index(drop=True)', 'df.to_csv("taranmis.csv", index=False)');
+  const expected: string[] = [];
+  if (opts.straightLine) expected.push(`Duz cizgi: ${r.straightLiners.length}`);
+  if (opts.mahalanobis) expected.push(`Mahalanobis: ${r.mahalanobis.length} en_buyuk_D2: ${fmt(r.maxD2 ?? NaN, 4)}`);
+  expected.push(`Cikarilan satir: ${r.flagged.length}`);
+  const code = L.join('\n') + '\n';
+  return { filename: 'tarama.py', code, expectedOutput: expected, requirements: requirementsOf(code) };
 }

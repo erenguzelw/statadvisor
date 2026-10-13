@@ -173,6 +173,18 @@ export function ScaleBuilder({ datasetId, columns }: { datasetId: string; column
                     <li key={r.name}>
                       <span className="font-semibold">{r.name}</span>: Cronbach α ={' '}
                       <span className="font-mono">{r.alpha === null ? '–' : r.alpha.toFixed(2)}</span> ({alphaLabel(r.alpha)}), geçerli puan {r.nValid}
+                      {r.skewness !== null && r.kurtosis !== null && (
+                        <span className="block text-caption text-fg-muted">
+                          Puanın normalliği: çarpıklık <span className="font-mono">{r.skewness.toFixed(2)}</span>, basıklık{' '}
+                          <span className="font-mono">{r.kurtosis.toFixed(2)}</span> —{' '}
+                          {Math.abs(r.skewness) <= 1.5 && Math.abs(r.kurtosis) <= 1.5 ? 'normal kabul edilir (±1.5)' : Math.abs(r.skewness) <= 2 && Math.abs(r.kurtosis) <= 2 ? '±1.5 dışında, ±2 içinde' : 'normal kabul edilmez (±2 dışında)'}
+                          {r.shapiroP !== null && (
+                            <>
+                              ; Shapiro-Wilk <span className="font-mono">W = {r.shapiroW!.toFixed(3)}, p {r.shapiroP < 0.001 ? '< .001' : '= ' + r.shapiroP.toFixed(3)}</span>
+                            </>
+                          )}
+                        </span>
+                      )}
                       {r.notes.map((t) => (
                         <span key={t} className="block text-caption text-warning">{t}</span>
                       ))}
