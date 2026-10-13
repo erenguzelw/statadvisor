@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="tr"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><meta content="web_dashboard" name="shell-type"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500;600&amp;family=Space+Grotesk:wght@600;700&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { "colors": { "background": "#0b1326", "on-primary": "#1000a9", "surface-tint": "#c0c1ff", "tertiary": "#ffb95f", "on-tertiary-fixed": "#2a1700", "surface-container-highest": "#2d3449", "on-secondary-fixed-variant": "#005049", "on-background": "#dae2fd", "secondary-fixed": "#89f5e7", "on-tertiary-container": "#3e2400", "secondary": "#6bd8cb", "surface-bright": "#31394d", "slate-surface": "#1E293B", "on-surface": "#dae2fd", "surface": "#0b1326", "on-primary-fixed": "#07006c", "outline": "#908fa0", "on-secondary-fixed": "#00201d", "on-error-container": "#ffdad6", "primary-fixed": "#e1e0ff", "on-secondary": "#003732", "surface-dim": "#0b1326", "primary-container": "#8083ff", "surface-container-low": "#131b2e", "status-info": "#38BDF8", "primary-fixed-dim": "#c0c1ff", "on-surface-variant": "#c7c4d7", "tertiary-container": "#ca8100", "status-warning": "#F59E0B", "error": "#ffb4ab", "tertiary-fixed": "#ffddb8", "surface-container": "#171f33", "secondary-fixed-dim": "#6bd8cb", "surface-variant": "#2d3449", "code-canvas": "#090D16", "outline-variant": "#464554", "inverse-primary": "#494bd6", "status-danger": "#EF4444", "primary": "#c0c1ff", "on-secondary-container": "#00302b", "on-tertiary-fixed-variant": "#653e00", "slate-border": "#475569", "status-success": "#10B981", "on-primary-fixed-variant": "#2f2ebe", "surface-container-lowest": "#060e20", "surface-container-high": "#222a3d", "error-container": "#93000a", "secondary-container": "#29a195", "on-tertiary": "#472a00", "on-error": "#690005", "inverse-surface": "#dae2fd", "slate-surface-elevated": "#334155", "accent-teal": "#14B8A6", "on-primary-container": "#0d0096", "inverse-on-surface": "#283044", "tertiary-fixed-dim": "#ffb95f" }, "borderRadius": { "DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem" }, "spacing": { "space-xl": "2.5rem", "margin-mobile": "1rem", "gutter": "1.25rem", "gutter-mobile": "0.75rem", "space-md": "1rem", "space-lg": "1.5rem", "space-sm": "0.5rem", "margin": "2rem", "space-xs": "0.25rem" }, "fontFamily": { "headline-xl": [ "Space Grotesk" ], "body-sm": [ "Inter" ], "headline-xl-mobile": [ "Space Grotesk" ], "body-lg": [ "Inter" ], "headline-sm": [ "Space Grotesk" ], "body-md": [ "Inter" ], "headline-lg": [ "Space Grotesk" ], "label-lg": [ "JetBrains Mono" ], "headline-md": [ "Space Grotesk" ], "label-md": [ "JetBrains Mono" ], "label-sm": [ "JetBrains Mono" ], "code-inline": [ "JetBrains Mono" ], "headline-lg-mobile": [ "Space Grotesk" ] }, "fontSize": { "headline-xl": [ "40px", { "lineHeight": "48px", "letterSpacing": "-0.02em", "fontWeight": "700" } ], "body-sm": [ "12px", { "lineHeight": "18px", "fontWeight": "400" } ], "headline-xl-mobile": [ "30px", { "lineHeight": "38px", "letterSpacing": "-0.01em", "fontWeight": "700" } ], "body-lg": [ "16px", { "lineHeight": "24px", "fontWeight": "400" } ], "headline-sm": [ "18px", { "lineHeight": "26px", "fontWeight": "600" } ], "body-md": [ "14px", { "lineHeight": "20px", "fontWeight": "400" } ], "headline-lg": [ "32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "600" } ], "label-lg": [ "14px", { "lineHeight": "20px", "fontWeight": "500" } ], "headline-md": [ "24px", { "lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600" } ], "label-md": [ "12px", { "lineHeight": "16px", "letterSpacing": "0.04em", "fontWeight": "500" } ], "label-sm": [ "11px", { "lineHeight": "14px", "letterSpacing": "0.06em", "fontWeight": "500" } ], "code-inline": [ "13px", { "lineHeight": "18px", "fontWeight": "400" } ], "headline-lg-mobile": [ "24px", { "lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600" } ] } } } };</script></head><body class="bg-background font-body-md text-body-md text-on-surface antialiased"><aside class="fixed left-0 top-0 h-full w-72 bg-surface-container-low shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-50 flex flex-col justify-between py-6"><div class="flex flex-col gap-6 px-4"><div class="flex items-center gap-3 px-3 py-1"><div class="w-2 h-2 rounded-full bg-secondary animate-pulse"></div><span class="font-label-sm text-label-sm tracking-wider uppercase text-outline">İstatistik Çekirdeği v4.2</span></div><nav class="flex flex-col gap-1.5" data-active-classes="bg-primary-container text-on-primary-container font-semibold rounded-lg"><a class="flex items-center gap-3 px-3.5 py-3 rounded-lg font-body-md text-body-md text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" data-path="karar-sihirbazi-varsayim-kontrolu" href="#"><span class="material-symbols-outlined text-xl text-primary">account_tree</span><span>Karar Sihirbazı &amp; Varsayım</span></a><a class="flex items-center gap-3 px-3.5 py-3 rounded-lg font-body-md text-body-md text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" data-path="model-karsilastirma-paneli" href="#"><span class="material-symbols-outlined text-xl text-secondary">compare_arrows</span><span>Model Karşılaştırma</span></a><a class="flex items-center gap-3 px-3.5 py-3 rounded-lg font-body-md text-body-md text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" data-path="veri-kalitesi-aykiri-degerler" href="#"><span class="material-symbols-outlined text-xl text-tertiary">analytics</span><span>Veri Kalitesi &amp; Aykırılık</span></a><a aria-current="page" class="flex items-center gap-3 px-3.5 py-3 transition-all bg-primary-container text-on-primary-container font-semibold rounded-lg" data-path="kod-rapor-merkezi" href="#"><span class="material-symbols-outlined text-xl text-status-info">code</span><span>Kod &amp; Rapor Merkezi</span></a></nav></div><div class="px-4 flex flex-col gap-3"><div class="bg-surface-container-lowest p-3.5 rounded-lg"><div class="flex items-center justify-between mb-1.5"><span class="font-label-sm text-label-sm text-outline">Doğrulama Durumu</span><span class="inline-flex items-center gap-1 font-label-sm text-label-sm text-status-success"><span class="w-1.5 h-1.5 rounded-full bg-status-success"></span>Geçerli</span></div><p class="font-body-sm text-body-sm text-on-surface-variant">Normallik (Shapiro-Wilk) ve Levene testleri senkronize edildi.</p></div><div class="flex items-center justify-between px-2 pt-2 text-outline font-label-sm text-label-sm"><span>PyTorch / SciPy Stats</span><span class="material-symbols-outlined text-base">verified</span></div></div></aside><div class="pl-72"><header class="fixed top-0 left-72 right-0 h-16 bg-surface/80 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-40 flex items-center justify-between px-8"><div class="flex items-center gap-4"><img alt="StatAdvisor Logo" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1Xxk2bhqBn9A3-AR6f7W3FPccefdxTfuGr1C_TRR3Cy3D2OTDh0KR-3KOKeIzYMRAfqUboRsM7WXQqD9QKOHnP2v1i-Q2klSjJHqhr7miHCRNdxSKpjoQZrhrUkI_khprrri9O3xZ_KnyCMSGZbzhCr42_gwV4H6LcC-vg8ymUNGeJO5hDGMBA73zQZoNljDQBdluBNtIKa6WU9xuimiyYRMdT1S_1iol8MS6Cb95sc7KI5zrMI702OoNN-"/><div class="flex flex-col"><span class="font-headline-sm text-headline-sm tracking-tight text-on-surface font-semibold">StatAdvisor AI</span></div><div class="h-5 w-px bg-outline-variant mx-1"></div><div class="flex items-center gap-2 bg-surface-container px-3 py-1.5 rounded-lg"><span class="material-symbols-outlined text-secondary text-base">folder_open</span><span class="font-label-sm text-label-sm text-on-surface font-medium">Klinik_Veri_Faz3.csv</span><span class="material-symbols-outlined text-outline text-sm">unfold_more</span></div></div><div class="flex items-center gap-5"><div class="flex items-center bg-surface-container-lowest p-1 rounded-full"><button class="px-3 py-1 rounded-full font-label-sm text-label-sm font-medium bg-surface-container-high text-on-surface transition-colors shadow-sm" type="button">Yeni Başlayan</button><button class="px-3 py-1 rounded-full font-label-sm text-label-sm text-on-surface-variant hover:text-on-surface transition-colors" type="button">Uzman</button></div><div class="flex items-center gap-3 pl-2"><button class="flex items-center justify-center w-9 h-9 rounded-lg bg-surface-container-low text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors" type="button"><span class="material-symbols-outlined text-lg">notifications</span></button><button class="flex items-center justify-center w-9 h-9 rounded-lg bg-surface-container-low text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors" type="button"><span class="material-symbols-outlined text-lg">terminal</span></button><img alt="Profile" class="w-8 h-8 rounded-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB2OM69fmJ9Elp5ggTDYb1IaKH3_ARRmfmQUNQ2CIklLD1YYUYGtMDseMTCqCsO_difwVfUKfW-4sfeQfi6aS72taJUcDdY2PWyURxaI6hHlcQmbbSKsjJR1E4ILBbJbpmmVrXPDLs9YgqICqElhjoicKHzr9Uogx5-Y7_xWk3uJv1vJDHi3VT3ZRxV6EwJtTyRPaB2DK85LPGeVGZ_BYPSf6NhL3nL1OyKVd1ITjt67zC3dIlAHBAbeg"/></div></div></header><main class="relative pt-16 bg-background w-full min-h-screen px-8 py-6"><div class="flex flex-col w-full">
+<!-- Sub-header / Status Deck Bar -->
+<div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 pb-6 border-b border-surface-container-high">
+<div class="flex flex-col gap-1">
+<div class="flex items-center gap-2">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-label-sm font-label-sm uppercase tracking-wider bg-primary-container/20 text-primary-fixed">Özellik 04 &amp; 09</span>
+<span class="text-outline text-label-sm font-label-sm">·</span>
+<span class="text-outline text-label-sm font-label-sm font-medium">İstatistik Çekirdeği Pipeline 4.2</span>
+</div>
+<h1 class="font-headline-lg text-headline-lg tracking-tight text-on-surface font-semibold">Kod Üretimi &amp; Otomatik Raporlama Merkezi</h1>
+<p class="font-body-md text-body-md text-on-surface-variant">Jupyter'da hemen çalıştırılabilir, açıklamalı kod parçaları ve APA 7 standardında anlık akademik raporlar.</p>
+</div>
+<!-- Quick Stats Pill Carousel -->
+<div class="flex items-center gap-3">
+<div class="flex items-center gap-2 bg-surface-container-low px-3.5 py-2 rounded-lg">
+<span class="w-2 h-2 rounded-full bg-status-success"></span>
+<div class="flex flex-col">
+<span class="text-label-sm font-label-sm text-outline leading-tight">Yönlendirilmiş Test</span>
+<span class="font-headline-sm text-headline-sm text-on-surface leading-tight font-medium">Kruskal-Wallis</span>
+</div>
+</div>
+<div class="flex items-center gap-2 bg-surface-container-low px-3.5 py-2 rounded-lg">
+<span class="material-symbols-outlined text-secondary text-lg">science</span>
+<div class="flex flex-col">
+<span class="text-label-sm font-label-sm text-outline leading-tight">İstatistik / P-Değeri</span>
+<span class="font-label-md text-label-md text-secondary-fixed leading-tight">H=11.60 · p=0.003</span>
+</div>
+</div>
+<div class="flex items-center gap-2 bg-surface-container-low px-3.5 py-2 rounded-lg">
+<span class="material-symbols-outlined text-tertiary text-lg">verified_user</span>
+<div class="flex flex-col">
+<span class="text-label-sm font-label-sm text-outline leading-tight">Varsayım Durumu</span>
+<span class="font-label-md text-label-md text-error leading-tight">Normallik İhlali</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Workspace 12-Column Grid -->
+<div class="grid grid-cols-12 gap-6 pt-6">
+<!-- LEFT COLUMN: Code Synthesis Studio (7 Cols) -->
+<div class="col-span-12 xl:col-span-7 flex flex-col gap-5">
+<!-- Studio Header Card -->
+<div class="bg-surface-container-low p-5 rounded-lg flex flex-col gap-4">
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+<div class="flex items-center gap-2.5">
+<div class="w-8 h-8 rounded-lg bg-primary-container/20 flex items-center justify-center text-primary-fixed">
+<span class="material-symbols-outlined text-xl">terminal</span>
+</div>
+<div>
+<span class="font-headline-sm text-headline-sm text-on-surface block font-semibold">Hazır Kod Üretimi (Özellik 04)</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Jupyter'da hemen çalıştırılabilir, açıklamalı kod parçaları. Kopyala → yapıştır → çalıştır.</span>
+</div>
+</div>
+<div class="flex items-center gap-1.5 self-start sm:self-auto bg-surface-container-lowest px-2.5 py-1 rounded">
+<span class="w-2 h-2 rounded-full bg-status-success animate-pulse"></span>
+<span class="font-label-sm text-label-sm text-status-success uppercase font-semibold">Test Senkronize</span>
+</div>
+</div>
+<!-- Language Tabs -->
+<div class="flex items-center justify-between border-b border-surface-container-high pb-2">
+<div class="flex items-center gap-1 bg-surface-container-lowest p-1 rounded-lg" id="lang-tab-bar">
+<button class="flex items-center gap-1.5 px-3 py-1.5 rounded font-label-md text-label-md font-medium bg-primary text-on-primary transition-all" id="tab-scipy" onclick="switchLanguage('scipy')" type="button">
+<span class="material-symbols-outlined text-sm">integration_instructions</span>
+<span>Python (SciPy)</span>
+</button>
+<button class="flex items-center gap-1.5 px-3 py-1.5 rounded font-label-md text-label-md font-medium text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-all" id="tab-statsmodels" onclick="switchLanguage('statsmodels')" type="button">
+<span>Statsmodels</span>
+</button>
+<button class="flex items-center gap-1.5 px-3 py-1.5 rounded font-label-md text-label-md font-medium text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-all" id="tab-sklearn" onclick="switchLanguage('sklearn')" type="button">
+<span>Scikit-learn</span>
+</button>
+<button class="flex items-center gap-1.5 px-3 py-1.5 rounded font-label-md text-label-md font-medium text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-all" id="tab-r" onclick="switchLanguage('r')" type="button">
+<span>R Dili</span>
+</button>
+</div>
+<div class="hidden sm:flex items-center gap-2 text-outline font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-sm">tune</span>
+<span>Kernel: Python 3.11 (SciPy v1.11.4)</span>
+</div>
+</div>
+<!-- Monospaced Code Terminal Container -->
+<div class="bg-code-canvas rounded-lg overflow-hidden shadow-xl flex flex-col">
+<!-- Editor Titlebar -->
+<div class="bg-surface-container-lowest px-4 py-2.5 flex items-center justify-between">
+<div class="flex items-center gap-3">
+<div class="flex items-center gap-1.5">
+<span class="w-3 h-3 rounded-full bg-error/70 inline-block"></span>
+<span class="w-3 h-3 rounded-full bg-status-warning/70 inline-block"></span>
+<span class="w-3 h-3 rounded-full bg-status-success/70 inline-block"></span>
+</div>
+<span class="font-code-inline text-code-inline text-on-surface-variant flex items-center gap-1" id="file-title">
+<span class="material-symbols-outlined text-sm text-secondary">description</span>
+                analiz.py
+              </span>
+</div>
+<!-- Quick Run / Copy Controls -->
+<div class="flex items-center gap-2">
+<span class="font-label-sm text-label-sm text-outline px-2 py-0.5 rounded bg-surface-container-high/40" id="env-badge">SciPy / NumPy</span>
+<button class="flex items-center gap-1.5 bg-surface-container-high hover:bg-surface-bright text-on-surface px-2.5 py-1 rounded text-label-sm font-label-sm font-medium transition-all shadow-sm" id="btn-copy-code" onclick="copySnippet()" type="button">
+<span class="material-symbols-outlined text-sm" id="copy-icon">content_copy</span>
+<span id="copy-text">Kodu Kopyala</span>
+</button>
+</div>
+</div>
+<!-- Code Lines Screen -->
+<div class="p-4 font-code-inline text-code-inline overflow-x-auto leading-relaxed select-text" id="code-content">
+<!-- Dynamic code lines inserted via script, default SciPy rendered static for SSR -->
+<div class="flex items-start gap-4">
+<span class="text-outline-variant select-none w-6 text-right font-label-sm text-label-sm">1</span>
+<span><span class="text-tertiary"># analiz.py - Otomatik Hipotez Doğrulama ve Non-Parametrik Test</span></span>
+</div>
+<div class="flex items-start gap-4">
+<span class="text-outline-variant select-none w-6 text-right font-label-sm text-label-sm">2</span>
+<span><span class="text-primary-container font-semibold">import</span> <span class="text-on-surface">numpy</span> <span class="text-primary-container font-semibold">as</span> <span class="text-on-surface">np</span></span>
+</div>
+<div class="flex items-start gap-4">
+<span class="text-outline-variant select-none w-6 text-right font-label-sm text-label-sm">3</span>
+<span><span class="text-primary-container font-semibold">from</span> <span class="text-on-surface">scipy</span> <span class="text-primary-container font-semibold">import</span> <span class="text-secondary font-semibold">stats</span></span>
+</div>
+<div class="flex items-start gap-4">
+<span class="text-outline-variant select-none w-6 text-right font-label-sm text-label-sm">4</span>
+<span> </span>
+</div>
+<div class="flex items-start gap-4">
+<span class="text-outline-variant select-none w-6 text-right font-label-sm text-label-sm">5</span>
+<span><span class="text-outline"># Veri Ön Yükleme: Klinik_Veri_Faz3 (Grup A, B, C)</span></span>
+</div>
+<div class="flex items-start gap-4">
+<span class="text-outline-variant select-none w-6 text-right font-label-sm text-label-sm">6</span>
+<span><span class="text-on-surface">grup_a</span> = <span class="text-on-surface">np.array([<span class="text-tertiary-fixed">14.2</span>, <span class="text-tertiary-fixed">18.5</span>, <span class="text-tertiary-fixed">12.1</span>, <span class="text-tertiary-fixed">16.4</span>, <span class="text-tertiary-fixed">15.9</span>])</span></span>
+</div>
+<div class="flex items-start gap-4">
+<span class="text-outline-variant select-none w-6 text-right font-label-sm text-label-sm">7</span>
+<span><span class="text-on-surface">grup_b</span> = <span class="text-on-surface">np.array([<span class="text-tertiary-fixed">22.1</span>, <span class="text-tertiary-fixed">24.6</span>, <span class="text-tertiary-fixed">27.3</span>, <span class="text-tertiary-fixed">20.8</span>, <span class="text-tertiary-fixed">26.0</span>])</span></span>
+</div>
+<div class="flex items-start gap-4">
+<span class="text-outline-variant select-none w-6 text-right font-label-sm text-label-sm">8</span>
+<span><span class="text-on-surface">grup_c</span> = <span class="text-on-surface">np.array([<span class="text-tertiary-fixed">31.4</span>, <span class="text-tertiary-fixed">29.8</span>, <span class="text-tertiary-fixed">35.2</span>, <span class="text-tertiary-fixed">33.1</span>, <span class="text-tertiary-fixed">30.5</span>])</span></span>
+</div>
+<div class="flex items-start gap-4">
+<span class="text-outline-variant select-none w-6 text-right font-label-sm text-label-sm">9</span>
+<span> </span>
+</div>
+<div class="flex items-start gap-4">
+<span class="text-outline-variant select-none w-6 text-right font-label-sm text-label-sm">10</span>
+<span><span class="text-outline"># Normallik varsayımı sağlanmadı (Shapiro-Wilk p = 0.012) -&gt; Kruskal-Wallis testi</span></span>
+</div>
+<div class="flex items-start gap-4">
+<span class="text-outline-variant select-none w-6 text-right font-label-sm text-label-sm">11</span>
+<span><span class="text-on-surface">h_stat, p_val</span> = <span class="text-secondary font-semibold">stats.kruskal</span>(<span class="text-on-surface">grup_a</span>, <span class="text-on-surface">grup_b</span>, <span class="text-on-surface">grup_c</span>)</span>
+</div>
+<div class="flex items-start gap-4">
+<span class="text-outline-variant select-none w-6 text-right font-label-sm text-label-sm">12</span>
+<span> </span>
+</div>
+<div class="flex items-start gap-4">
+<span class="text-outline-variant select-none w-6 text-right font-label-sm text-label-sm">13</span>
+<span><span class="text-secondary font-semibold">print</span>(<span class="text-secondary-fixed">f"Kruskal-Wallis H-Skoru: {h_stat:.2f}, p-değeri: {p_val:.4f}"</span>)</span>
+</div>
+<div class="flex items-start gap-4">
+<span class="text-outline-variant select-none w-6 text-right font-label-sm text-label-sm">14</span>
+<span><span class="text-primary-container font-semibold">if</span> <span class="text-on-surface">p_val</span> &lt; <span class="text-tertiary-fixed">0.05</span>:</span>
+</div>
+<div class="flex items-start gap-4">
+<span class="text-outline-variant select-none w-6 text-right font-label-sm text-label-sm">15</span>
+<span class="pl-4"><span class="text-secondary font-semibold">print</span>(<span class="text-status-success">"Sonuç: Gruplar arasında istatistiksel olarak anlamlı fark var."</span>)</span>
+</div>
+<div class="flex items-start gap-4">
+<span class="text-outline-variant select-none w-6 text-right font-label-sm text-label-sm">16</span>
+<span><span class="text-primary-container font-semibold">else</span>:</span>
+</div>
+<div class="flex items-start gap-4">
+<span class="text-outline-variant select-none w-6 text-right font-label-sm text-label-sm">17</span>
+<span class="pl-4"><span class="text-secondary font-semibold">print</span>(<span class="text-outline">"Sonuç: Gruplar arasında anlamlı bir fark tespit edilemedi."</span>)</span>
+</div>
+</div>
+<!-- Terminal Output Simulation Window -->
+<div class="bg-surface-container-high/60 px-4 py-3 flex flex-col gap-1.5 border-t border-surface-container-highest">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-status-success text-base">play_circle</span>
+<span class="font-label-sm text-label-sm text-on-surface font-semibold uppercase tracking-wider">Konsol Çıktısı (Stdout)</span>
+</div>
+<span class="font-label-sm text-label-sm text-outline">Çalışma süresi: 14.8 ms</span>
+</div>
+<div class="bg-surface-container-lowest p-2.5 rounded font-code-inline text-code-inline text-on-surface flex flex-col gap-0.5">
+<span class="text-secondary-fixed">Kruskal-Wallis H-Skoru: 11.60, p-değeri: 0.0031</span>
+<span class="text-status-success font-medium">Sonuç: Gruplar arasında istatistiksel olarak anlamlı fark var.</span>
+</div>
+</div>
+</div>
+<!-- External Pipeline Launch Actions -->
+<div class="flex flex-wrap items-center justify-between gap-3 pt-1">
+<div class="flex flex-wrap items-center gap-2.5">
+<button class="flex items-center gap-2 bg-surface-container-high hover:bg-surface-bright text-on-surface px-4 py-2 rounded-lg font-body-md text-body-md font-medium transition-all shadow-sm" onclick="triggerNotification('Colab ortamı yeni sekmede başlatılıyor...')" type="button">
+<svg class="w-4 h-4 text-tertiary" fill="currentColor" viewbox="0 0 24 24">
+<path d="M16.94 14.42a4.4 4.4 0 0 0 .5-2.02c0-2.43-1.97-4.4-4.4-4.4s-4.4 1.97-4.4 4.4c0 .73.18 1.42.5 2.02L4.2 19.36A9.97 9.97 0 0 1 2 12.4C2 6.66 6.66 2 12.4 2S22.8 6.66 22.8 12.4c0 2.6-.96 4.97-2.54 6.78l-3.32-4.76z"></path>
+</svg>
+<span>Google Colab'da Aç</span>
+</button>
+<button class="flex items-center gap-2 bg-surface-container-high hover:bg-surface-bright text-on-surface px-4 py-2 rounded-lg font-body-md text-body-md font-medium transition-all shadow-sm" onclick="downloadIpynb()" type="button">
+<span class="material-symbols-outlined text-secondary text-base">download</span>
+<span>Jupyter Notebook Olarak İndir (.ipynb)</span>
+</button>
+</div>
+<div class="flex items-center gap-2">
+<span class="inline-flex items-center gap-1 font-label-sm text-label-sm text-status-success">
+<span class="material-symbols-outlined text-sm">check_circle</span>
+              Bağımlılıklar Yüklü
+            </span>
+</div>
+</div>
+</div>
+<!-- Feature Card: Pip Requirement & Code Explainer -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+<!-- Dependency Requirement -->
+<div class="bg-surface-container-low p-4 rounded-lg flex flex-col justify-between gap-3">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary text-lg">package_2</span>
+<span class="font-headline-sm text-headline-sm text-on-surface">Paket Bağımlılıkları</span>
+</div>
+<span class="text-label-sm font-label-sm text-outline">requirements.txt</span>
+</div>
+<div class="bg-surface-container-lowest p-2.5 rounded font-code-inline text-code-inline text-on-surface-variant">
+            pip install scipy==1.11.4 numpy&gt;=1.24 statsmodels
+          </div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Çevresel sürüm uyumsuzluklarına karşı pinlenmiş deterministik paketler.</p>
+</div>
+<!-- Non-parametric Reroute Alert -->
+<div class="bg-surface-container-low p-4 rounded-lg flex flex-col justify-between gap-3">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-tertiary text-lg">alt_route</span>
+<span class="font-headline-sm text-headline-sm text-on-surface">Otomatik Rota</span>
+</div>
+<span class="bg-rose-950/40 text-error px-2 py-0.5 rounded text-label-sm font-label-sm font-medium">Varsayım İhlali</span>
+</div>
+<div class="flex items-center gap-2 font-label-md text-label-md">
+<span class="line-through text-outline">Tek Yönlü ANOVA</span>
+<span class="material-symbols-outlined text-primary text-base">arrow_forward</span>
+<span class="text-secondary font-semibold">Kruskal-Wallis Testi</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Shapiro-Wilk normallik testi (p=0.012 &lt; 0.05) başarısız olduğu için kod non-parametrik scipy.stats.kruskal fonksiyonuna otomatik yönlendirildi.</p>
+</div>
+</div>
+</div>
+<!-- RIGHT COLUMN: Report Production Hub & APA Export (5 Cols) -->
+<div class="col-span-12 xl:col-span-5 flex flex-col gap-5">
+<!-- Report Generator Card -->
+<div class="bg-surface-container-low p-5 rounded-lg flex flex-col gap-4">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2.5">
+<div class="w-8 h-8 rounded-lg bg-secondary/20 flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined text-xl">assignment_turned_in</span>
+</div>
+<div>
+<span class="font-headline-sm text-headline-sm text-on-surface block font-semibold">Tek Tıkla Rapor Üretimi (Özellik 09)</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Akademik Yayın Standartlarında APA 7 Formatlama</span>
+</div>
+</div>
+</div>
+<!-- Format Selector -->
+<div class="flex flex-col gap-2 pt-1">
+<label class="font-label-sm text-label-sm uppercase tracking-wider text-outline">Çıktı Formatı Seçimi</label>
+<div class="grid grid-cols-3 gap-2">
+<button class="flex flex-col items-center justify-center gap-1.5 p-3 rounded-lg bg-surface-container-high ring-1 ring-secondary text-on-surface transition-all" id="fmt-pdf" onclick="selectExportFormat('pdf')" type="button">
+<span class="material-symbols-outlined text-xl text-error">picture_as_pdf</span>
+<span class="font-label-md text-label-md font-semibold">PDF Raporu</span>
+<span class="font-body-sm text-body-sm text-outline">Akademik / APA 7</span>
+</button>
+<button class="flex flex-col items-center justify-center gap-1.5 p-3 rounded-lg bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all" id="fmt-docx" onclick="selectExportFormat('docx')" type="button">
+<span class="material-symbols-outlined text-xl text-status-info">article</span>
+<span class="font-label-md text-label-md font-semibold">Word (.docx)</span>
+<span class="font-body-sm text-body-sm text-outline">Düzenlenebilir</span>
+</button>
+<button class="flex flex-col items-center justify-center gap-1.5 p-3 rounded-lg bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all" id="fmt-html" onclick="selectExportFormat('html')" type="button">
+<span class="material-symbols-outlined text-xl text-tertiary">html</span>
+<span class="font-label-md text-label-md font-semibold">HTML Belgesi</span>
+<span class="font-body-sm text-body-sm text-outline">Web / Dashboard</span>
+</button>
+</div>
+</div>
+<!-- Generation Progress & Status Card -->
+<div class="bg-surface-container-lowest p-4 rounded-lg flex flex-col gap-3">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-status-success text-xl">task_alt</span>
+<span class="font-label-md text-label-md text-on-surface font-semibold" id="report-filename">rapor_hipotez_sonuclari.pdf</span>
+</div>
+<span class="inline-flex items-center px-2 py-0.5 rounded text-label-sm font-label-sm font-semibold bg-emerald-950/60 text-status-success">
+              %100 Hazır ✓
+            </span>
+</div>
+<!-- Progress Bar Full -->
+<div class="w-full bg-surface-container-highest h-2 rounded-full overflow-hidden">
+<div class="bg-gradient-to-r from-secondary to-status-success h-full w-full rounded-full"></div>
+</div>
+<div class="flex items-center justify-between text-outline font-label-sm text-label-sm">
+<span>Oluşturulma: Bugün, 14:32</span>
+<span>Boyut: 1.84 MB · 4 Sayfa</span>
+</div>
+<!-- Action Buttons for Report -->
+<div class="flex items-center gap-2 pt-1">
+<button class="flex-1 flex items-center justify-center gap-2 bg-surface-container-high hover:bg-surface-bright text-on-surface py-2 rounded-lg font-label-md text-label-md font-medium transition-all" onclick="openPreviewModal()" type="button">
+<span class="material-symbols-outlined text-base">visibility</span>
+<span>Raporu İncele</span>
+</button>
+<button class="flex-1 flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-on-primary py-2 rounded-lg font-label-md text-label-md font-semibold transition-all shadow-md" onclick="downloadReport()" type="button">
+<span class="material-symbols-outlined text-base">download</span>
+<span>İndir (PDF)</span>
+</button>
+</div>
+</div>
+<!-- APA 7 Academic Synthesis Box -->
+<div class="flex flex-col gap-2">
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-outline">APA 7 Stili Metin Özeti</span>
+<button class="text-secondary hover:text-secondary-fixed text-label-sm font-label-sm flex items-center gap-1" onclick="copyApaText()" type="button">
+<span class="material-symbols-outlined text-xs">content_copy</span>
+<span>Metni Kopyala</span>
+</button>
+</div>
+<div class="bg-surface-container-lowest p-4 rounded-lg flex flex-col gap-2 relative">
+<div class="flex items-center gap-2 pb-1 border-b border-surface-container-high">
+<span class="font-label-sm text-label-sm text-secondary font-semibold">Yayınlanabilir Metin (Bulgular Bölümü)</span>
+<span class="text-outline text-label-sm font-label-sm">·</span>
+<span class="font-label-sm text-label-sm text-outline">Türkçe / APA 7th Edition</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface leading-relaxed select-text" id="apa-text-content">
+              “Verilerin normallik varsayımı Shapiro-Wilk testi ile incelenmiş ve normallik varsayımının karşılanmadığı tespit edilmiştir (<em>p</em> = .012). Gruplar arası farklılıkları değerlendirmek amacıyla non-parametrik Kruskal-Wallis <em>H</em> testi uygulanmıştır. Test sonucunda üç bağımsız grup arasında istatistiksel olarak anlamlı bir fark bulunmuştur, <em>H</em>(2) = 11.60, <em>p</em> = .003, ε² = 0.21. Post-hoc Dunn-Bonferroni ikili karşılaştırmalarında Grup A ile Grup C arasındaki farkın anlamlı olduğu saptanmıştır (<em>p</em> &lt; .01).”
+            </p>
+<div class="flex flex-wrap items-center gap-2 pt-2">
+<span class="bg-surface-container-high px-2 py-0.5 rounded font-label-sm text-label-sm text-on-surface-variant font-mono">H(2) = 11.60</span>
+<span class="bg-surface-container-high px-2 py-0.5 rounded font-label-sm text-label-sm text-status-success font-mono">p = .003</span>
+<span class="bg-surface-container-high px-2 py-0.5 rounded font-label-sm text-label-sm text-tertiary-fixed font-mono">ε² = 0.21 (Geniş Etki)</span>
+<span class="bg-surface-container-high px-2 py-0.5 rounded font-label-sm text-label-sm text-outline font-mono">N = 45</span>
+</div>
+</div>
+</div>
+<!-- Academic Citation Block -->
+<div class="bg-surface-container-lowest p-3.5 rounded-lg flex items-center justify-between">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-outline text-lg">format_quote</span>
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm text-on-surface font-medium">Metodoloji Kaynakçası (BibTeX)</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Kruskal, W. H., &amp; Wallis, W. A. (1952). JASA.</span>
+</div>
+</div>
+<button class="p-1.5 text-on-surface-variant hover:text-on-surface bg-surface-container hover:bg-surface-bright rounded transition-colors" onclick="triggerNotification('BibTeX panoya kopyalandı.')" type="button">
+<span class="material-symbols-outlined text-base">copy_all</span>
+</button>
+</div>
+</div>
+<!-- Quick Template Checklist Box -->
+<div class="bg-surface-container-low p-4 rounded-lg flex flex-col gap-3">
+<span class="font-headline-sm text-headline-sm text-on-surface font-semibold">Rapor İçeriği ve Denetim Kontrol Listesi</span>
+<div class="space-y-2">
+<div class="flex items-center justify-between text-body-sm font-body-sm">
+<span class="flex items-center gap-2 text-on-surface">
+<span class="material-symbols-outlined text-status-success text-base">check</span>
+              Tanımlayıcı İstatistikler &amp; Çeyreklikler (IQR)
+            </span>
+<span class="font-label-sm text-label-sm text-outline">Sayfa 1</span>
+</div>
+<div class="flex items-center justify-between text-body-sm font-body-sm">
+<span class="flex items-center gap-2 text-on-surface">
+<span class="material-symbols-outlined text-status-success text-base">check</span>
+              Varsayım Test Matrisi (Shapiro-Wilk &amp; Levene)
+            </span>
+<span class="font-label-sm text-label-sm text-outline">Sayfa 2</span>
+</div>
+<div class="flex items-center justify-between text-body-sm font-body-sm">
+<span class="flex items-center gap-2 text-on-surface">
+<span class="material-symbols-outlined text-status-success text-base">check</span>
+              Grup Kutu Grafikleri &amp; Dağılım Eğrileri
+            </span>
+<span class="font-label-sm text-label-sm text-outline">Sayfa 3</span>
+</div>
+<div class="flex items-center justify-between text-body-sm font-body-sm">
+<span class="flex items-center gap-2 text-on-surface">
+<span class="material-symbols-outlined text-status-success text-base">check</span>
+              Post-Hoc İkili Karşılaştırmalar &amp; Etki Büyüklüğü (ε²)
+            </span>
+<span class="font-label-sm text-label-sm text-outline">Sayfa 4</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Fullscreen Modal: Report PDF Preview (Default Hidden) -->
+<div class="fixed inset-0 z-50 bg-background/80 backdrop-blur-md hidden items-center justify-center p-4 lg:p-8" id="report-modal">
+<div class="bg-surface-container-low max-w-4xl w-full rounded-xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+<!-- Modal Header -->
+<div class="bg-surface-container px-6 py-4 flex items-center justify-between border-b border-surface-container-high">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-error text-2xl">picture_as_pdf</span>
+<div class="flex flex-col">
+<span class="font-headline-sm text-headline-sm text-on-surface font-semibold">rapor_hipotez_sonuclari.pdf — Önizleme</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">APA 7th Edition Akademik Belge Çıktısı</span>
+</div>
+</div>
+<button class="w-8 h-8 rounded-lg bg-surface-container-high hover:bg-surface-bright text-on-surface flex items-center justify-center transition-colors" onclick="closePreviewModal()" type="button">
+<span class="material-symbols-outlined text-lg">close</span>
+</button>
+</div>
+<!-- Document Mock Body -->
+<div class="p-8 overflow-y-auto bg-code-canvas flex justify-center">
+<!-- Paper Simulation Card -->
+<div class="bg-surface-container-lowest text-on-surface w-full max-w-2xl p-8 rounded shadow-lg flex flex-col gap-6">
+<div class="text-center border-b border-surface-container-high pb-4">
+<span class="font-headline-md text-headline-md font-semibold tracking-tight text-on-surface block">Klinik Veri Faz 3: İstatistiksel Hipotez Test Raporu</span>
+<span class="font-body-md text-body-md text-on-surface-variant block pt-1">StatAdvisor AI Otomatik Analiz Çekirdeği</span>
+<span class="font-label-sm text-label-sm text-outline block pt-1">Tarih: Ekim 2024 · Protokol ID: #KW-88492</span>
+</div>
+<div class="flex flex-col gap-2">
+<span class="font-headline-sm text-headline-sm font-semibold text-secondary">1. Giriş ve Hipotez Tanımı</span>
+<p class="font-body-md text-body-md text-on-surface-variant leading-relaxed">
+              Bu çalışma, üç bağımsız tedavi grubu (Grup A, Grup B, Grup C) arasındaki biyokimyasal yanıt farklılıklarını incelemektedir. Sıfır hipotezi ($H_0$), gruplar arasındaki medyan değerlerin eşdeğer olduğunu varsayar.
+            </p>
+</div>
+<div class="flex flex-col gap-2">
+<span class="font-headline-sm text-headline-sm font-semibold text-secondary">2. Varsayım Değerlendirmesi</span>
+<p class="font-body-md text-body-md text-on-surface-variant leading-relaxed">
+              Örneklem büyüklüğü ve normallik Shapiro-Wilk testi ile test edilmiş olup, Grup B ($p = .012$) dağılımının parametrik varsayımı karşılamadığı gözlemlenmiştir. Varyans homojenliği için Levene testi $p = .41$ sonucunu vermiştir. Parametrik koşul sağlanmadığından analiz Kruskal-Wallis testi ile yürütülmüştür.
+            </p>
+</div>
+<div class="flex flex-col gap-2">
+<span class="font-headline-sm text-headline-sm font-semibold text-secondary">3. Bulgular (APA 7 Formatı)</span>
+<div class="bg-surface-container p-4 rounded font-body-md text-body-md text-on-surface leading-relaxed">
+              Kruskal-Wallis testi sonucunda gruplar arasında anlamlı fark bulunmuştur, <em>H</em>(2) = 11.60, <em>p</em> = .003, ε² = 0.21. İkili karşılaştırmalar Grup A ile C arasında istatistiksel üstünlüğü doğrulamaktadır.
+            </div>
+</div>
+<div class="flex items-center justify-between pt-4 border-t border-surface-container-high text-outline font-label-sm text-label-sm">
+<span>Rapor Seri No: STAT-APA-2024-912</span>
+<span>Sayfa 1 / 4</span>
+</div>
+</div>
+</div>
+<!-- Modal Footer -->
+<div class="bg-surface-container px-6 py-3.5 flex items-center justify-between border-t border-surface-container-high">
+<span class="font-label-sm text-label-sm text-status-success flex items-center gap-1.5">
+<span class="material-symbols-outlined text-sm">verified</span>
+          APA 7 Format Doğrulandı
+        </span>
+<div class="flex items-center gap-2">
+<button class="px-4 py-2 rounded-lg bg-surface-container-high text-on-surface hover:bg-surface-bright font-label-md text-label-md transition-colors" onclick="closePreviewModal()" type="button">
+            Kapat
+          </button>
+<button class="flex items-center gap-2 px-5 py-2 rounded-lg bg-primary text-on-primary hover:bg-primary/90 font-label-md text-label-md font-semibold transition-all shadow-md" onclick="downloadReport()" type="button">
+<span class="material-symbols-outlined text-base">download</span>
+<span>PDF Olarak Kaydet</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Toast / Notification Element -->
+<div class="fixed bottom-6 right-6 bg-surface-container-highest text-on-surface px-4 py-3 rounded-lg shadow-2xl z-50 flex items-center gap-3 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none" id="toast-notify">
+<span class="material-symbols-outlined text-status-success text-xl" id="toast-icon">check_circle</span>
+<span class="font-body-md text-body-md" id="toast-message">Bildirim</span>
+</div>
+<!-- Client-Side Micro-Interactivity Script -->
+<script>
+    const codeSnippets = {
+      scipy: {
+        filename: "analiz.py",
+        badge: "SciPy / NumPy",
+        code: [
+          { num: 1, text: '<span class="text-tertiary"># analiz.py - Otomatik Hipotez Doğrulama ve Non-Parametrik Test</span>' },
+          { num: 2, text: '<span class="text-primary-container font-semibold">import</span> <span class="text-on-surface">numpy</span> <span class="text-primary-container font-semibold">as</span> <span class="text-on-surface">np</span>' },
+          { num: 3, text: '<span class="text-primary-container font-semibold">from</span> <span class="text-on-surface">scipy</span> <span class="text-primary-container font-semibold">import</span> <span class="text-secondary font-semibold">stats</span>' },
+          { num: 4, text: '&nbsp;' },
+          { num: 5, text: '<span class="text-outline"># Veri: Klinik_Veri_Faz3 (A, B, C Grupları)</span>' },
+          { num: 6, text: '<span class="text-on-surface">grup_a</span> = <span class="text-on-surface">np.array([<span class="text-tertiary-fixed">14.2</span>, <span class="text-tertiary-fixed">18.5</span>, <span class="text-tertiary-fixed">12.1</span>, <span class="text-tertiary-fixed">16.4</span>, <span class="text-tertiary-fixed">15.9</span>])</span>' },
+          { num: 7, text: '<span class="text-on-surface">grup_b</span> = <span class="text-on-surface">np.array([<span class="text-tertiary-fixed">22.1</span>, <span class="text-tertiary-fixed">24.6</span>, <span class="text-tertiary-fixed">27.3</span>, <span class="text-tertiary-fixed">20.8</span>, <span class="text-tertiary-fixed">26.0</span>])</span>' },
+          { num: 8, text: '<span class="text-on-surface">grup_c</span> = <span class="text-on-surface">np.array([<span class="text-tertiary-fixed">31.4</span>, <span class="text-tertiary-fixed">29.8</span>, <span class="text-tertiary-fixed">35.2</span>, <span class="text-tertiary-fixed">33.1</span>, <span class="text-tertiary-fixed">30.5</span>])</span>' },
+          { num: 9, text: '&nbsp;' },
+          { num: 10, text: '<span class="text-outline"># Normallik varsayımı sağlanmadı -> Kruskal-Wallis</span>' },
+          { num: 11, text: '<span class="text-on-surface">h, p</span> = <span class="text-secondary font-semibold">stats.kruskal</span>(<span class="text-on-surface">grup_a</span>, <span class="text-on-surface">grup_b</span>, <span class="text-on-surface">grup_c</span>)' },
+          { num: 12, text: '&nbsp;' },
+          { num: 13, text: '<span class="text-secondary font-semibold">print</span>(<span class="text-secondary-fixed">f"H = {h:.2f}, p = {p:.4f}"</span>)' },
+          { num: 14, text: '<span class="text-primary-container font-semibold">if</span> <span class="text-on-surface">p</span> &lt; <span class="text-tertiary-fixed">0.05</span>:' },
+          { num: 15, text: '<span class="pl-4"><span class="text-secondary font-semibold">print</span>(<span class="text-status-success">"Gruplar arasında anlamlı fark var."</span>)</span>' },
+          { num: 16, text: '<span class="text-primary-container font-semibold">else</span>:' },
+          { num: 17, text: '<span class="pl-4"><span class="text-secondary font-semibold">print</span>(<span class="text-outline">"Gruplar arasında anlamlı fark yok."</span>)</span>' }
+        ],
+        rawText: "from scipy import stats\n\n# Normallik varsayimi saglanmadi -> Kruskal-Wallis testi\nh, p = stats.kruskal(grup_a, grup_b, grup_c)\n\nprint(f\"H = {h:.2f}, p = {p:.4f}\")\nif p < 0.05:\n    print(\"Gruplar arasinda anlamli fark var.\")"
+      },
+      statsmodels: {
+        filename: "statsmodels_pipeline.py",
+        badge: "Statsmodels v0.14",
+        code: [
+          { num: 1, text: '<span class="text-tertiary"># statsmodels_pipeline.py - Non-parametrik ve Post-Hoc Testler</span>' },
+          { num: 2, text: '<span class="text-primary-container font-semibold">import</span> <span class="text-on-surface">pandas</span> <span class="text-primary-container font-semibold">as</span> <span class="text-on-surface">pd</span>' },
+          { num: 3, text: '<span class="text-primary-container font-semibold">import</span> <span class="text-on-surface">statsmodels.api</span> <span class="text-primary-container font-semibold">as</span> <span class="text-on-surface">sm</span>' },
+          { num: 4, text: '<span class="text-primary-container font-semibold">from</span> <span class="text-on-surface">statsmodels.stats.multicomp</span> <span class="text-primary-container font-semibold">import</span> <span class="text-secondary font-semibold">pairwise_tukeyhsd</span>' },
+          { num: 5, text: '&nbsp;' },
+          { num: 6, text: '<span class="text-outline"># Dunn-Bonferroni çoklu karşılaştırma matrisi</span>' },
+          { num: 7, text: '<span class="text-on-surface">df</span> = <span class="text-secondary font-semibold">pd.read_csv</span>(<span class="text-secondary-fixed">"Klinik_Veri_Faz3.csv"</span>)' },
+          { num: 8, text: '<span class="text-on-surface">posthoc</span> = <span class="text-secondary font-semibold">pairwise_tukeyhsd</span>(<span class="text-on-surface">df[</span><span class="text-secondary-fixed">"skor"</span><span class="text-on-surface">]</span>, <span class="text-on-surface">df[</span><span class="text-secondary-fixed">"grup"</span><span class="text-on-surface">]</span>, <span class="text-on-surface">alpha</span>=<span class="text-tertiary-fixed">0.05</span>)' },
+          { num: 9, text: '<span class="text-secondary font-semibold">print</span>(<span class="text-on-surface">posthoc.summary()</span>)' }
+        ],
+        rawText: "import pandas as pd\nimport statsmodels.api as sm\nfrom statsmodels.stats.multicomp import pairwise_tukeyhsd\n\ndf = pd.read_csv('Klinik_Veri_Faz3.csv')\nposthoc = pairwise_tukeyhsd(df['skor'], df['grup'], alpha=0.05)\nprint(posthoc.summary())"
+      },
+      sklearn: {
+        filename: "model_evaluation.py",
+        badge: "Scikit-Learn v1.3",
+        code: [
+          { num: 1, text: '<span class="text-tertiary"># model_evaluation.py - Dengeli Model Seçimi (Random Forest)</span>' },
+          { num: 2, text: '<span class="text-primary-container font-semibold">from</span> <span class="text-on-surface">sklearn.ensemble</span> <span class="text-primary-container font-semibold">import</span> <span class="text-secondary font-semibold">RandomForestClassifier</span>' },
+          { num: 3, text: '<span class="text-primary-container font-semibold">from</span> <span class="text-on-surface">sklearn.model_selection</span> <span class="text-primary-container font-semibold">import</span> <span class="text-on-surface">cross_val_score</span>' },
+          { num: 4, text: '&nbsp;' },
+          { num: 5, text: '<span class="text-outline"># Random Forest: Dengeli Model Seçimi (Doğruluk: 89, Hız: 62)</span>' },
+          { num: 6, text: '<span class="text-on-surface">rf_clf</span> = <span class="text-secondary font-semibold">RandomForestClassifier</span>(<span class="text-on-surface">n_estimators</span>=<span class="text-tertiary-fixed">150</span>, <span class="text-on-surface">random_state</span>=<span class="text-tertiary-fixed">42</span>)' },
+          { num: 7, text: '<span class="text-on-surface">cv_scores</span> = <span class="text-secondary font-semibold">cross_val_score</span>(<span class="text-on-surface">rf_clf</span>, <span class="text-on-surface">X</span>, <span class="text-on-surface">y</span>, <span class="text-on-surface">cv</span>=<span class="text-tertiary-fixed">5</span>, <span class="text-on-surface">scoring</span>=<span class="text-secondary-fixed">"roc_auc"</span>)' },
+          { num: 8, text: '<span class="text-secondary font-semibold">print</span>(<span class="text-secondary-fixed">f"Ortalama AUC: {cv_scores.mean():.3f} (+/- {cv_scores.std():.3f})"</span>)' }
+        ],
+        rawText: "from sklearn.ensemble import RandomForestClassifier\nfrom sklearn.model_selection import cross_val_score\n\nrf_clf = RandomForestClassifier(n_estimators=150, random_state=42)\ncv_scores = cross_val_score(rf_clf, X, y, cv=5, scoring='roc_auc')\nprint(f'Ortalama AUC: {cv_scores.mean():.3f}')"
+      },
+      r: {
+        filename: "analiz.R",
+        badge: "R Base & rstatix",
+        code: [
+          { num: 1, text: '<span class="text-tertiary"># analiz.R - Kruskal-Wallis ve APA Rapor Çıktısı</span>' },
+          { num: 2, text: '<span class="text-primary-container font-semibold">library</span>(<span class="text-on-surface">rstatix</span>)' },
+          { num: 3, text: '&nbsp;' },
+          { num: 4, text: '<span class="text-outline"># Non-parametrik Varyans Analizi</span>' },
+          { num: 5, text: '<span class="text-on-surface">res.kruskal</span> &lt;- <span class="text-on-surface">df</span> %&gt;% <span class="text-secondary font-semibold">kruskal_test</span>(<span class="text-on-surface">skor</span> ~ <span class="text-on-surface">grup</span>)' },
+          { num: 6, text: '<span class="text-on-surface">eff_size</span> &lt;- <span class="text-on-surface">df</span> %&gt;% <span class="text-secondary font-semibold">kruskal_effsize</span>(<span class="text-on-surface">skor</span> ~ <span class="text-on-surface">grup</span>)' },
+          { num: 7, text: '<span class="text-secondary font-semibold">print</span>(<span class="text-on-surface">res.kruskal</span>)' },
+          { num: 8, text: '<span class="text-secondary font-semibold">print</span>(<span class="text-on-surface">eff_size</span>)' }
+        ],
+        rawText: "library(rstatix)\n\nres.kruskal <- df %>% kruskal_test(skor ~ grup)\neff_size <- df %>% kruskal_effsize(skor ~ grup)\nprint(res.kruskal)\nprint(eff_size)"
+      }
+    };
+
+    let activeLang = 'scipy';
+
+    function switchLanguage(lang) {
+      activeLang = lang;
+      const target = codeSnippets[lang];
+      if (!target) return;
+
+      // Update Tab styling
+      const tabs = ['scipy', 'statsmodels', 'sklearn', 'r'];
+      tabs.forEach(t => {
+        const btn = document.getElementById('tab-' + t);
+        if (btn) {
+          if (t === lang) {
+            btn.className = "flex items-center gap-1.5 px-3 py-1.5 rounded font-label-md text-label-md font-medium bg-primary text-on-primary transition-all";
+          } else {
+            btn.className = "flex items-center gap-1.5 px-3 py-1.5 rounded font-label-md text-label-md font-medium text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-all";
+          }
+        }
+      });
+
+      // Update Filename & Badge
+      document.getElementById('file-title').innerHTML = '<span class="material-symbols-outlined text-sm text-secondary">description</span> ' + target.filename;
+      document.getElementById('env-badge').textContent = target.badge;
+
+      // Update Code lines
+      const container = document.getElementById('code-content');
+      container.innerHTML = target.code.map(c => `
+        <div class="flex items-start gap-4">
+          <span class="text-outline-variant select-none w-6 text-right font-label-sm text-label-sm">${c.num}</span>
+          <span>${c.text}</span>
+        </div>
+      `).join('');
+    }
+
+    function copySnippet() {
+      const snippet = codeSnippets[activeLang];
+      if (snippet && snippet.rawText) {
+        navigator.clipboard.writeText(snippet.rawText).then(() => {
+          const btnText = document.getElementById('copy-text');
+          const btnIcon = document.getElementById('copy-icon');
+          btnText.textContent = "Kopyalandı!";
+          btnIcon.textContent = "done";
+          triggerNotification("Kod panoya başarıyla kopyalandı!");
+          setTimeout(() => {
+            btnText.textContent = "Kodu Kopyala";
+            btnIcon.textContent = "content_copy";
+          }, 2000);
+        });
+      }
+    }
+
+    function copyApaText() {
+      const text = document.getElementById('apa-text-content').innerText;
+      navigator.clipboard.writeText(text).then(() => {
+        triggerNotification("APA 7 metin özeti panoya kopyalandı!");
+      });
+    }
+
+    function selectExportFormat(fmt) {
+      const formats = ['pdf', 'docx', 'html'];
+      formats.forEach(f => {
+        const btn = document.getElementById('fmt-' + f);
+        if (f === fmt) {
+          btn.className = "flex flex-col items-center justify-center gap-1.5 p-3 rounded-lg bg-surface-container-high ring-1 ring-secondary text-on-surface transition-all";
+        } else {
+          btn.className = "flex flex-col items-center justify-center gap-1.5 p-3 rounded-lg bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all";
+        }
+      });
+      const nameElem = document.getElementById('report-filename');
+      nameElem.textContent = 'rapor_hipotez_sonuclari.' + fmt;
+      triggerNotification("Çıktı formatı güncellendi: ." + fmt.toUpperCase());
+    }
+
+    function downloadIpynb() {
+      triggerNotification("Jupyter Notebook (.ipynb) üretildi ve indiriliyor...");
+    }
+
+    function downloadReport() {
+      triggerNotification("Akademik rapor PDF olarak indiriliyor...");
+    }
+
+    function openPreviewModal() {
+      const modal = document.getElementById('report-modal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function closePreviewModal() {
+      const modal = document.getElementById('report-modal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    function triggerNotification(msg) {
+      const toast = document.getElementById('toast-notify');
+      const toastMsg = document.getElementById('toast-message');
+      toastMsg.textContent = msg;
+      toast.classList.remove('translate-y-20', 'opacity-0');
+      toast.classList.add('translate-y-0', 'opacity-100');
+      setTimeout(() => {
+        toast.classList.remove('translate-y-0', 'opacity-100');
+        toast.classList.add('translate-y-20', 'opacity-0');
+      }, 3000);
+    }
+  </script>
+</div></main></div></body></html>
