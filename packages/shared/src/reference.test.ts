@@ -8,6 +8,8 @@ import { averagePrecision, chiSquareSurvival, fSurvival, kruskalWallis, levene, 
  */
 interface Case {
   test: string;
+  // Girdi şekli teste göre değişir; her çalıştırıcı kendi alanlarını okur.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   input: Record<string, any>;
   expected: Record<string, number>;
 }
