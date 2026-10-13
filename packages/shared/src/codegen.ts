@@ -4,6 +4,7 @@
  */
 import type { AnalysisResult } from './analysis.ts';
 import type { ImputeMethod } from './clean.ts';
+import type { ScaleDef, ScaleResult } from './scales.ts';
 
 export interface DatasetFile {
   fileName: string;
@@ -425,4 +426,41 @@ export function generateCleaningCode(
   L.push('', 'df.to_csv("temizlenmis.csv", index=False)', 'print(f"Temizlenen veri: {len(df)} satır")');
   const code = L.join('\n') + '\n';
   return { filename: 'temizle.py', code, expectedOutput: [], requirements: requirementsOf(code) };
+}
+
+/** Ölçek puanı kodu: ters maddeleri çevirir, toplam/ortalama puanı ve Cronbach alfayı hesaplar; olcekli.csv'ye yazar. */
+export function generateScalesCode(file: DatasetFile, defs: ScaleDef[], results: ScaleResult[]): GeneratedCode {
+  const L: string[] = ['# StatAdvisor AI tarafından üretildi. Veri dosyası betikle aynı klasörde olmalıdır.', ''];
+  L.push('import numpy as np', 'import pandas as pd', '', naBlock, '', readCsvLine(file), '');
+  L.push('# Ölçekler: alt boyutlar araştırmacı tarafından tanımlanmıştır (ters maddeler: min + max - x)');
+  L.push('SKALALAR = [');
+  for (const d of defs) {
+    L.push(`    {"ad": ${py(d.name.trim())}, "maddeler": ${pyList(d.items)}, "ters": ${pyList(d.reverse)}, "yontem": ${py(d.method)}, "min": ${d.min}, "max": ${d.max}, "gecerli_oran": ${d.minValidShare}},`);
+  }
+  L.push(']', 'for sk in SKALALAR:', '    k = len(sk["maddeler"])', '    for s in sk["maddeler"]:', '        df[s] = pd.to_numeric(df[s], errors="coerce")');
+  L.push(
+    '    m = df[sk["maddeler"]].copy()',
+    '    for s in sk["ters"]:',
+    '        m[s] = sk["min"] + sk["max"] - m[s]',
+    '    gerekli = max(1, int(np.ceil(sk["gecerli_oran"] * k - 1e-9)))',
+    '    puan = m.mean(axis=1)',
+    '    if sk["yontem"] == "sum":',
+    '        puan = puan * k  # yanıtlananların ortalaması x madde sayısı',
+    '    puan = puan.where(m.notna().sum(axis=1) >= gerekli)',
+    '    df[sk["ad"]] = puan',
+    '    tam = m.dropna()  # alfa yalnızca tüm maddeleri yanıtlayanlarda',
+    '    toplam_var = tam.sum(axis=1).var(ddof=1) if len(tam) >= 3 else float("nan")',
+    '    alfa = k / (k - 1) * (1 - tam.var(ddof=1).sum() / toplam_var) if toplam_var > 0 else float("nan")',
+    '    ort = puan.mean() if puan.notna().any() else float("nan")',
+    '    print(f"Olcek [{sk[\'ad\']}] alfa: {alfa:.4f} n_alfa: {len(tam)}")',
+    '    print(f"Olcek [{sk[\'ad\']}] ortalama: {ort:.4f} gecerli: {int(puan.notna().sum())}")',
+    '',
+    'df.to_csv("olcekli.csv", index=False)',
+  );
+  const expected = results.flatMap((r) => [
+    `Olcek [${r.name}] alfa: ${r.alpha === null ? 'nan' : fmt(r.alpha, 4)} n_alfa: ${r.nAlpha}`,
+    `Olcek [${r.name}] ortalama: ${r.mean === null ? 'nan' : fmt(r.mean, 4)} gecerli: ${r.nValid}`,
+  ]);
+  const code = L.join('\n') + '\n';
+  return { filename: 'olcek.py', code, expectedOutput: expected, requirements: requirementsOf(code) };
 }

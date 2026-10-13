@@ -166,6 +166,39 @@ suite('üretilen Python kodu, ekrandaki sonucu birebir yeniden üretir', () => {
     expect(code.code).toContain('SIRALI');
   });
 
+  it('ölçek puanları: ters madde, toplam/ortalama, eksik kuralı ve Cronbach alfa Python ile eşleşir; sonuç sütunu analiz edilebilir', { timeout: T }, async () => {
+    const rows = Array.from({ length: 80 }, (_, i) => {
+      const latent = gaussian(rng);
+      const item = (rev = false) => {
+        const v = Math.min(4, Math.max(0, Math.round(2 + latent + 0.7 * gaussian(rng))));
+        return rev ? 4 - v : v;
+      };
+      const cell = (v: number, miss: boolean) => (miss ? '' : v);
+      return [['kadın', 'erkek'][i % 2]!, item(), item(), cell(item(), i % 11 === 0), item(true), item(), cell(item(), i % 7 === 0), item()];
+    });
+    const header = ['cinsiyet', 'a1', 'a2', 'a3', 'a4', 'b1', 'b2', 'b3'];
+    const id = await uploadCsv(csv(header, rows), 'olcek.csv');
+    const scales = [
+      { name: 'A_puan', items: ['a1', 'a2', 'a3', 'a4'], reverse: ['a4'], method: 'mean', min: 0, max: 4, minValidShare: 0.75 },
+      { name: 'B_toplam', items: ['b1', 'b2', 'b3'], reverse: [], method: 'sum', min: 0, max: 4, minValidShare: 1 },
+    ];
+    const made = await app.inject({ method: 'POST', url: `/api/datasets/${id}/scales`, payload: { scales } });
+    expect(made.statusCode, made.body).toBe(201);
+    const child = made.json();
+    expect(child.columns.find((c: { name: string }) => c.name === 'A_puan')).toMatchObject({ type: 'continuous', numeric: true });
+    const code = (await app.inject({ method: 'POST', url: `/api/datasets/${id}/scales-code`, payload: { scales } })).json();
+    const ds = (await app.inject({ url: `/api/datasets/${id}` })).json();
+    writeFileSync(join(work, ds.name), (await app.inject({ url: `/api/datasets/${id}/download` })).rawPayload);
+    writeFileSync(join(work, code.filename), code.code);
+    const out = execFileSync(PY, [code.filename], { cwd: work, encoding: 'utf8', env: { ...process.env, PYTHONIOENCODING: 'utf-8' }, timeout: 90_000 });
+    expect(out.trim().split(/\r?\n/)).toEqual(code.expectedOutput);
+    expect(code.expectedOutput[0]).toMatch(/alfa: 0\.\d{4} n_alfa: \d+/);
+    const { analysis } = await verify(child.id, cmp({ value: 'A_puan', group: 'cinsiyet' }));
+    expect(['Welch t-testi', 'Mann-Whitney U testi']).toContain(analysis.outcome.test);
+    const bad = await app.inject({ method: 'POST', url: `/api/datasets/${id}/scales`, payload: { scales: [{ ...scales[0], max: 3 }] } });
+    expect(bad.statusCode).toBe(422);
+  });
+
   it('küçük 2×2 tablo: Fisher kesin testi', { timeout: T }, async () => {
     const rows = [...Array(7).fill(['a', 'evet']), ...Array(2).fill(['a', 'hayir']), ...Array(1).fill(['b', 'evet']), ...Array(8).fill(['b', 'hayir'])];
     const id = await uploadCsv(csv(['grup', 'sonuc'], rows));

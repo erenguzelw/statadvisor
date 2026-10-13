@@ -11,6 +11,9 @@ import {
   AnalysisError,
   buildReport,
   cleanColumns,
+  computeScales,
+  generateScalesCode,
+  type ScaleDef,
   generateAnalysisCode,
   generateCleaningCode,
   columnsToCsv,
@@ -246,6 +249,49 @@ export function buildApp(opts: AppOptions): FastifyInstance {
     const operations = { ...body, removedRows: result.removedRows, imputedCells: result.imputedCells, log: result.log };
     const { dataset, created } = ingest(buf, `${row.name.replace(/\.csv$/i, '')} (temizlenmiş).csv`, { parentId: row.id, operations });
     return reply.status(created ? 201 : 200).send({ ...dataset, duplicate: !created });
+  });
+
+  /** Ölçek puanları: araştırmacının tanımladığı alt boyutlardan yeni sütunlar ekleyen yeni bir veri sürümü üretir. */
+  const ScaleBody = z.object({
+    scales: z
+      .array(
+        z.object({
+          name: z.string().trim().min(1).max(80),
+          items: z.array(colName).min(2).max(200),
+          reverse: z.array(colName).max(200).default([]),
+          method: z.enum(['mean', 'sum']).default('mean'),
+          min: z.number().finite(),
+          max: z.number().finite(),
+          minValidShare: z.number().gt(0).max(1).default(1),
+        }),
+      )
+      .min(1)
+      .max(30),
+  });
+  const qcols = (csv: ParsedCsv) => csv.columns.map((c) => ({ name: c.name, numeric: c.numeric, values: c.values, skip: c.likelyId }));
+  app.post('/api/datasets/:id/scales', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const body = ScaleBody.parse(req.body ?? {});
+    const { row, csv } = parsed(id);
+    const base = qcols(csv);
+    const results = computeScales(base, body.scales as ScaleDef[]);
+    const added = results.map((r) => ({ name: r.name, numeric: true, values: r.values, skip: false }));
+    const buf = Buffer.from(columnsToCsv([...base, ...added]), 'utf8');
+    const operations = {
+      scales: body.scales,
+      results: results.map((r) => ({ name: r.name, alpha: r.alpha, nAlpha: r.nAlpha, nValid: r.nValid, mean: r.mean, notes: r.notes })),
+      log: results.map((r) => `Ölçek “${r.name}”: ${r.nValid} geçerli puan, alfa ${r.alpha === null ? 'hesaplanamadı' : r.alpha.toFixed(3)}.`),
+    };
+    const { dataset, created } = ingest(buf, `${row.name.replace(/\.csv$/i, '')} (ölçekli).csv`, { parentId: row.id, operations });
+    return reply.status(created ? 201 : 200).send({ ...dataset, duplicate: !created, scaleResults: operations.results });
+  });
+  /** Ölçek tanımının Python karşılığı (sonuçlar sunucuda yeniden hesaplanır). */
+  app.post('/api/datasets/:id/scales-code', async (req) => {
+    const { id } = req.params as { id: string };
+    const body = ScaleBody.parse(req.body ?? {});
+    const { row, csv } = parsed(id);
+    const results = computeScales(qcols(csv), body.scales as ScaleDef[]);
+    return generateScalesCode(fileInfo(row, csv), body.scales as ScaleDef[], results);
   });
 
   app.get('/api/datasets', async () => {

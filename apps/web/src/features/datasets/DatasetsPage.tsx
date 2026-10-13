@@ -9,6 +9,7 @@ import type { ColumnInfo, DatasetInfo } from '@/data/api';
 import { useDataset, useDatasets, useDeleteDataset, useLoadSample, useSamples, useUploadDataset } from '@/data/hooks';
 import { cn } from '@/lib/cn';
 import { columnTypeLabel } from '@/lib/variables';
+import { ScaleBuilder } from './ScaleBuilder';
 
 const nf = new Intl.NumberFormat('tr-TR');
 const kb = (b: number) => (b < 1024 * 1024 ? `${(b / 1024).toFixed(1)} KB` : `${(b / 1024 / 1024).toFixed(1)} MB`);
@@ -96,7 +97,7 @@ export function DatasetsPage() {
           {d.parentId && (
             <StatusChip status="info">
               <GitBranch size={12} aria-hidden />
-              temizlenmiş sürüm
+              {d.operations && 'scales' in d.operations ? 'ölçekli sürüm' : 'temizlenmiş sürüm'}
             </StatusChip>
           )}
           {d.id === active?.id && <StatusChip status="success">etkin</StatusChip>}
@@ -206,6 +207,8 @@ export function DatasetsPage() {
         </QueryView>
       </Panel>
 
+      {active && <ScaleBuilder datasetId={active.id} columns={active.columns} />}
+
       {active && (
         <Panel className="mt-6">
           <SectionHeader
@@ -215,7 +218,7 @@ export function DatasetsPage() {
           {active.operations && (
             <div className="mb-4 rounded-card border border-line/30 bg-surface-lowest p-3">
               <p className="mb-1 flex items-center gap-2 text-caption font-semibold text-fg-muted">
-                <GitBranch size={14} aria-hidden /> Uygulanan temizlik
+                <GitBranch size={14} aria-hidden /> Uygulanan işlemler
               </p>
               <ul className="list-disc pl-5 text-caption text-fg-muted">
                 {active.operations.log.map((l) => (

@@ -70,10 +70,11 @@ export interface ColumnInfo {
 }
 
 export interface DatasetOperations {
-  outlierColumns: string[];
-  impute: 'none' | 'median' | 'knn';
-  removedRows: number;
-  imputedCells: number;
+  outlierColumns?: string[];
+  impute?: 'none' | 'median' | 'knn';
+  removedRows?: number;
+  imputedCells?: number;
+  scales?: unknown;
   log: string[];
 }
 
