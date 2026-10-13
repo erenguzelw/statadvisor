@@ -30,6 +30,7 @@ import {
   tukeyFences,
   welchAnova,
   wilcoxonSignedRank,
+  ENGINE,
   type AdjustMethod,
 } from './index.ts';
 
@@ -124,6 +125,13 @@ const specs: Record<string, Spec> = {
 
 export { specs, close, fixture };
 export type { Case };
+
+describe('motor kimliği', () => {
+  it('ENGINE.referenceSuite, referans dosyasıyla uyumludur', () => {
+    expect(ENGINE.referenceSuite.cases).toBe(fixture.cases.length);
+    expect(ENGINE.referenceSuite.scipy).toBe(fixture.meta.scipy);
+  });
+});
 
 describe(`referans vakalar (SciPy ${fixture.meta.scipy}, scikit-learn ${fixture.meta.sklearn})`, () => {
   const byTest: Record<string, Case[]> = {};

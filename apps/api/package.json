@@ -1,0 +1,20 @@
+{
+  "name": "@statadvisor/api",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch src/index.ts",
+    "start": "node src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@fastify/multipart": "^10.1.3",
+    "@statadvisor/shared": "*",
+    "csv-parse": "^7.0.3",
+    "fastify": "^5.12.7",
+    "zod": "^4.6.7"
+  }
+}
