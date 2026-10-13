@@ -1,8 +1,7 @@
 import type { AnalysisResult } from './analysis.ts';
+import { histogramSvg } from './chart-svg.ts';
 import { formatP, pText } from './stats.ts';
-import type { AssumptionTest, DecisionPath, GroupDescriptive } from './types.ts';
-
-export type ReportMode = 'html' | 'print' | 'word';
+import type { AssumptionTest, DecisionPath, DistributionSample, GroupDescriptive } from './types.ts';
 
 /** Rapora yazılan düz veri; hem gerçek analiz sonuçlarından hem örnek özetten üretilebilir. */
 export interface ReportData {
@@ -11,6 +10,8 @@ export interface ReportData {
   /** Rapor tarihi (görüntülenecek biçimde). */
   date: string;
   descriptives: GroupDescriptive[];
+  /** Sayısal hedeflerde grup içi kalıntıların dağılımı (rapora grafik olarak eklenir). */
+  distribution?: DistributionSample;
   assumptions: AssumptionTest[];
   decision: DecisionPath;
   /** Sonuç satırı, ör. "H(2) = 11.70, p = .003, ε² = 0.27 (geniş etki), N = 45". */
@@ -33,6 +34,7 @@ export function reportFromResult(r: AnalysisResult, date: string, audit?: [strin
     datasetName: r.datasetName,
     date,
     descriptives: r.descriptives,
+    distribution: r.distribution,
     assumptions: r.assumptions,
     decision: r.decision,
     resultLine: `${o.statisticText}, ${pText(o.p)}, ${o.effect.symbol} = ${o.effect.value.toFixed(2)} (${o.effect.magnitude} etki), N = ${o.n}`,
@@ -49,7 +51,7 @@ const style = `body{font-family:Georgia,'Times New Roman',serif;max-width:44rem;
 h1{font-size:1.6rem;margin-bottom:.25rem}h2{font-size:1.15rem;margin-top:2rem;border-bottom:1px solid #bbb;padding-bottom:.25rem}
 table{border-collapse:collapse;width:100%;margin:.75rem 0;font-size:.95rem}th,td{border:1px solid #bbb;padding:.35rem .6rem;text-align:left}
 th{background:#f2f2f2}td.n{text-align:right;font-variant-numeric:tabular-nums}.muted{color:#555;font-size:.9rem}
-.warn{background:#fff7e0;border-left:4px solid #c98a00;padding:.5rem .8rem;margin:.4rem 0}li{margin:.3rem 0}@media print{body{margin:0}}`;
+.warn{background:#fff7e0;border-left:4px solid #c98a00;padding:.5rem .8rem;margin:.4rem 0}li{margin:.3rem 0}figure{margin:1rem 0}svg{max-width:100%}@media print{body{margin:0}section{break-inside:avoid}}`;
 
 const table = (header: string[], cells: string[][]) =>
   `<table><thead><tr>${header.map((h) => `<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${cells
@@ -57,11 +59,12 @@ const table = (header: string[], cells: string[][]) =>
     .join('')}</tbody></table>`;
 
 /** Tek dosyalık rapor üretir. Her değer HTML'e kaçırılarak yazılır. */
-export function buildReport(d: ReportData, mode: ReportMode): string {
+export function buildReport(d: ReportData): string {
   const desc = table(['Grup', 'n', 'Medyan', 'Ortalama', 'SS'], d.descriptives.map((x) => [x.group, String(x.n), x.median.toFixed(2), x.mean.toFixed(2), Number.isFinite(x.sd) ? x.sd.toFixed(2) : '–']));
   const assump = d.assumptions.length
     ? table(['Test', 'Uygulandığı veri', 'İstatistik', 'p', 'Sonuç'], d.assumptions.map((x) => [x.name, x.subject, x.statistic, formatP(x.p, true), x.passed ? 'Sağlandı' : 'İhlal edildi']))
     : '<p class="muted">Bu test türü için ayrı bir varsayım testi uygulanmadı.</p>';
+  const chart = d.distribution ? `<figure><figcaption class="muted">Kalıntıların histogramı ve kuramsal normal eğri (n = ${d.distribution.n}, çarpıklık = ${d.distribution.skewness})</figcaption>${histogramSvg(d.distribution, 'Kalıntıların histogramı ve kuramsal normal eğri')}</figure>` : '';
   const warnings = d.decision.warnings.map((w) => `<p class="warn">${esc(w)}</p>`).join('');
   const notes = d.notes.length ? `<ul>${d.notes.map((n) => `<li>${esc(n)}</li>`).join('')}</ul>` : '';
   const audit = d.audit ? `<section data-section="audit"><h2>Denetim izi</h2>${table(['Öğe', 'Değer'], d.audit)}</section>` : '';
@@ -69,7 +72,7 @@ export function buildReport(d: ReportData, mode: ReportMode): string {
   const body = `<h1>${esc(d.title)}</h1>
 <p class="muted">${esc(d.datasetName)} · ${esc(d.date)} · StatAdvisor AI</p>
 <section data-section="desc"><h2>Tanımlayıcı istatistikler</h2>${desc}${notes}</section>
-<section data-section="assump"><h2>Varsayım testleri ve karar notları</h2>${assump}
+<section data-section="assump"><h2>Varsayım testleri ve karar notları</h2>${assump}${chart}
 <p>Önerilen test: <strong>${esc(d.decision.finalTest)}</strong>${d.decision.rerouteReason ? ` (${esc(d.decision.rerouteReason)})` : ''}.</p>${warnings}</section>
 <section data-section="result"><h2>Test sonucu</h2><p>${esc(d.resultLine)}</p></section>
 <section data-section="apa"><h2>APA 7 stilinde özet</h2><p>${esc(d.apaSummary)}</p></section>
@@ -77,7 +80,5 @@ export function buildReport(d: ReportData, mode: ReportMode): string {
 ${audit}
 <p class="muted">Bu rapor bir karar destek aracı tarafından üretilmiştir; yöntem seçiminin ve yorumun sorumluluğu araştırmacıya aittir.</p>`;
 
-  const printScript = mode === 'print' ? `<script>addEventListener('load',function(){setTimeout(function(){print()},250)})</script>` : '';
-  const htmlAttrs = mode === 'word' ? ' xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"' : '';
-  return `<!doctype html><html lang="tr"${htmlAttrs}><head><meta charset="utf-8"><title>${esc(d.title)}</title><style>${style}</style></head><body>${body}${printScript}</body></html>`;
+  return `<!doctype html><html lang="tr"><head><meta charset="utf-8"><title>${esc(d.title)}</title><style>${style}</style></head><body>${body}</body></html>`;
 }

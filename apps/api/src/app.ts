@@ -26,6 +26,8 @@ import {
 } from '@statadvisor/shared';
 import { CsvError, parseCsv, type ParsedColumn, type ParsedCsv } from './csv.ts';
 import { openDb } from './db.ts';
+import { buildDocx } from './docx.ts';
+import { PdfUnavailableError, pdfAvailable, renderPdf } from './pdf.ts';
 
 export interface AppOptions {
   /** Veritabanı ve yüklenen dosyaların tutulduğu klasör. ":memory:" ile yalnızca bellekte çalışır. */
@@ -130,6 +132,7 @@ export function buildApp(opts: AppOptions): FastifyInstance {
       const issue = err.issues[0];
       return reply.status(400).send({ error: { code: 'invalid_request', message: `Geçersiz istek: ${issue?.path.join('.') || 'gövde'}: ${issue?.message ?? ''}`.trim() } });
     }
+    if (err instanceof PdfUnavailableError) return reply.status(501).send({ error: { code: err.code, message: err.message } });
     if (err instanceof CsvError || err instanceof AnalysisError) return reply.status(422).send({ error: { code: (err as CsvError).code, message: err.message } });
     if (e.code === 'FST_REQ_FILE_TOO_LARGE' || e.statusCode === 413) {
       return reply.status(413).send({ error: { code: 'too_large', message: `Dosya çok büyük (en fazla ${Math.round(maxUpload / 1024 / 1024)} MB).` } });
@@ -410,10 +413,11 @@ export function buildApp(opts: AppOptions): FastifyInstance {
     return reply.status(204).send();
   });
 
-  /** Rapor: denetim izi dahil. format = html | print | word */
+  /** Rapor: denetim izi dahil. format = html | pdf | docx */
   app.get('/api/analyses/:id/report', async (req, reply) => {
-    const { format } = z.object({ format: z.enum(['html', 'print', 'word']).default('html') }).parse(req.query);
+    const { format } = z.object({ format: z.enum(['html', 'pdf', 'docx']).default('html') }).parse(req.query);
     const a = analysisJson(getAnalysis((req.params as { id: string }).id));
+    // Tarih, analizin oluşturulma tarihidir: aynı analiz her zaman aynı raporu üretir.
     const date = new Date(a.createdAt).toLocaleDateString('tr-TR');
     const eng = a.engine as ReturnType<typeof engineInfo>;
     const audit: [string, string][] = [
@@ -437,12 +441,25 @@ export function buildApp(opts: AppOptions): FastifyInstance {
         audit.splice(1, 0, ['Veri sürümü', 'Ham veri (değiştirilmemiş)']);
       }
     }
-    const html = buildReport(reportFromResult(a.result, date, audit), format);
-    reply.header('Content-Type', format === 'word' ? 'application/msword; charset=utf-8' : 'text/html; charset=utf-8');
-    if (format === 'word') reply.header('Content-Disposition', 'attachment; filename="rapor.doc"');
-    reply.header('Content-Security-Policy', format === 'print' ? "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'" : "default-src 'none'; style-src 'unsafe-inline'");
-    return html;
+    const data = reportFromResult(a.result, date, audit);
+    const html = buildReport(data);
+    if (format === 'html') {
+      reply.header('Content-Type', 'text/html; charset=utf-8');
+      reply.header('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; img-src data:");
+      return html;
+    }
+    if (format === 'docx') {
+      reply.header('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+      reply.header('Content-Disposition', 'attachment; filename="rapor.docx"');
+      return buildDocx(data);
+    }
+    reply.header('Content-Type', 'application/pdf');
+    reply.header('Content-Disposition', 'attachment; filename="rapor.pdf"');
+    return renderPdf(html);
   });
+
+  /** Bu makinede hangi çıktı biçimleri kullanılabilir? */
+  app.get('/api/capabilities', async () => ({ pdf: await pdfAvailable(), docx: true, html: true }));
 
   /** Analizin Python karşılığı; betik, beklenen çıktıyla birebir aynı satırları yazdırır. */
   app.get('/api/analyses/:id/code', async (req) => {

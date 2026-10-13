@@ -1,20 +1,20 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { ClipboardCheck, Database, Download, Eye, FileText, FileType2, FlaskConical, Globe, History, Package, Printer, Quote, Route, ShieldAlert, SquareTerminal } from 'lucide-react';
+import { ClipboardCheck, Database, Download, Eye, FileText, FileType2, FlaskConical, Globe, History, Package, Quote, Route, ShieldAlert, SquareTerminal } from 'lucide-react';
 import { pText, REPORT_SECTION_IDS } from '@statadvisor/shared';
 import { HeaderStat, PageHeader } from '@/components/layout/PageHeader';
 import { QueryView } from '@/components/layout/PageStatus';
 import { Button, Callout, Checklist, CodeBlock, ConsoleOutput, CopyButton, LinkButton, Panel, RadioCardGroup, SectionHeader, Select, StatusLine, Tag } from '@/components/ui';
 import { DecisionPath } from '@/components/domain';
 import { useActiveDataset } from '@/context/AppContext';
-import { useAnalyses, useAnalysisCode, useSavedAnalysis } from '@/data/hooks';
+import { useAnalyses, useAnalysisCode, useCapabilities, useSavedAnalysis } from '@/data/hooks';
 import { downloadText, toNotebook } from '@/lib/download';
 
-type Format = 'html' | 'print' | 'word';
+type Format = 'html' | 'pdf' | 'docx';
 const formats: { id: Format; title: string; description: string; icon: typeof Globe }[] = [
-  { id: 'html', title: 'HTML belgesi', description: 'Tarayıcıda açılır, indirilir', icon: Globe },
-  { id: 'print', title: 'PDF (yazdır)', description: 'Tarayıcının “PDF olarak kaydet” seçeneği', icon: FileText },
-  { id: 'word', title: 'Word (.doc)', description: 'HTML tabanlı, Word’de açılır', icon: FileType2 },
+  { id: 'html', title: 'HTML belgesi', description: 'Grafiklerle, tarayıcıda açılır', icon: Globe },
+  { id: 'pdf', title: 'PDF', description: 'A4, grafiklerle', icon: FileText },
+  { id: 'docx', title: 'Word (.docx)', description: 'Düzenlenebilir; grafik içermez', icon: FileType2 },
 ];
 const SECTION_LABELS: Record<string, string> = {
   desc: 'Tanımlayıcı istatistikler (n, medyan, ortalama, standart sapma)',
@@ -79,6 +79,8 @@ function Report({ id, head, history, onPick }: { id: string; head: React.ReactNo
   const saved = useSavedAnalysis(id);
   const code = useAnalysisCode(id);
   const [format, setFormat] = useState<Format>('html');
+  const caps = useCapabilities();
+  const pdfOk = caps.data?.pdf ?? true;
 
   return (
     <>
@@ -166,21 +168,26 @@ function Report({ id, head, history, onPick }: { id: string; head: React.ReactNo
                         İndir (.html)
                       </LinkButton>
                     )}
-                    {format === 'print' && (
-                      <LinkButton variant="primary" icon={Printer} href={href('print')} target="_blank" rel="noopener noreferrer">
-                        Yazdır / PDF kaydet
+                    {format === 'pdf' && pdfOk && (
+                      <LinkButton variant="primary" icon={Download} href={href('pdf')} download="rapor.pdf">
+                        İndir (.pdf)
                       </LinkButton>
                     )}
-                    {format === 'word' && (
-                      <LinkButton variant="primary" icon={Download} href={href('word')} download="rapor.doc">
-                        İndir (.doc)
+                    {format === 'pdf' && !pdfOk && (
+                      <Button variant="primary" icon={Download} disabled>
+                        İndir (.pdf)
+                      </Button>
+                    )}
+                    {format === 'docx' && (
+                      <LinkButton variant="primary" icon={Download} href={href('docx')} download="rapor.docx">
+                        İndir (.docx)
                       </LinkButton>
                     )}
                   </div>
-                  {format !== 'html' && (
-                    <p className="text-caption text-fg-subtle">
-                      {format === 'print' ? 'Açılan sayfada yazdırma penceresinden “PDF olarak kaydet” seçeneğini kullanın.' : 'Dosya, Word’ün açabildiği HTML tabanlı bir belgedir; biçim uyarısı çıkabilir.'}
-                    </p>
+                  {format === 'pdf' && !pdfOk && (
+                    <StatusLine status="warning" className="text-caption">
+                      PDF üretimi için Chromium gerekir. Terminalde <code className="font-mono">npx playwright install chromium</code> çalıştırın; bu sırada HTML raporunu tarayıcıdan PDF olarak yazdırabilirsiniz.
+                    </StatusLine>
                   )}
 
                   <section aria-labelledby="apa-ozet">
