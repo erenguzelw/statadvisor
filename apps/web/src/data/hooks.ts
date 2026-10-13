@@ -150,6 +150,10 @@ export function useCleaningCode(datasetId: string | null, p: { clean: string[]; 
   });
 }
 
+export function useCapabilities() {
+  return useQuery({ queryKey: ['capabilities'], queryFn: () => api.get<{ pdf: boolean; docx: boolean; html: boolean }>('/api/capabilities'), staleTime: Infinity });
+}
+
 /** Model karşılaştırma: tarayıcıda eğitilen modeller (sentetik, tohumlu veri). */
 export function useModelComparison() {
   return useQuery({

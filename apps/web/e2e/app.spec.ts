@@ -156,6 +156,25 @@ test('kaydet → kod ve rapor: kod indirilir, rapor sunucudan gelir ve denetim i
   for (const id of ['desc', 'assump', 'result', 'apa', 'refs', 'audit']) expect(html).toContain(`data-section="${id}"`);
   expect(html).toContain('klinik_ornek.csv');
   await expect(page.getByText('Girdi karması (SHA-256)')).toBeVisible();
+
+  // Word (.docx): gerçek bir Office Open XML paketi
+  await page.locator('label', { hasText: 'Word (.docx)' }).click();
+  const docxHref = await page.getByRole('link', { name: 'İndir (.docx)' }).getAttribute('href');
+  const docx = await request.get(docxHref!);
+  expect(docx.headers()['content-type']).toContain('wordprocessingml');
+  expect((await docx.body()).subarray(0, 2).toString()).toBe('PK');
+
+  // PDF: Chromium kuruluysa gerçek bir PDF, değilse uyarı ve kapalı düğme
+  const caps = (await (await request.get('/api/capabilities')).json()) as { pdf: boolean };
+  await page.locator('label', { hasText: 'PDF' }).click();
+  if (caps.pdf) {
+    const pdfHref = await page.getByRole('link', { name: 'İndir (.pdf)' }).getAttribute('href');
+    const pdf = await request.get(pdfHref!);
+    expect((await pdf.body()).subarray(0, 5).toString()).toBe('%PDF-');
+  } else {
+    await expect(page.getByText(/npx playwright install chromium/)).toBeVisible();
+    await expect(page.getByRole('button', { name: 'İndir (.pdf)' })).toBeDisabled();
+  }
 });
 
 test('kod ve rapor: kaydedilmiş analiz yokken yönlendirir', async ({ page, request }) => {

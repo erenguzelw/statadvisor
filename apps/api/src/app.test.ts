@@ -194,22 +194,6 @@ describe('analizler', () => {
     expect(q.focus.boxesBefore.map((b: { group: string }) => b.group)).toEqual(['A', 'B', 'C']);
     expect((await app.inject({ url: `/api/datasets/${id}/quality?value=yok` })).statusCode).toBe(422);
   });
-
-  it('rapor: denetim izini içerir; word biçimi indirme başlığı verir', async () => {
-    const id = (await upload()).json().id;
-    const a = (await app.inject({ method: 'POST', url: '/api/analyses', payload: kruskalBody(id) })).json();
-    const html = await app.inject({ url: `/api/analyses/${a.id}/report` });
-    expect(html.headers['content-type']).toContain('text/html');
-    expect(html.body).toContain('data-section="audit"');
-    expect(html.body).toContain(a.inputHash);
-    expect(html.body).toContain('Kruskal-Wallis H testi');
-    expect(html.body).not.toContain('<script>');
-    const word = await app.inject({ url: `/api/analyses/${a.id}/report?format=word` });
-    expect(word.headers['content-disposition']).toContain('rapor.doc');
-    const print = await app.inject({ url: `/api/analyses/${a.id}/report?format=print` });
-    expect(print.body).toContain('print()');
-    expect((await app.inject({ url: `/api/analyses/${a.id}/report?format=pdf` })).statusCode).toBe(400);
-  });
 });
 
 describe('güvenlik', () => {
