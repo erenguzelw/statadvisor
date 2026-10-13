@@ -199,6 +199,51 @@ suite('üretilen Python kodu, ekrandaki sonucu birebir yeniden üretir', () => {
     expect(bad.statusCode).toBe(422);
   });
 
+  it('normallik çarpıklık-basıklık ölçütüyle (±1.5 ve ±2) değerlendirilir; Python aynı değerleri üretir', { timeout: T }, async () => {
+    const skew = (n: number, mu: number) => g(n, mu, 0.9).map((v) => Math.round(Math.exp(v) * 100) / 100);
+    const id = await uploadCsv(twoGroups(skew(60, 1), skew(55, 1.3)));
+    const a = await verify(id, cmp({ value: 'deger', group: 'grup', normality: 'skewkurt-1.5' }));
+    const card = a.analysis.assumptions.find((x: { name: string }) => x.name === 'Çarpıklık-Basıklık');
+    expect(card).toBeDefined();
+    expect(a.analysis.assumptions.some((x: { name: string }) => x.name === 'Shapiro-Wilk')).toBe(false);
+    expect(a.analysis.outcome.test).toBe(card.passed ? 'Welch t-testi' : 'Mann-Whitney U testi');
+    expect(a.analysis.references.join(' ')).toContain('Tabachnick');
+    expect(a.code.code).toContain('stats.kurtosis');
+    const normalId = await uploadCsv(twoGroups(g(50, 10, 2), g(50, 11, 2)), 'normal.csv');
+    const b = await verify(normalId, cmp({ value: 'deger', group: 'grup', normality: 'skewkurt-2' }));
+    expect(b.analysis.outcome.test).toBe('Welch t-testi');
+    expect(b.analysis.descriptives[0]).toHaveProperty('kurtosis');
+  });
+
+  it('anket taraması: düz çizgi ve Mahalanobis Python ile eşleşir; uygulama işaretli satırları çıkarır', { timeout: T }, async () => {
+    const items = ['m1', 'm2', 'm3', 'm4', 'm5', 'm6'];
+    const rows = Array.from({ length: 150 }, (_, i) => {
+      if (i % 25 === 3) return [`k${i}`, ...items.map(() => 2)]; // düz çizgi
+      if (i === 40) return [`k${i}`, 4, 0, 4, 0, 4, 0]; // tutarsız örüntü
+      const latent = gaussian(rng);
+      return [`k${i}`, ...items.map(() => Math.min(4, Math.max(0, Math.round(2 + latent + 0.6 * gaussian(rng)))))];
+    });
+    rows[7]![3] = '';
+    const id = await uploadCsv(csv(['kisi', ...items], rows), 'tarama.csv');
+    const body = { items, straightLine: true, mahalanobis: true };
+    const res = (await app.inject({ method: 'POST', url: `/api/datasets/${id}/screen`, payload: body })).json();
+    expect(res.complete).toBe(149);
+    expect(res.straightLiners).toEqual(expect.arrayContaining([3, 28, 53, 78, 103, 128]));
+    expect(res.straightLiners).not.toContain(7);
+    expect(res.mahalanobis.map((m: { row: number }) => m.row)).toContain(40);
+    const code = (await app.inject({ method: 'POST', url: `/api/datasets/${id}/screen-code`, payload: body })).json();
+    const ds = (await app.inject({ url: `/api/datasets/${id}` })).json();
+    writeFileSync(join(work, ds.name), (await app.inject({ url: `/api/datasets/${id}/download` })).rawPayload);
+    writeFileSync(join(work, code.filename), code.code);
+    const out = execFileSync(PY, [code.filename], { cwd: work, encoding: 'utf8', env: { ...process.env, PYTHONIOENCODING: 'utf-8' }, timeout: 90_000 });
+    expect(out.trim().split(/\r?\n/)).toEqual(code.expectedOutput);
+    const applied = await app.inject({ method: 'POST', url: `/api/datasets/${id}/screen/apply`, payload: body });
+    expect(applied.statusCode, applied.body).toBe(201);
+    expect(applied.json().rows).toBe(150 - res.flagged.length);
+    const bad = await app.inject({ method: 'POST', url: `/api/datasets/${id}/screen`, payload: { items: ['m1', 'kisi'], straightLine: true, mahalanobis: false } });
+    expect(bad.statusCode).toBe(422);
+  });
+
   it('küçük 2×2 tablo: Fisher kesin testi', { timeout: T }, async () => {
     const rows = [...Array(7).fill(['a', 'evet']), ...Array(2).fill(['a', 'hayir']), ...Array(1).fill(['b', 'evet']), ...Array(8).fill(['b', 'hayir'])];
     const id = await uploadCsv(csv(['grup', 'sonuc'], rows));

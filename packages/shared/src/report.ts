@@ -60,9 +60,10 @@ const table = (header: string[], cells: string[][]) =>
 
 /** Tek dosyalık rapor üretir. Her değer HTML'e kaçırılarak yazılır. */
 export function buildReport(d: ReportData): string {
-  const desc = table(['Grup', 'n', 'Medyan', 'Ortalama', 'SS'], d.descriptives.map((x) => [x.group, String(x.n), x.median.toFixed(2), x.mean.toFixed(2), Number.isFinite(x.sd) ? x.sd.toFixed(2) : '–']));
+  const f2 = (v: number) => (Number.isFinite(v) ? v.toFixed(2) : '–');
+  const desc = table(['Grup', 'n', 'Medyan', 'Ortalama', 'SS', 'Çarpıklık', 'Basıklık'], d.descriptives.map((x) => [x.group, String(x.n), x.median.toFixed(2), x.mean.toFixed(2), f2(x.sd), f2(x.skewness), f2(x.kurtosis)]));
   const assump = d.assumptions.length
-    ? table(['Test', 'Uygulandığı veri', 'İstatistik', 'p', 'Sonuç'], d.assumptions.map((x) => [x.name, x.subject, x.statistic, formatP(x.p, true), x.passed ? 'Sağlandı' : 'İhlal edildi']))
+    ? table(['Test', 'Uygulandığı veri', 'İstatistik', 'p', 'Sonuç'], d.assumptions.map((x) => [x.name, x.subject, x.statistic, x.shape ? `sınır ±${x.shape.limit}` : formatP(x.p, true), x.passed ? 'Sağlandı' : 'İhlal edildi']))
     : '<p class="muted">Bu test türü için ayrı bir varsayım testi uygulanmadı.</p>';
   const chart = d.distribution ? `<figure><figcaption class="muted">Kalıntıların histogramı ve kuramsal normal eğri (n = ${d.distribution.n}, çarpıklık = ${d.distribution.skewness})</figcaption>${histogramSvg(d.distribution, 'Kalıntıların histogramı ve kuramsal normal eğri')}</figure>` : '';
   const warnings = d.decision.warnings.map((w) => `<p class="warn">${esc(w)}</p>`).join('');

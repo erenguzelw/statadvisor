@@ -32,6 +32,8 @@ export interface AssumptionTest {
   alpha: number;
   passed: boolean;
   verdict: string;
+  /** Çarpıklık-basıklık ölçütünde ham değerler (kod doğrulaması için). */
+  shape?: { skewness: number; kurtosis: number; limit: number };
   /** "Bu ne demek?" açıklaması; seviyeye göre iki anlatım. */
   explain: Narrated;
 }
@@ -56,6 +58,9 @@ export interface GroupDescriptive {
   median: number;
   mean: number;
   sd: number;
+  /** Düzeltilmiş çarpıklık ve fazlalık basıklık (yetersiz gözlemde NaN). */
+  skewness: number;
+  kurtosis: number;
 }
 
 export interface Interpretation {

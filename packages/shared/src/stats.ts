@@ -100,6 +100,28 @@ export function skewness(values: number[]): number {
   return m3 / m2 ** 1.5;
 }
 
+/**
+ * Düzeltilmiş çarpıklık (G1) ve fazlalık basıklık (G2); SPSS ve scipy skew/kurtosis(bias=False) ile aynıdır.
+ * Standart hatalar SPSS formülleriyle hesaplanır. Yetersiz gözlemde NaN döner (G1 için n ≥ 3, G2 için n ≥ 4).
+ */
+export function shapeStats(values: number[]): { skewness: number; kurtosis: number; seSkewness: number; seKurtosis: number } {
+  const n = values.length;
+  if (n < 3) return { skewness: NaN, kurtosis: NaN, seSkewness: NaN, seKurtosis: NaN };
+  const mean = values.reduce((s, v) => s + v, 0) / n;
+  const m2 = values.reduce((s, v) => s + (v - mean) ** 2, 0) / n;
+  const m3 = values.reduce((s, v) => s + (v - mean) ** 3, 0) / n;
+  const m4 = values.reduce((s, v) => s + (v - mean) ** 4, 0) / n;
+  if (m2 === 0) return { skewness: NaN, kurtosis: NaN, seSkewness: NaN, seKurtosis: NaN };
+  const g1 = m3 / m2 ** 1.5;
+  const g2 = m4 / m2 ** 2 - 3;
+  const skew = (g1 * Math.sqrt(n * (n - 1))) / (n - 2);
+  const seSkewness = Math.sqrt((6 * n * (n - 1)) / ((n - 2) * (n + 1) * (n + 3)));
+  if (n < 4) return { skewness: skew, kurtosis: NaN, seSkewness, seKurtosis: NaN };
+  const kurt = (((n + 1) * g2 + 6) * (n - 1)) / ((n - 2) * (n - 3));
+  const seKurtosis = 2 * seSkewness * Math.sqrt((n * n - 1) / ((n - 3) * (n + 5)));
+  return { skewness: skew, kurtosis: kurt, seSkewness, seKurtosis };
+}
+
 export function meanSd(values: number[]) {
   const n = values.length;
   const mean = values.reduce((s, v) => s + v, 0) / n;

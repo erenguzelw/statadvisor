@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Database, FlaskConical, Save, TriangleAlert, Wand2 } from 'lucide-react';
-import type { WizardAnswers } from '@statadvisor/shared';
+import type { NormalityMethod, WizardAnswers } from '@statadvisor/shared';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Button, Callout, CheckboxGroup, Panel, SectionHeader, Select, StatusLine, Tag } from '@/components/ui';
 import { DecisionPath, DecisionWizard, RecommendationNotes } from '@/components/domain';
@@ -41,8 +41,13 @@ function Wizard({ dataset }: { dataset: DatasetInfo }) {
   const [answers, setAnswers] = useState<Answers>({ goal: 'compare', design: 'unknown', target: init.target });
   const [picks, setPicks] = useState<Picks>(init.picks);
   const save = useSaveAnalysis();
+  // Ölçek puanı içeren (anket) veri setlerinde varsayılan ölçüt çarpıklık-basıklıktır.
+  const [normality, setNormality] = useState<NormalityMethod>(dataset.operations?.scales ? 'skewkurt-1.5' : 'shapiro');
 
-  const body = useMemo(() => buildBody(dataset.id, cols, answers, picks), [dataset.id, cols, answers, picks]);
+  const body = useMemo(() => {
+    const b = buildBody(dataset.id, cols, answers, picks);
+    return b && answers.target === 'continuous' ? { ...b, normality } : b;
+  }, [dataset.id, cols, answers, picks, normality]);
   const settled = useDebounced(body, 350);
   const preview = useAnalysisPreview(settled);
   const result = preview.data?.result;
@@ -136,6 +141,21 @@ function Wizard({ dataset }: { dataset: DatasetInfo }) {
                     Model Karşılaştırma sayfasına gidin.
                   </Link>
                 </StatusLine>
+              )}
+              {answers.goal !== 'predict' && answers.target === 'continuous' && (
+                <div className="mt-4">
+                  <Select
+                    label="Normallik ölçütü"
+                    value={normality}
+                    onChange={(v) => setNormality(v as NormalityMethod)}
+                    options={[
+                      { value: 'shapiro', label: 'Shapiro-Wilk (p ≥ α)' },
+                      { value: 'skewkurt-1.5', label: 'Çarpıklık ve basıklık ±1.5 (Tabachnick ve Fidell)' },
+                      { value: 'skewkurt-2', label: 'Çarpıklık ve basıklık ±2 (George ve Mallery)' },
+                    ]}
+                    hint="Anket ve ölçek puanlarında çarpıklık-basıklık ölçütü yaygındır; büyük örneklemde Shapiro-Wilk çok küçük sapmaları da reddeder."
+                  />
+                </div>
               )}
             </div>
             {result && (

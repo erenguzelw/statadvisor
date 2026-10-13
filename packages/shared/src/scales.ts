@@ -3,7 +3,9 @@
  * Cronbach alfa ile iç tutarlılığı hesaplar. Alt boyutları kullanıcı elle tanımlar; uygulama madde anahtarı uydurmaz.
  */
 import { AnalysisError } from './analysis.ts';
+import { shapiroWilk } from './assumptions.ts';
 import type { QualityColumn } from './quality.ts';
+import { shapeStats } from './stats.ts';
 
 export interface ScaleDef {
   name: string;
@@ -26,6 +28,11 @@ export interface ScaleResult {
   nAlpha: number;
   nValid: number;
   mean: number | null;
+  /** Puanın normalliği: düzeltilmiş çarpıklık/basıklık ve Shapiro-Wilk (en fazla 5000 gözlem; fazlası eşit aralıklı alt örnek). */
+  skewness: number | null;
+  kurtosis: number | null;
+  shapiroW: number | null;
+  shapiroP: number | null;
   /** Maddeler arası ortalama ilişki yerine okunabilir uyarılar. */
   notes: string[];
 }
@@ -100,7 +107,23 @@ export function computeScales(columns: QualityColumn[], defs: ScaleDef[]): Scale
     } else notes.push('Alfa için tüm maddeleri yanıtlayan en az 3 satır gerekir.');
     if (alpha !== null && alpha < 0.7) notes.push(`Cronbach alfa ${alpha.toFixed(2)} (${alphaLabel(alpha)}): maddeler tek bir yapıyı tutarlı ölçmüyor olabilir; ters maddeleri ve madde seçimini kontrol edin.`);
     const present = values.filter(isNum);
+    let skewness: number | null = null;
+    let kurtosis: number | null = null;
+    let shapiroW: number | null = null;
+    let shapiroP: number | null = null;
+    if (present.length >= 4) {
+      const sh = shapeStats(present);
+      skewness = Number.isFinite(sh.skewness) ? sh.skewness : null;
+      kurtosis = Number.isFinite(sh.kurtosis) ? sh.kurtosis : null;
+      if (skewness !== null) {
+        const sorted = [...present].sort((a, b) => a - b);
+        const sample = sorted.length <= 5000 ? present : Array.from({ length: 5000 }, (_, i) => sorted[Math.floor((i * sorted.length) / 5000)]!);
+        const w = shapiroWilk(sample);
+        shapiroW = w.W;
+        shapiroP = w.p;
+      }
+    }
     if (present.length < rows) notes.push(`${rows - present.length} satırda yeterli yanıt olmadığı için puan eksik bırakıldı.`);
-    return { name, values, alpha, nAlpha: complete.length, nValid: present.length, mean: present.length ? present.reduce((s, x) => s + x, 0) / present.length : null, notes };
+    return { name, values, alpha, nAlpha: complete.length, nValid: present.length, mean: present.length ? present.reduce((s, x) => s + x, 0) / present.length : null, skewness, kurtosis, shapiroW, shapiroP, notes };
   });
 }

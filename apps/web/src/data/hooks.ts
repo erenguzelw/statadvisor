@@ -94,6 +94,10 @@ export interface ScaleResultInfo {
   nAlpha: number;
   nValid: number;
   mean: number | null;
+  skewness: number | null;
+  kurtosis: number | null;
+  shapiroW: number | null;
+  shapiroP: number | null;
   notes: string[];
 }
 
@@ -103,6 +107,36 @@ export function useCreateScales(datasetId: string) {
     mutationFn: (scales: ScaleRequest[]) => api.post<DatasetInfo & { scaleResults: ScaleResultInfo[] }>(`/api/datasets/${datasetId}/scales`, { scales }),
     onSuccess: invalidate,
   });
+}
+
+export interface ScreenRequest {
+  items: string[];
+  straightLine: boolean;
+  mahalanobis: boolean;
+}
+
+export interface ScreenResultInfo {
+  items: number;
+  complete: number;
+  straightLiners: number[];
+  mahalanobis: { row: number; d2: number; p: number }[];
+  critical: number | null;
+  maxD2: number | null;
+  flagged: number[];
+  notes: string[];
+}
+
+export function useScreen(datasetId: string) {
+  return useMutation({ mutationFn: (body: ScreenRequest) => api.post<ScreenResultInfo>(`/api/datasets/${datasetId}/screen`, body) });
+}
+
+export function useApplyScreen(datasetId: string) {
+  const invalidate = useInvalidateDatasets();
+  return useMutation({ mutationFn: (body: ScreenRequest) => api.post<DatasetInfo>(`/api/datasets/${datasetId}/screen/apply`, body), onSuccess: invalidate });
+}
+
+export function useScreenCode(datasetId: string) {
+  return useMutation({ mutationFn: (body: ScreenRequest) => api.post<CodeResponse>(`/api/datasets/${datasetId}/screen-code`, body) });
 }
 
 export function useScalesCode(datasetId: string) {

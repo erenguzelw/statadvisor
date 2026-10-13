@@ -13,6 +13,8 @@ import {
   cleanColumns,
   computeScales,
   generateScalesCode,
+  generateScreeningCode,
+  screenResponses,
   type ScaleDef,
   generateAnalysisCode,
   generateCleaningCode,
@@ -66,6 +68,7 @@ const AnalysisBody = z.object({
   design: z.enum(['independent', 'paired', 'unknown']),
   target: z.enum(['continuous', 'ordinal', 'categorical']),
   alpha: z.number().gt(0).lt(1).optional(),
+  normality: z.enum(['shapiro', 'skewkurt-1.5', 'skewkurt-2']).optional(),
   value: colName.optional(),
   group: colName.optional(),
   conditions: z.array(colName).min(2).max(12).optional(),
@@ -279,12 +282,45 @@ export function buildApp(opts: AppOptions): FastifyInstance {
     const buf = Buffer.from(columnsToCsv([...base, ...added]), 'utf8');
     const operations = {
       scales: body.scales,
-      results: results.map((r) => ({ name: r.name, alpha: r.alpha, nAlpha: r.nAlpha, nValid: r.nValid, mean: r.mean, notes: r.notes })),
+      results: results.map((r) => ({ name: r.name, alpha: r.alpha, nAlpha: r.nAlpha, nValid: r.nValid, mean: r.mean, skewness: r.skewness, kurtosis: r.kurtosis, shapiroW: r.shapiroW, shapiroP: r.shapiroP, notes: r.notes })),
       log: results.map((r) => `Ölçek “${r.name}”: ${r.nValid} geçerli puan, alfa ${r.alpha === null ? 'hesaplanamadı' : r.alpha.toFixed(3)}.`),
     };
     const { dataset, created } = ingest(buf, `${row.name.replace(/\.csv$/i, '')} (ölçekli).csv`, { parentId: row.id, operations });
     return reply.status(created ? 201 : 200).send({ ...dataset, duplicate: !created, scaleResults: operations.results });
   });
+  /** Anket yanıt taraması: düz çizgi ve Mahalanobis. Önizleme, uygulama (yeni sürüm) ve Python kodu. */
+  const ScreenBody = z.object({
+    items: z.array(colName).min(2).max(200),
+    straightLine: z.boolean().default(true),
+    mahalanobis: z.boolean().default(true),
+    mahalanobisAlpha: z.number().gt(0).lt(0.5).default(0.001),
+  });
+  const screen = (id: string, raw: unknown) => {
+    const body = ScreenBody.parse(raw ?? {});
+    const { row, csv } = parsed(id);
+    return { body, row, csv, result: screenResponses(qcols(csv), body) };
+  };
+  app.post('/api/datasets/:id/screen', async (req) => screen((req.params as { id: string }).id, req.body).result);
+  app.post('/api/datasets/:id/screen/apply', async (req, reply) => {
+    const { body, row, csv, result } = screen((req.params as { id: string }).id, req.body);
+    if (result.flagged.length === 0) throw new ApiError(422, 'nothing_to_do', 'Çıkarılacak işaretli satır yok.');
+    const drop = new Set(result.flagged);
+    const kept = qcols(csv).map((c) => ({ ...c, values: c.values.filter((_, i) => !drop.has(i)) }));
+    if (kept[0]!.values.length < 3) throw new ApiError(422, 'too_few_rows', 'Taramadan sonra analiz için yeterli satır kalmıyor.');
+    const log = [
+      ...(body.straightLine ? [`Düz çizgi yanıt (${body.items.length} maddenin tümüne aynı yanıt): ${result.straightLiners.length} satır.`] : []),
+      ...(body.mahalanobis ? [`Mahalanobis D² (sd = ${result.items}, p < ${body.mahalanobisAlpha}, kritik değer ${result.critical!.toFixed(2)}): ${result.mahalanobis.length} satır.`] : []),
+      `Toplam ${result.flagged.length} satır çıkarıldı.`,
+    ];
+    const operations = { screening: body, removedRows: result.flagged.length, log };
+    const { dataset, created } = ingest(Buffer.from(columnsToCsv(kept), 'utf8'), `${row.name.replace(/\.csv$/i, '')} (taranmış).csv`, { parentId: row.id, operations });
+    return reply.status(created ? 201 : 200).send({ ...dataset, duplicate: !created });
+  });
+  app.post('/api/datasets/:id/screen-code', async (req) => {
+    const { body, row, csv, result } = screen((req.params as { id: string }).id, req.body);
+    return generateScreeningCode(fileInfo(row, csv), body, result);
+  });
+
   /** Ölçek tanımının Python karşılığı (sonuçlar sunucuda yeniden hesaplanır). */
   app.post('/api/datasets/:id/scales-code', async (req) => {
     const { id } = req.params as { id: string };
@@ -380,6 +416,7 @@ export function buildApp(opts: AppOptions): FastifyInstance {
       design: b.design,
       target: b.target,
       alpha: b.alpha,
+      normality: b.normality,
       datasetName,
       value: b.target === 'categorical' ? undefined : num(b.value),
       group: text(b.group),

@@ -5,7 +5,7 @@
 import { groupResiduals, levene, mean, shapiroWilk } from './assumptions.ts';
 import { recommendTest, type AssumptionInput, type Design, type Goal, type Target, type WizardAnswers } from './decision.ts';
 import { describeGroups, interpretOutcome, runTest, type TestInput, type TestOutcome } from './inference.ts';
-import { histogram, meanSd, pText, skewness } from './stats.ts';
+import { histogram, meanSd, pText, shapeStats, skewness } from './stats.ts';
 import type { AssumptionTest, DecisionPath, DistributionSample, GroupDescriptive, Interpretation } from './types.ts';
 
 /** Çözümlenebilir bir istek biçimi hatası; kullanıcıya olduğu gibi gösterilebilir. */
@@ -21,6 +21,11 @@ export interface AnalysisRequest {
   design: Design;
   target: Target;
   alpha?: number;
+  /**
+   * Normallik ölçütü: Shapiro-Wilk (varsayılan) ya da çarpıklık ve basıklığın ±sınır içinde olması
+   * (anket/ölçek verisinde yaygın; ±1.5 Tabachnick & Fidell, ±2 George & Mallery).
+   */
+  normality?: NormalityMethod;
   /** Karşılaştırma (bağımsız gruplar): sonuç değişkeni ve grup değişkeni. */
   value?: NumericColumn;
   group?: TextColumn;
@@ -34,6 +39,8 @@ export interface AnalysisRequest {
   colVar?: TextColumn;
   datasetName?: string;
 }
+
+export type NormalityMethod = 'shapiro' | 'skewkurt-1.5' | 'skewkurt-2';
 
 export interface AnalysisResult {
   datasetName: string;
@@ -60,6 +67,8 @@ const collator = new Intl.Collator('tr', { numeric: true });
 const SHAPIRO_MAX = 5000;
 
 const REFERENCES: Record<string, string> = {
+  tabachnick: 'Tabachnick, B. G., & Fidell, L. S. (2013). Using multivariate statistics (6th ed.). Pearson.',
+  george: 'George, D., & Mallery, P. (2010). SPSS for Windows step by step: A simple guide and reference (10th ed.). Pearson.',
   shapiro: 'Royston, P. (1995). Remark AS R94: A remark on algorithm AS 181: The W-test for normality. Applied Statistics, 44(4), 547–551.',
   levene: 'Brown, M. B., & Forsythe, A. B. (1974). Robust tests for the equality of variances. Journal of the American Statistical Association, 69(346), 364–367.',
   kruskal: 'Kruskal, W. H., & Wallis, W. A. (1952). Use of ranks in one-criterion variance analysis. Journal of the American Statistical Association, 47(260), 583–621.',
@@ -74,9 +83,11 @@ const REFERENCES: Record<string, string> = {
   fisher: 'Fisher, R. A. (1922). On the interpretation of χ² from contingency tables, and the calculation of P. Journal of the Royal Statistical Society, 85(1), 87–94.',
 };
 
-function referencesFor(o: TestOutcome, usedShapiro: boolean, usedLevene: boolean): string[] {
+function referencesFor(o: TestOutcome, normality: NormalityMethod | null, usedLevene: boolean): string[] {
   const out: string[] = [];
-  if (usedShapiro) out.push(REFERENCES.shapiro!);
+  if (normality === 'shapiro') out.push(REFERENCES.shapiro!);
+  if (normality === 'skewkurt-1.5') out.push(REFERENCES.tabachnick!);
+  if (normality === 'skewkurt-2') out.push(REFERENCES.george!);
   if (usedLevene) out.push(REFERENCES.levene!);
   const t = o.test;
   if (t === 'Kruskal-Wallis H testi') out.push(REFERENCES.kruskal!);
@@ -134,6 +145,35 @@ export function shapiroAssumption(label: string, subject: string, values: number
   };
 }
 
+/** Çarpıklık ve basıklığın ±sınır içinde olup olmadığına göre normallik kararı. */
+export function skewKurtAssumption(label: string, subject: string, values: number[], alpha: number, limit: number): { test: AssumptionTest; p: number } {
+  if (values.length < 4) throw new AnalysisError('Çarpıklık ve basıklık için en az 4 gözlem gerekir.');
+  const s = shapeStats(values);
+  if (!Number.isFinite(s.skewness) || !Number.isFinite(s.kurtosis)) throw new AnalysisError(`${subject}: tüm değerler aynı; çarpıklık ve basıklık hesaplanamaz.`);
+  const passed = Math.abs(s.skewness) <= limit && Math.abs(s.kurtosis) <= limit;
+  const src = limit === 1.5 ? 'Tabachnick ve Fidell, 2013' : 'George ve Mallery, 2010';
+  return {
+    p: passed ? 1 : 0,
+    test: {
+      id: `skewkurt:${label}`,
+      name: 'Çarpıklık-Basıklık',
+      subject: `${subject}, n = ${values.length}`,
+      statistic: `çarpıklık = ${s.skewness.toFixed(3)}, basıklık = ${s.kurtosis.toFixed(3)}`,
+      p: NaN,
+      alpha,
+      passed,
+      shape: { skewness: s.skewness, kurtosis: s.kurtosis, limit },
+      verdict: passed
+        ? `Çarpıklık ve basıklık ±${limit} aralığında: dağılım normal kabul edilir (${src}).`
+        : `Çarpıklık ya da basıklık ±${limit} aralığının dışında: dağılım normal kabul edilmez (${src}).`,
+      explain: {
+        novice: `Çarpıklık dağılımın bir yana yığılmasını, basıklık ise sivri ya da basık olmasını ölçer. İkisi de 0’a yakınsa dağılım çan eğrisine benzer. Bu çalışmada ±${limit} aralığı ölçüt alındı.`,
+        expert: `Düzeltilmiş çarpıklık G1 = ${s.skewness.toFixed(3)} (SH = ${s.seSkewness.toFixed(3)}), fazlalık basıklık G2 = ${s.kurtosis.toFixed(3)} (SH = ${s.seKurtosis.toFixed(3)}). Ölçüt |G1|, |G2| ≤ ${limit} (${src}). Büyük örneklemde Shapiro-Wilk önemsiz sapmalara da duyarlı olduğundan anket verisinde bu ölçüt sık kullanılır.`,
+      },
+    },
+  };
+}
+
 export function leveneAssumption(groups: number[][], alpha: number): { test: AssumptionTest; p: number } {
   const r = levene(groups);
   const passed = r.p >= alpha;
@@ -180,6 +220,13 @@ function pairedResiduals(conds: number[][]): { values: number[]; subject: string
 
 function apaSentence(o: TestOutcome, assumptions: AssumptionTest[]): string {
   const parts: string[] = [];
+  const sk = assumptions.filter((a) => a.name === 'Çarpıklık-Basıklık');
+  if (sk.length) {
+    const lim = sk[0]!.shape!.limit;
+    parts.push(
+      `Normallik varsayımı çarpıklık ve basıklık değerleriyle incelenmiştir (${sk.map((a) => `${a.subject}: ${a.statistic}`).join('; ')}); değerler ${sk.every((a) => a.passed) ? `±${lim} aralığında olduğundan dağılımın normal olduğu kabul edilmiştir` : `±${lim} aralığının dışında kaldığından dağılım normal kabul edilmemiştir`} (${lim === 1.5 ? 'Tabachnick ve Fidell, 2013' : 'George ve Mallery, 2010'}).`,
+    );
+  }
   const sh = assumptions.filter((a) => a.name === 'Shapiro-Wilk');
   if (sh.length) {
     parts.push(
@@ -224,7 +271,11 @@ export function analyze(req: AnalysisRequest): AnalysisResult {
   let groupCount: '2' | '3+' = '2';
   let descriptives: GroupDescriptive[] = [];
   let variables: string[];
-  let usedShapiro = false;
+  const normality: NormalityMethod = req.normality ?? 'shapiro';
+  const limit = normality === 'skewkurt-2' ? 2 : 1.5;
+  let usedNormality = false;
+  const normalCheck = (label: string, subject: string, values: number[]) =>
+    normality === 'shapiro' ? shapiroAssumption(label, subject, shapiroSubsample(values, notes), alpha) : skewKurtAssumption(label, subject, values, alpha, limit);
   const numeric = req.target !== 'categorical';
 
   const drop = (dropped: number, what: string) => {
@@ -256,11 +307,11 @@ export function analyze(req: AnalysisRequest): AnalysisResult {
     const y = keep.map((i) => req.y!.values[i] as number);
     if (x.length < 5) throw new AnalysisError('Korelasyon için en az 5 tam gözlem gerekir.');
     if (numeric && req.target === 'continuous') {
-      const a = shapiroAssumption('x', `“${req.x.name}”`, shapiroSubsample(x, notes), alpha);
-      const b = shapiroAssumption('y', `“${req.y.name}”`, shapiroSubsample(y, notes), alpha);
+      const a = normalCheck('x', `“${req.x.name}”`, x);
+      const b = normalCheck('y', `“${req.y.name}”`, y);
       assumptions.push(a.test, b.test);
       normalP = Math.min(a.p, b.p);
-      usedShapiro = true;
+      usedNormality = true;
     }
     input = { kind: 'xy', xName: req.x.name, yName: req.y.name, x, y };
     variables = [req.x.name, req.y.name];
@@ -274,10 +325,10 @@ export function analyze(req: AnalysisRequest): AnalysisResult {
     groupCount = conds.length === 2 ? '2' : '3+';
     if (req.target === 'continuous') {
       const r = pairedResiduals(conds);
-      const a = shapiroAssumption('paired', r.subject, shapiroSubsample(r.values, notes), alpha);
+      const a = normalCheck('paired', r.subject, r.values);
       assumptions.push(a.test);
       normalP = a.p;
-      usedShapiro = true;
+      usedNormality = true;
       residualsForChart = r.values;
     }
     input = { kind: 'paired', names: req.conditions.map((c) => c.name), conditions: conds };
@@ -297,10 +348,10 @@ export function analyze(req: AnalysisRequest): AnalysisResult {
     if (req.target === 'continuous') {
       const residuals = groupResiduals(groups);
       if (residuals.length < 3) throw new AnalysisError('Normallik testi için en az 3 gözlem gerekir.');
-      const a = shapiroAssumption('residuals', 'grup içi kalıntılar', shapiroSubsample(residuals, notes), alpha);
+      const a = normalCheck('residuals', 'grup içi kalıntılar', residuals);
       assumptions.push(a.test);
       normalP = a.p;
-      usedShapiro = true;
+      usedNormality = true;
       residualsForChart = residuals;
       const l = leveneAssumption(groups, alpha);
       assumptions.push(l.test);
@@ -317,7 +368,7 @@ export function analyze(req: AnalysisRequest): AnalysisResult {
     input.kind === 'groups' ? input.groups.flat().length : input.kind === 'paired' ? input.conditions[0]!.length : input.kind === 'xy' ? input.x.length : input.table.flat().reduce((s, v) => s + v, 0);
   const minGroupN =
     input.kind === 'groups' ? Math.min(...input.groups.map((g) => g.length)) : input.kind === 'paired' ? input.conditions[0]!.length : nTotal;
-  const assumptionInput: AssumptionInput = { normalP, varianceP, alpha, n: nTotal, minGroupN };
+  const assumptionInput: AssumptionInput = { normalP, varianceP, alpha, n: nTotal, minGroupN, normality };
   const rec = recommendTest(answers, assumptionInput);
 
   let outcome: TestOutcome;
@@ -355,7 +406,7 @@ export function analyze(req: AnalysisRequest): AnalysisResult {
     interpretation: interpretOutcome(outcome),
     table: input.kind === 'table' ? { rowNames: input.rowNames, colNames: input.colNames, table: input.table } : undefined,
     apaSummary: apaSentence(outcome, assumptions),
-    references: referencesFor(outcome, usedShapiro, groupsForLevene !== undefined),
+    references: referencesFor(outcome, usedNormality ? normality : null, groupsForLevene !== undefined),
     notes,
     variables,
   };

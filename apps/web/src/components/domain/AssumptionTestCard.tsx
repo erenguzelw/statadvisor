@@ -10,14 +10,22 @@ export function AssumptionTestCard({ test }: { test: AssumptionTest }) {
   return (
     <article className="flex flex-col gap-3 rounded-card border border-line/30 bg-surface-lowest p-4">
       <header className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-body-lg font-semibold text-fg">{test.name} testi</h3>
+        <h3 className="text-body-lg font-semibold text-fg">{test.shape ? 'Çarpıklık ve basıklık' : `${test.name} testi`}</h3>
         <StatusChip status={status}>{test.passed ? 'Sağlandı' : 'İhlal edildi'}</StatusChip>
       </header>
       <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-caption text-fg-subtle">
-        <PValue p={test.p} alpha={test.alpha} className="text-body-lg!" />
+        {!test.shape && <PValue p={test.p} alpha={test.alpha} className="text-body-lg!" />}
         <Tag>{test.statistic}</Tag>
         <span className="whitespace-nowrap">
-          eşik <span className="font-mono">α = {test.alpha}</span>
+          {test.shape ? (
+            <>
+              ölçüt <span className="font-mono">|değer| ≤ {test.shape.limit}</span>
+            </>
+          ) : (
+            <>
+              eşik <span className="font-mono">α = {test.alpha}</span>
+            </>
+          )}
         </span>
       </p>
       <p className="text-caption text-fg-subtle">Uygulandığı veri: {test.subject}</p>

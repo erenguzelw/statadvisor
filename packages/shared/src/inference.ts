@@ -3,7 +3,7 @@
  * gerekiyorsa post-hoc karşılaştırmaları hesaplar ve sonucu Yeni Başlayan / Uzman dillerinde yorumlar.
  */
 import { mean, median } from './assumptions.ts';
-import { effectLabel, kruskalWallis, pText } from './stats.ts';
+import { effectLabel, kruskalWallis, pText, shapeStats } from './stats.ts';
 import {
   anovaOneWay,
   anovaRepeated,
@@ -76,7 +76,10 @@ function mkPairs(names: string[], pairs: PairResult[], alpha: number): OutcomePa
 }
 
 export function describeGroups(names: string[], groups: number[][]) {
-  return groups.map((g, i) => ({ group: names[i]!, n: g.length, median: median(g), mean: mean(g), sd: g.length > 1 ? sd(g) : NaN }));
+  return groups.map((g, i) => {
+    const sh = shapeStats(g);
+    return { group: names[i]!, n: g.length, median: median(g), mean: mean(g), sd: g.length > 1 ? sd(g) : NaN, skewness: sh.skewness, kurtosis: sh.kurtosis };
+  });
 }
 
 /** Karar motorunun önerdiği testi çalıştırır. Desteklenmeyen ad ya da uyumsuz girdi için hata fırlatır. */
