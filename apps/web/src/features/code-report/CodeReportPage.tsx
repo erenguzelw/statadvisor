@@ -1,82 +1,54 @@
-import { useEffect, useState } from 'react';
-import {
-  CheckCircle2,
-  ClipboardCheck,
-  Download,
-  Eye,
-  FileText,
-  FileType2,
-  FlaskConical,
-  Globe,
-  Package,
-  Quote,
-  Route,
-  ShieldAlert,
-  SquareTerminal,
-} from 'lucide-react';
+import { useState } from 'react';
+import { ClipboardCheck, Download, Eye, FileText, FileType2, FlaskConical, Globe, Package, Printer, Quote, Route, ShieldAlert, SquareTerminal } from 'lucide-react';
 import { HeaderStat, PageHeader } from '@/components/layout/PageHeader';
 import { QueryView } from '@/components/layout/PageStatus';
-import {
-  Button,
-  Checklist,
-  CodeBlock,
-  ConsoleOutput,
-  CopyButton,
-  Panel,
-  ProgressBar,
-  RadioCardGroup,
-  SectionHeader,
-  StatusChip,
-  StatusLine,
-  Tabs,
-  Tag,
-} from '@/components/ui';
+import { Button, Checklist, CodeBlock, ConsoleOutput, CopyButton, Panel, RadioCardGroup, SectionHeader, StatusChip, Tabs, Tag } from '@/components/ui';
 import { DecisionPath } from '@/components/domain';
 import { useApp } from '@/context/AppContext';
 import { useCodeReport } from '@/data/queries';
 import type { ReportFormat } from '@/data/types';
-import { downloadText, htmlReport, openHtml, toNotebook } from '@/lib/download';
+import { downloadText, openHtml, toNotebook } from '@/lib/download';
+import { buildReport } from '@/lib/report';
 import { effectLabel, formatP } from '@/lib/stats';
 
-const formatIcons = { pdf: FileText, docx: FileType2, html: Globe } as const;
-
-/** Rapor üretimini taklit eden ilerleme (sunucu aşamasında gerçek iş durumuyla değişecek). */
-function useFakeProgress(key: string) {
-  const [progress, setProgress] = useState(100);
-  useEffect(() => {
-    setProgress(15);
-    const id = setInterval(() => setProgress((p) => (p >= 100 ? 100 : Math.min(100, p + 17))), 180);
-    return () => clearInterval(id);
-  }, [key]);
-  return progress;
-}
+const formatIcons = { html: Globe, print: FileText, word: FileType2 } as const;
+const kb = (bytes: number) => `${(bytes / 1024).toFixed(1)} KB`;
 
 export function CodeReportPage() {
   const { datasetId } = useApp();
   const query = useCodeReport(datasetId);
   const [snippetId, setSnippetId] = useState('scipy');
-  const [formatId, setFormatId] = useState<ReportFormat['id']>('pdf');
-  const progress = useFakeProgress(formatId);
+  const [formatId, setFormatId] = useState<ReportFormat['id']>('html');
 
   return (
     <QueryView query={query}>
       {({ snippets, reportFormats, apaSummary, citation, reportSections, requirements, analysis }) => {
         const snippet = snippets.find((s) => s.id === snippetId) ?? snippets[0]!;
         const format = reportFormats.find((f) => f.id === formatId) ?? reportFormats[0]!;
-        const ready = progress >= 100;
         const t = analysis.testStatistic;
-        const report = htmlReport('Hipotez testi sonuçları', apaSummary, citation);
+        const shapiro = analysis.assumptions.find((a) => a.id === 'shapiro');
+        const date = new Date().toLocaleDateString('tr-TR');
+        const reportInput = { analysis, apaSummary, citation, date };
+        const html = buildReport(reportInput, 'html');
+        const size = new Blob([html]).size;
+
+        const primary =
+          format.id === 'html'
+            ? { label: 'İndir (.html)', icon: Download, run: () => downloadText(format.fileName, html, 'text/html') }
+            : format.id === 'print'
+              ? { label: 'Yazdır / PDF kaydet', icon: Printer, run: () => openHtml(buildReport(reportInput, 'print')) }
+              : { label: 'İndir (.doc)', icon: Download, run: () => downloadText(format.fileName, buildReport(reportInput, 'word'), 'application/msword') };
 
         return (
           <>
             <PageHeader
               features={['Özellik 04 & 09']}
-              context="İstatistik çekirdeği işlem hattı 4.2"
+              context="İstatistik çekirdeği v0.1"
               title="Kod Üretimi ve Otomatik Raporlama Merkezi"
-              description="Jupyter’da hemen çalıştırılabilir, açıklamalı kod parçaları ve APA 7 standardında anlık akademik raporlar."
+              description="Jupyter’da çalıştırılabilir, açıklamalı kod parçaları ve APA 7 stilinde rapor özeti."
               aside={
                 <>
-                  <HeaderStat label="Yönlendirilmiş test" icon={<span className="size-2 rounded-full bg-secondary" aria-hidden />}>
+                  <HeaderStat label="Önerilen test" icon={<span className="size-2 rounded-full bg-secondary" aria-hidden />}>
                     {analysis.decision.finalTest}
                   </HeaderStat>
                   <HeaderStat label="İstatistik / p değeri" icon={<FlaskConical size={18} className="text-secondary" aria-hidden />}>
@@ -84,8 +56,11 @@ export function CodeReportPage() {
                       {t.name}={t.value.toFixed(2)}, p={formatP(t.p)}
                     </span>
                   </HeaderStat>
-                  <HeaderStat label="Varsayım durumu" icon={<ShieldAlert size={18} className="text-tertiary" aria-hidden />}>
-                    <span className="text-tertiary">Normallik ihlali</span>
+                  <HeaderStat
+                    label="Varsayım durumu"
+                    icon={<ShieldAlert size={18} className={shapiro?.passed ? 'text-success' : 'text-tertiary'} aria-hidden />}
+                  >
+                    <span className={shapiro?.passed ? 'text-success' : 'text-tertiary'}>{shapiro?.passed ? 'Normallik sağlandı' : 'Normallik ihlali'}</span>
                   </HeaderStat>
                 </>
               }
@@ -97,8 +72,7 @@ export function CodeReportPage() {
                   icon={SquareTerminal}
                   title="Hazır kod üretimi"
                   feature="Özellik 04"
-                  description="Jupyter’da hemen çalıştırılabilir, açıklamalı kod parçaları. Kopyala, yapıştır, çalıştır."
-                  actions={<StatusChip status="success">Test senkronize</StatusChip>}
+                  description="Kopyala, yapıştır, çalıştır. Beklenen çıktı, koddaki örnek verinin hesabından gelir; kendi verinizde farklı olacaktır."
                 />
                 <Tabs
                   label="Kod dili ve kütüphane"
@@ -107,14 +81,8 @@ export function CodeReportPage() {
                   onChange={setSnippetId}
                 >
                   <div className="flex flex-col gap-4">
-                    <CodeBlock
-                      code={snippet.code}
-                      language={snippet.language}
-                      filename={snippet.filename}
-                      runtime={snippet.runtime}
-                      lineNumbers
-                    />
-                    <ConsoleOutput lines={snippet.output} duration={snippet.duration} />
+                    <CodeBlock code={snippet.code} language={snippet.language} filename={snippet.filename} runtime={snippet.runtime} lineNumbers maxHeight="26rem" />
+                    <ConsoleOutput lines={snippet.output} />
                   </div>
                 </Tabs>
                 <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -132,18 +100,15 @@ export function CodeReportPage() {
                   >
                     Jupyter defteri olarak indir (.ipynb)
                   </Button>
-                  <StatusLine status="success" className="text-caption">
-                    Bağımlılıklar yüklü
-                  </StatusLine>
                 </div>
               </Panel>
 
-              <Panel className="flex flex-col gap-5 lg:col-span-5">
+              <Panel className="flex min-w-0 flex-col gap-5 lg:col-span-5">
                 <SectionHeader
                   icon={ClipboardCheck}
-                  title="Tek tıkla rapor üretimi"
+                  title="Tek tıkla rapor"
                   feature="Özellik 09"
-                  description="Akademik yayın standartlarında APA 7 biçimlendirme."
+                  description="Tanımlayıcı istatistikleri, varsayım testlerini, sonucu ve APA özetini tek dosyada toplar."
                   className="mb-0"
                 />
                 <RadioCardGroup
@@ -154,34 +119,28 @@ export function CodeReportPage() {
                 />
 
                 <div className="rounded-card border border-line/30 bg-surface-lowest p-4">
-                  <div className="mb-3 flex items-center justify-between gap-2">
-                    <p className="flex min-w-0 items-center gap-2 font-mono text-data text-fg">
-                      <CheckCircle2 size={16} className={ready ? 'shrink-0 text-secondary' : 'shrink-0 text-fg-subtle'} aria-hidden />
-                      <span className="truncate">{format.fileName}</span>
-                    </p>
-                    <Tag tone={ready ? 'secondary' : 'neutral'}>
-                      <span aria-live="polite">{ready ? 'Hazır' : `%${progress}`}</span>
-                    </Tag>
-                  </div>
-                  <ProgressBar value={progress} label="Rapor oluşturma ilerlemesi" />
-                  <p className="mt-2 text-caption text-fg-subtle">
-                    Boyut: <span className="font-mono">{format.size}</span>
-                    {format.pages && <>, {format.pages} sayfa</>}
+                  <p className="mb-1 flex min-w-0 items-center gap-2 font-mono text-data text-fg">
+                    <FileText size={16} className="shrink-0 text-secondary" aria-hidden />
+                    <span className="truncate">{format.fileName}</span>
                   </p>
-                  <div className="mt-4 grid grid-cols-2 gap-3">
-                    <Button icon={Eye} variant="tonal" disabled={!ready} onClick={() => openHtml(report)}>
+                  <p className="text-caption text-fg-subtle">
+                    Boyut: <span className="font-mono">≈ {kb(size)}</span> · {reportSections.length} bölüm
+                  </p>
+                  <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <Button icon={Eye} variant="tonal" onClick={() => openHtml(html)}>
                       Raporu incele
                     </Button>
-                    <Button
-                      icon={Download}
-                      variant="primary"
-                      disabled={!ready || format.id !== 'html'}
-                      title={format.id !== 'html' ? 'PDF ve Word çıktısı sunucu aşamasında etkinleşecek' : undefined}
-                      onClick={() => downloadText(format.fileName, report, 'text/html')}
-                    >
-                      İndir ({format.id.toUpperCase()})
+                    <Button icon={primary.icon} variant="primary" onClick={primary.run}>
+                      {primary.label}
                     </Button>
                   </div>
+                  {format.id !== 'html' && (
+                    <p className="mt-3 text-caption text-fg-subtle">
+                      {format.id === 'print'
+                        ? 'Açılan sayfada yazdırma penceresinden “PDF olarak kaydet” seçeneğini kullanın.'
+                        : 'Dosya, Word’ün açabildiği HTML tabanlı bir belgedir; biçim uyarısı çıkabilir.'}
+                    </p>
+                  )}
                 </div>
 
                 <section aria-labelledby="apa-ozet">
@@ -192,7 +151,7 @@ export function CodeReportPage() {
                     <CopyButton text={apaSummary} label="Metni kopyala" variant="ghost" />
                   </div>
                   <div className="rounded-card border border-line/30 bg-surface-lowest p-4">
-                    <p className="mb-2 text-caption text-fg-subtle">Yayınlanabilir metin, bulgular bölümü · Türkçe, APA 7</p>
+                    <p className="mb-2 text-caption text-fg-subtle">Bulgular bölümü için taslak · Türkçe, APA 7</p>
                     <p className="font-[Georgia,serif] text-body-lg leading-7 text-fg">“{apaSummary}”</p>
                     <div className="mt-3 flex flex-wrap gap-2">
                       <Tag>
@@ -222,24 +181,30 @@ export function CodeReportPage() {
               <Panel>
                 <SectionHeader icon={Package} title="Paket bağımlılıkları" level={3} />
                 <CodeBlock code={requirements} language="text" filename="requirements.txt" />
-                <p className="mt-3 text-caption text-fg-subtle">Ortam sürüm uyumsuzluklarına karşı sabitlenmiş paketler.</p>
+                <p className="mt-3 text-caption text-fg-subtle">Sürüm uyumsuzluklarına karşı sabitlenmiş (ya da alt sınırı verilmiş) paketler. Kurulumu sizin ortamınızda yapılır.</p>
               </Panel>
               <Panel>
                 <SectionHeader
                   icon={Route}
-                  title="Otomatik rota"
+                  title="Test önerisi"
                   level={3}
-                  actions={<StatusChip status="danger">Varsayım ihlali</StatusChip>}
+                  actions={
+                    <StatusChip status={analysis.decision.plannedTest === analysis.decision.finalTest ? 'success' : 'warning'}>
+                      {analysis.decision.plannedTest === analysis.decision.finalTest ? 'Plan geçerli' : 'Plan değişti'}
+                    </StatusChip>
+                  }
                 />
                 <DecisionPath path={analysis.decision} compact />
-                <p className="mt-3 text-body text-fg-muted">
-                  Shapiro-Wilk normallik testi (<span className="font-mono">p = 0.012</span>) başarısız olduğu için kod{' '}
-                  <code className="text-secondary">scipy.stats.kruskal</code> fonksiyonuna yönlendirildi.
-                </p>
+                {shapiro && (
+                  <p className="mt-3 text-body text-fg-muted">
+                    Shapiro-Wilk (<span className="font-mono">p = {formatP(shapiro.p)}</span>, grup içi kalıntılar) normallik varsayımını reddettiği için kod{' '}
+                    <code className="text-secondary">scipy.stats.kruskal</code> fonksiyonunu kullanıyor.
+                  </p>
+                )}
               </Panel>
               <Panel className="md:col-span-2 xl:col-span-1">
-                <SectionHeader title="Rapor içeriği ve denetim listesi" level={3} />
-                <Checklist items={reportSections.map((s) => ({ id: s.id, label: s.label, meta: `Sayfa ${s.page}` }))} />
+                <SectionHeader title="Rapor içeriği" level={3} description="Rapor dosyasında yer alan bölümler." />
+                <Checklist items={reportSections.map((s) => ({ id: s.id, label: s.label }))} />
               </Panel>
             </div>
           </>

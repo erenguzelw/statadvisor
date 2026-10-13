@@ -4,8 +4,8 @@
  */
 import { useQuery } from '@tanstack/react-query';
 import { analysis, datasets } from './mocks/analysis';
-import { minoritySupport, modelInsight, models, redFlags } from './mocks/models';
-import { cleanedBins, cleanedStats, groupBoxes, imputationMethods, qualitySummary, rawRows } from './mocks/quality';
+import { getModelReport } from './mocks/models';
+import { getQualityReport, imputationMethods } from './mocks/quality';
 import {
   apaSummary,
   citation,
@@ -20,8 +20,16 @@ import {
 
 const LATENCY_MS = import.meta.env.MODE === 'test' ? 0 : 120;
 
-function mock<T>(data: T): Promise<T> {
-  return new Promise((resolve) => setTimeout(() => resolve(data), LATENCY_MS));
+function mock<T>(compute: () => T): Promise<T> {
+  return new Promise((resolve, reject) =>
+    setTimeout(() => {
+      try {
+        resolve(compute());
+      } catch (e) {
+        reject(e);
+      }
+    }, LATENCY_MS),
+  );
 }
 
 export const queryKeys = {
@@ -33,40 +41,31 @@ export const queryKeys = {
 };
 
 export function useDatasets() {
-  return useQuery({ queryKey: queryKeys.datasets, queryFn: () => mock(datasets) });
+  return useQuery({ queryKey: queryKeys.datasets, queryFn: () => mock(() => datasets) });
 }
 
 export function useAnalysis(datasetId: string) {
-  return useQuery({ queryKey: queryKeys.analysis(datasetId), queryFn: () => mock(analysis) });
+  return useQuery({ queryKey: queryKeys.analysis(datasetId), queryFn: () => mock(() => analysis) });
 }
 
+/** Modeller bu çağrıda (ilk kullanımda) gerçekten eğitilir; sonuç bellekte tutulur. */
 export function useModelComparison(datasetId: string) {
   return useQuery({
     queryKey: queryKeys.models(datasetId),
-    queryFn: () => mock({ models, insight: modelInsight, minoritySupport, redFlags, pipeline: comparisonSnippet }),
+    queryFn: () => mock(() => ({ ...getModelReport(), pipeline: comparisonSnippet })),
   });
 }
 
 export function useDataQuality(datasetId: string) {
   return useQuery({
     queryKey: queryKeys.quality(datasetId),
-    queryFn: () =>
-      mock({
-        summary: qualitySummary,
-        rows: rawRows,
-        imputationMethods,
-        boxes: groupBoxes,
-        cleanedBins,
-        cleanedStats,
-        cleaningSnippet,
-        imputationCode,
-      }),
+    queryFn: () => mock(() => ({ ...getQualityReport(), imputationMethods, cleaningSnippet, imputationCode })),
   });
 }
 
 export function useCodeReport(datasetId: string) {
   return useQuery({
     queryKey: queryKeys.codeReport(datasetId),
-    queryFn: () => mock({ snippets, reportFormats, apaSummary, citation, reportSections, requirements, analysis }),
+    queryFn: () => mock(() => ({ snippets, reportFormats, apaSummary, citation, reportSections, requirements, analysis })),
   });
 }

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowDown, BrainCircuit, Download, Flag, LineChart, Rocket, Scale, ShieldCheck, Table2, Wand2 } from 'lucide-react';
+import { ArrowDown, BrainCircuit, CheckCheck, Flag, LineChart, Scale, ShieldCheck, Table2 } from 'lucide-react';
 import { HeaderStat, PageHeader } from '@/components/layout/PageHeader';
 import { QueryView } from '@/components/layout/PageStatus';
 import { Button, Callout, CodeBlock, Panel, SectionHeader, StatusChip, StatusLine, Tag } from '@/components/ui';
@@ -9,36 +9,45 @@ import { ModelCard, ModelComparisonTable, RedFlagCard, modelColors } from '@/com
 import { useApp } from '@/context/AppContext';
 import { useModelComparison } from '@/data/queries';
 
+const pct = (x: number) => `%${(x * 100).toFixed(1)}`;
+
 export function ModelComparisonPage() {
   const { datasetId, narrate } = useApp();
   const navigate = useNavigate();
   const query = useModelComparison(datasetId);
-  const [selected, setSelected] = useState('rf');
+  const [selected, setSelected] = useState<string | null>(null);
   const [resolved, setResolved] = useState<Set<string>>(new Set());
 
   const resolve = (ids: string[]) => setResolved((prev) => new Set([...prev, ...ids]));
 
   return (
     <QueryView query={query}>
-      {({ models, insight, minoritySupport, redFlags, pipeline }) => {
+      {({ models, insight, facts, redFlags, pipeline, recommendedId }) => {
         const open = redFlags.length - resolved.size;
+        const sel = selected ?? recommendedId;
+        const selectedModel = models.find((m) => m.id === sel) ?? models[0]!;
+        const topAuc = models.reduce((a, b) => (b.metrics.rocAuc > a.metrics.rocAuc ? b : a));
         return (
           <>
             <PageHeader
               features={['Özellik 06 & 07']}
-              context={<span className="font-mono">Klinik_Faz3_Sonuc.parquet</span>}
+              context={
+                <span className="font-mono">
+                  Tohumlu örnek veri · {facts.rows} gözlem · {facts.features} özellik
+                </span>
+              }
               title="Model Karşılaştırma ve Analitik Tuzak Radarı"
-              description="Tek bir mutlak doğru model yoktur. Yorumlanabilirlik, hız ve hata toleransı dengesini değerlendirin; kritik istatistiksel tuzakları zamanında görün."
+              description="Tek bir mutlak doğru model yoktur. Ölçütleri taban çizgisiyle birlikte okuyun; kritik istatistiksel tuzakları zamanında görün."
               aside={
-                <HeaderStat label="Aktif tuzak riski" icon={<Flag size={18} className={open ? 'text-tertiary' : 'text-success'} aria-hidden />}>
+                <HeaderStat label="Açık uyarılar" icon={<Flag size={18} className={open ? 'text-tertiary' : 'text-success'} aria-hidden />}>
                   <span aria-live="polite" className={open ? 'text-tertiary' : 'text-success'}>
-                    {open ? `${open} kritik kırmızı bayrak` : 'Tüm bayraklar çözüldü'}
+                    {open ? `${open} kırmızı bayrak açık` : 'Tüm bayraklar çözüldü'}
                   </span>
                 </HeaderStat>
               }
               actions={
-                <Button variant="primary" icon={Wand2} disabled={!open} onClick={() => resolve(redFlags.map((f) => f.id))}>
-                  Otomatik düzeltmeleri uygula
+                <Button variant="primary" icon={CheckCheck} disabled={!open} onClick={() => resolve(redFlags.map((f) => f.id))}>
+                  Tümünü çözüldü olarak işaretle
                 </Button>
               }
             />
@@ -47,26 +56,25 @@ export function ModelComparisonPage() {
               tone="neutral"
               icon={BrainCircuit}
               title="İnsan dilinde analitik yorum"
-              meta={<StatusChip status="danger">Kritik sınıf zayıflığı</StatusChip>}
+              meta={<StatusChip status={insight.headline.startsWith('Model azınlık') ? 'info' : 'danger'}>{insight.headline.startsWith('Model azınlık') ? 'Makul' : 'Azınlık sınıfı zayıf'}</StatusChip>}
               actions={
                 <>
                   <div className="rounded-card bg-surface-lowest px-3 py-2">
                     <p className="text-caption text-fg-subtle">Azınlık sınıf desteği</p>
                     <p className="font-mono text-body font-semibold text-tertiary tabular">
-                      {minoritySupport.minority} / {minoritySupport.total} vaka
+                      {facts.positives} / {facts.rows} vaka
                     </p>
                   </div>
-                  <Button
-                    icon={ArrowDown}
-                    onClick={() => document.getElementById('tuzaklar')?.scrollIntoView({ behavior: 'smooth' })}
-                  >
-                    Tuzakları çöz
+                  <Button icon={ArrowDown} onClick={() => document.getElementById('tuzaklar')?.scrollIntoView({ behavior: 'smooth' })}>
+                    Uyarılara git
                   </Button>
                 </>
               }
             >
               <p className="font-display text-heading font-semibold">
-                <Tag tone="tertiary" className="mr-2 align-middle">{insight.metric}</Tag>
+                <Tag tone="tertiary" className="mr-2 align-middle">
+                  {insight.metric}
+                </Tag>
                 {insight.headline}
               </p>
               <p className="mt-2 max-w-prose text-body text-fg-muted" aria-live="polite">
@@ -79,52 +87,60 @@ export function ModelComparisonPage() {
                 icon={Scale}
                 title={<span id="model-paneli">Karşılaştırmalı model paneli</span>}
                 feature="Özellik 07"
-                description="Tek bir en iyi yok: artılar ve eksiler yan yana."
-                actions={
-                  <span className="text-caption text-fg-subtle">
-                    Optimizasyon hedefi: <span className="text-secondary">dengeli F1 ve yorumlanabilirlik</span>
-                  </span>
-                }
+                description="Tek bir en iyi yok: artılar ve eksiler yan yana. Hız ve yorumlanabilirlik niteliksel değerlendirmedir; diğer ölçütler test setinde hesaplanmıştır."
               />
               <div className="grid grid-cols-1 gap-6 pt-2 md:grid-cols-3">
                 {models.map((m) => (
-                  <ModelCard key={m.id} model={m} selected={m.id === selected} onSelect={() => setSelected(m.id)} />
+                  <ModelCard
+                    key={m.id}
+                    model={m}
+                    selected={m.id === sel}
+                    onSelect={() => setSelected(m.id)}
+                    baselineAccuracy={facts.baselineAccuracy}
+                  />
                 ))}
               </div>
             </section>
 
             <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-12">
-              <Panel className="lg:col-span-7">
+              <Panel className="lg:col-span-8">
                 <SectionHeader
                   icon={Table2}
-                  title="Ayrıntılı performans ve hata matrisi"
+                  title="Ayrıntılı performans karşılaştırması"
                   level={3}
-                  actions={<span className="font-mono text-caption text-fg-subtle">N = {minoritySupport.total}</span>}
+                  actions={
+                    <span className="font-mono text-caption text-fg-subtle">
+                      test n = {facts.testRows} (pozitif {facts.testPositives})
+                    </span>
+                  }
                 />
-                <ModelComparisonTable models={models} selectedId={selected} detailed />
-                <div className="mt-4 rounded-card bg-surface-lowest p-3">
+                <ModelComparisonTable models={models} selectedId={sel} />
+                <div className="mt-4 flex flex-col gap-2 rounded-card bg-surface-lowest p-3">
+                  <StatusLine status="warning">
+                    Doğruluk tek başına yanıltıcıdır: her zaman çoğunluk sınıfını tahmin eden bir model bu test setinde {pct(facts.baselineAccuracy)} doğruluk alır.
+                    Dengesiz veride F1 ve PR-AUC’a bakın.
+                  </StatusLine>
                   <StatusLine status="info">
-                    Üretilen kodda SMOTE yalnızca çapraz doğrulamanın eğitim katlarında uygulanır (Pipeline). Veri sızıntısı denetimi, kendi
-                    verinizle çalıştırıldığında yapılmalıdır; bu ekran onu yapmaz.
+                    PR-AUC için rastgele sıralamanın değeri pozitif oranıdır ({facts.prevalence.toFixed(2)}). Eşik: 0.5.
                   </StatusLine>
                 </div>
               </Panel>
-              <Panel className="lg:col-span-5">
+              <Panel className="lg:col-span-4">
                 <SectionHeader
                   icon={LineChart}
-                  title="ROC eğrisi önizlemesi"
+                  title="ROC eğrisi"
                   level={3}
-                  actions={<Tag tone="primary">AUC = 0.91</Tag>}
-                  description="XGBoost ve Random Forest, tüm yanlış pozitif oranlarında lojistik regresyon taban çizgisinin üzerinde."
+                  actions={<Tag tone="primary">AUC = {selectedModel.metrics.rocAuc.toFixed(2)}</Tag>}
+                  description={`En yüksek ROC AUC: ${topAuc.name} (${topAuc.metrics.rocAuc.toFixed(2)}). Eğriler test setindeki gerçek tahmin olasılıklarından çizilir.`}
                 />
                 <RocCurve
                   series={models.map((m) => ({
                     id: m.id,
                     label: m.name,
-                    auc: m.rocAuc,
+                    auc: m.metrics.rocAuc,
                     points: m.roc,
                     color: modelColors[m.id] ?? 'var(--color-fg)',
-                    emphasized: m.id === selected,
+                    emphasized: m.id === sel,
                   }))}
                 />
               </Panel>
@@ -135,13 +151,9 @@ export function ModelComparisonPage() {
                 icon={Flag}
                 title={<span id="tuzak-baslik">Tuzak uyarıları ve kırmızı bayraklar</span>}
                 feature="Özellik 06"
-                description="Doğru görselleştirme, istatistiksel geçerlilik kontrolleri ve zamanında müdahale."
+                description="Uyarıların metinleri yukarıdaki modellerin gerçek ölçütlerinden üretilir. Bir bayrağı çözüldü işaretlemek ölçütleri değiştirmez; düzeltmeyi kendi veri hattınızda uygulayın."
                 actions={
-                  open ? (
-                    <StatusChip status="danger">Kritik hata seviyesi: yüksek</StatusChip>
-                  ) : (
-                    <StatusChip status="success">Tüm riskler giderildi</StatusChip>
-                  )
+                  open ? <StatusChip status="warning">{open} uyarı açık</StatusChip> : <StatusChip status="success">Tüm uyarılar çözüldü</StatusChip>
                 }
               />
               <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
@@ -154,12 +166,12 @@ export function ModelComparisonPage() {
             <Panel className="mt-10">
               <SectionHeader
                 icon={ShieldCheck}
-                title="Düzeltme ve karar simülasyon çekirdeği"
+                title="Düzeltme kod şablonu"
                 level={3}
-                description="Kırmızı bayraklar çözüldükçe metrik sapması ve Scikit-learn işlem hattı güncellenir."
+                description="SMOTE yalnızca eğitim katlarında uygulanır (Pipeline); çapraz doğrulama sızıntısını önler."
                 actions={
                   <StatusChip status={open ? 'warning' : 'success'}>
-                    Düzeltmeler: {resolved.size} / {redFlags.length} uygulandı
+                    {resolved.size} / {redFlags.length} işaretlendi
                   </StatusChip>
                 }
               />
@@ -167,17 +179,12 @@ export function ModelComparisonPage() {
             </Panel>
 
             <footer className="mt-6 flex flex-col gap-4 rounded-panel border border-line/30 bg-surface-low p-4 sm:flex-row sm:items-center">
-              <StatusLine status="success" className="flex-1">
-                Tüm modeller ve varsayım testleri IEEE / APA klinik standartlarına uygun.
+              <StatusLine status="info" className="flex-1">
+                Bu bir karar destek aracıdır; yöntem seçiminin ve sonuçların sorumluluğu kullanıcıdadır. Ölçütler örnek veriden gelir.
               </StatusLine>
-              <div className="flex flex-wrap gap-3">
-                <Button icon={Download} onClick={() => navigate('/kod-rapor')}>
-                  Raporu PDF olarak indir
-                </Button>
-                <Button variant="primary" icon={Rocket} disabled={open > 0} title={open ? 'Önce kırmızı bayrakları çözün' : undefined}>
-                  Modeli üretime aktar
-                </Button>
-              </div>
+              <Button variant="primary" onClick={() => navigate('/kod-rapor')}>
+                Kod ve rapor merkezine git
+              </Button>
             </footer>
           </>
         );

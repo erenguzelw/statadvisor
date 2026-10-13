@@ -1,4 +1,7 @@
+import { median } from '@/lib/assumptions';
 import { histogram, kruskalWallis, meanSd, skewness } from '@/lib/stats';
+
+export { median };
 
 /**
  * Ekranlardaki tüm sayıların tek kaynağı: her grupta 15 gözlemlik örnek (biyobelirteç X).
@@ -20,8 +23,3 @@ export const sampleBins = histogram(pooled, 14);
 /** Python / R kaynak kodunda kullanılan dizi gösterimi. */
 export const pyList = (values: number[]) => `[${values.map((v) => v.toFixed(1)).join(', ')}]`;
 
-export function median(values: number[]) {
-  const s = [...values].sort((a, b) => a - b);
-  const m = Math.floor(s.length / 2);
-  return s.length % 2 ? s[m]! : (s[m - 1]! + s[m]!) / 2;
-}
