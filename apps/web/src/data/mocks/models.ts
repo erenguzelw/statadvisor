@@ -86,7 +86,7 @@ export const redFlags: RedFlag[] = [
     title: 'Dengesiz veri seti (%92 / %8)',
     description:
       'Sınıflar arasındaki sert dengesizlik modelin azınlık sınıfını yok saymasına yol açıyor. Azınlık sınıfı F1 skoru 0.42’de kalıyor.',
-    solution: 'SMOTE veya ADASYN ile sentetik örnekleme yapın.',
+    solution: 'SMOTE veya ADASYN ile sentetik örnekleme yapın; yalnızca eğitim katlarında (Pipeline içinde), çapraz doğrulamadan önce değil.',
     actionLabel: 'SMOTE ile dengele',
     resolvedLabel: 'Sınıflar dengelendi',
   },

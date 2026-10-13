@@ -40,7 +40,7 @@ describe('InterpretationCard + ExpertiseToggle', () => {
 
     await user.click(screen.getByRole('radio', { name: 'Uzman' }));
 
-    expect(screen.getByText(/H\(2\) = 11\.6/)).toBeInTheDocument();
+    expect(screen.getByText(/H\(2\) = 11\.70/)).toBeInTheDocument();
     expect(screen.queryByText(/binde 3/)).not.toBeInTheDocument();
   });
 });

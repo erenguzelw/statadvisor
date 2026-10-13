@@ -35,7 +35,7 @@ for (const { path, title } of routes) {
 test('Uzman seviyesi istatistiksel gösterimi açar ve tercih korunur', async ({ page }) => {
   await page.goto('/karar-sihirbazi');
   await page.getByRole('radiogroup', { name: 'Anlatım seviyesi' }).first().getByRole('radio', { name: 'Uzman' }).click();
-  await expect(page.getByText(/H\(2\) = 11\.6/)).toBeVisible();
+  await expect(page.getByText(/H\(2\) = 11\.70/)).toBeVisible();
 
   await page.getByRole('link', { name: 'Model Karşılaştırma' }).click();
   await expect(page.getByText(/recall = 0\.31/)).toBeVisible();

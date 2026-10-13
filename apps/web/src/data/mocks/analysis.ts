@@ -1,11 +1,22 @@
+import { effectLabel, formatP } from '@/lib/stats';
 import type { AnalysisSummary, Dataset } from '../types';
+import { kruskal, sampleBins, sampleStats } from './sample';
 
 export const datasets: Dataset[] = [
   { id: 'klinik-faz3', fileName: 'Klinik_Veri_Faz3.csv', rows: 1420, columns: 8 },
   { id: 'anket-2026', fileName: 'Anket_Memnuniyet_2026.csv', rows: 864, columns: 14 },
 ];
 
-/** Sağa çarpık, üç gruplu klinik örnek (ekranlardaki değerler). */
+const eps = kruskal.epsilonSquared;
+const pText = formatP(kruskal.p);
+const pApa = formatP(kruskal.p, true);
+const significant = kruskal.p < 0.05;
+const oneInThousand = kruskal.p < 0.001 ? 'binde birden az' : `yaklaşık binde ${Math.round(kruskal.p * 1000)}`;
+
+/**
+ * Üç gruplu örnek analiz. H, p, ε², n, histogram ve çarpıklık `sample.ts` içindeki veriden hesaplanır.
+ * Varsayım testlerinin (Shapiro-Wilk, Levene) değerleri örnek olarak verilmiştir, hesaplanmaz.
+ */
 export const analysis: AnalysisSummary = {
   dataset: datasets[0]!,
   wizard: [
@@ -24,40 +35,39 @@ export const analysis: AnalysisSummary = {
     { id: 'levene', name: 'Levene', p: 0.41, alpha: 0.05, passed: true, verdict: 'Varyanslar homojen (eşit dağılımlı).' },
   ],
   distribution: {
-    bins: [
-      { x0: 0, x1: 1, count: 18 },
-      { x0: 1, x1: 2, count: 46 },
-      { x0: 2, x1: 3, count: 74 },
-      { x0: 3, x1: 4, count: 80 },
-      { x0: 4, x1: 5, count: 58 },
-      { x0: 5, x1: 6, count: 36 },
-      { x0: 6, x1: 7, count: 24 },
-      { x0: 7, x1: 8, count: 14 },
-      { x0: 8, x1: 9, count: 8 },
-      { x0: 9, x1: 10, count: 5 },
-      { x0: 10, x1: 11, count: 3 },
-    ],
-    mean: 5.2,
-    sd: 1.6,
-    skewness: 1.48,
-    n: 366,
+    bins: sampleBins,
+    mean: sampleStats.mean,
+    sd: sampleStats.sd,
+    skewness: Number(sampleStats.skewness.toFixed(2)),
+    n: sampleStats.n,
   },
   result: {
     id: 'kruskal',
-    metric: 'p = 0.003',
+    metric: `p = ${pText}`,
     threshold: 'α = 0.05',
-    verdict: 'H₀ reddedildi',
-    headline: 'Gruplar arasında istatistiksel olarak anlamlı bir fark var.',
+    verdict: significant ? 'H₀ reddedildi' : 'H₀ reddedilemedi',
+    significant,
+    headline: significant
+      ? 'Gruplar arasında istatistiksel olarak anlamlı bir fark var.'
+      : 'Gruplar arasında anlamlı bir fark bulunamadı.',
     body: {
       novice:
-        'Üç grup arasındaki bu farkın tesadüfen ortaya çıkma olasılığı binde 3. Uygulanan yöntem gruplar üzerinde gerçek bir etki yaratıyor.',
-      expert: 'Kruskal-Wallis H(2) = 11.6, p = .003, ε² = 0.21 (geniş etki). Sıra ortalamaları en az bir grup çiftinde farklılaşıyor.',
+        `Gruplar gerçekte aynı olsaydı, örneğimizdeki kadar büyük bir fark görme ihtimali ${oneInThousand} olurdu. Bu yüzden gruplar arasında gerçek bir fark olduğunu düşünmek için güçlü bir neden var. Farkın büyüklüğü ${effectLabel(eps)} (ε² = ${eps.toFixed(2)}). Bu sonuç, farkın nedenini göstermez.`,
+      expert: `Kruskal-Wallis H(${kruskal.df}) = ${kruskal.H.toFixed(2)}, p = ${pApa}, ε² = ${eps.toFixed(2)} (${effectLabel(eps)}), N = ${kruskal.n}. Gruplardan en az biri, diğerlerine göre sistematik olarak büyük (ya da küçük) değerler üretiyor (stokastik üstünlük). Hangi çiftlerin ayrıştığı post-hoc testle belirlenmeli.`,
     },
     recommendation: {
       label: 'Sıradaki adım',
       text: 'Hangi iki grubun birbirinden farklı olduğunu bulmak için post-hoc test yapın:',
-      link: 'Dunn-Bonferroni',
+      link: 'Dunn testi (Holm düzeltmeli)',
     },
   },
-  testStatistic: { name: 'H', value: 11.6, df: 2, p: 0.003, effect: 'ε²', effectValue: 0.21, n: 45 },
+  testStatistic: {
+    name: 'H',
+    value: kruskal.H,
+    df: kruskal.df,
+    p: kruskal.p,
+    effect: 'ε²',
+    effectValue: eps,
+    n: kruskal.n,
+  },
 };

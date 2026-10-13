@@ -7,7 +7,7 @@ export function ConsoleOutput({ lines, duration }: { lines: ReactNode[]; duratio
       <div className="mb-3 flex items-center justify-between gap-2">
         <p className="flex items-center gap-2 text-caption font-semibold text-fg-muted">
           <PlayCircle size={16} className="text-secondary" aria-hidden />
-          Konsol çıktısı
+          Beklenen konsol çıktısı
         </p>
         {duration && <p className="text-caption text-fg-subtle">Çalışma süresi: <span className="font-mono tabular">{duration}</span></p>}
       </div>

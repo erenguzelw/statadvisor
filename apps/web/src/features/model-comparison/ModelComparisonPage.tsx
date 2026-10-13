@@ -103,10 +103,10 @@ export function ModelComparisonPage() {
                 />
                 <ModelComparisonTable models={models} selectedId={selected} detailed />
                 <div className="mt-4 rounded-card bg-surface-lowest p-3">
-                  <StatusLine status="success">Veri sızıntısı (data leakage) taraması: temiz.</StatusLine>
-                  <p className="mt-1 pl-6 text-caption text-fg-subtle">
-                    Ağırlıklı karar indeksi: <span className="text-secondary">Random Forest, +14.2% üstün</span>
-                  </p>
+                  <StatusLine status="info">
+                    Üretilen kodda SMOTE yalnızca çapraz doğrulamanın eğitim katlarında uygulanır (Pipeline). Veri sızıntısı denetimi, kendi
+                    verinizle çalıştırıldığında yapılmalıdır; bu ekran onu yapmaz.
+                  </StatusLine>
                 </div>
               </Panel>
               <Panel className="lg:col-span-5">

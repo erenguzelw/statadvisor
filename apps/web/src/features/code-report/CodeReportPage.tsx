@@ -36,6 +36,7 @@ import { useApp } from '@/context/AppContext';
 import { useCodeReport } from '@/data/queries';
 import type { ReportFormat } from '@/data/types';
 import { downloadText, htmlReport, openHtml, toNotebook } from '@/lib/download';
+import { effectLabel, formatP } from '@/lib/stats';
 
 const formatIcons = { pdf: FileText, docx: FileType2, html: Globe } as const;
 
@@ -80,7 +81,7 @@ export function CodeReportPage() {
                   </HeaderStat>
                   <HeaderStat label="İstatistik / p değeri" icon={<FlaskConical size={18} className="text-secondary" aria-hidden />}>
                     <span className="font-mono text-secondary">
-                      {t.name}={t.value.toFixed(2)}, p={t.p}
+                      {t.name}={t.value.toFixed(2)}, p={formatP(t.p)}
                     </span>
                   </HeaderStat>
                   <HeaderStat label="Varsayım durumu" icon={<ShieldAlert size={18} className="text-tertiary" aria-hidden />}>
@@ -197,9 +198,9 @@ export function CodeReportPage() {
                       <Tag>
                         {t.name}({t.df}) = {t.value.toFixed(2)}
                       </Tag>
-                      <Tag tone="secondary">p = .003</Tag>
+                      <Tag tone="secondary">p = {formatP(t.p, true)}</Tag>
                       <Tag>
-                        {t.effect} = {t.effectValue} (geniş etki)
+                        {t.effect} = {t.effectValue.toFixed(2)} ({effectLabel(t.effectValue)} etki)
                       </Tag>
                       <Tag>N = {t.n}</Tag>
                     </div>
