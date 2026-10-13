@@ -63,6 +63,8 @@ export interface Interpretation {
   threshold?: string;
   verdict?: string;
   headline: string;
+  /** Sonuç istatistiksel olarak anlamlı mı; sonuç çipinin tonunu belirler. */
+  significant?: boolean;
   body: Narrated;
   recommendation?: { label: string; text: string; link?: string };
 }
@@ -152,7 +154,7 @@ export interface CodeSnippet {
   language: 'python' | 'r';
   code: string;
   output: string[];
-  duration: string;
+  duration?: string;
 }
 
 export interface ReportFormat {

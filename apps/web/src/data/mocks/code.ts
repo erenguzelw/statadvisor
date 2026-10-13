@@ -1,9 +1,22 @@
+import { formatP } from '@/lib/stats';
 import type { CodeSnippet, ReportFormat, ReportSection } from '../types';
+import { kruskal, median, pooled, pyList, sampleGroups } from './sample';
 
-const output = [
-  'Kruskal-Wallis H-Skoru: 11.60, p-değeri: 0.0031',
-  'Sonuç: Gruplar arasında istatistiksel olarak anlamlı fark var.',
+/**
+ * Kod örneklerinin çıktıları, kodun çalıştırdığı veriden (`sample.ts`) hesaplanır; elle yazılmış sayı yoktur.
+ * Çalıştırma süresi ölçülmediği için gösterilmez.
+ */
+const { H, df, p, n, epsilonSquared } = kruskal;
+const significant = p < 0.05;
+const verdictLine = significant
+  ? 'Sonuç: Gruplar arasında istatistiksel olarak anlamlı fark var.'
+  : 'Sonuç: Gruplar arasında anlamlı bir fark tespit edilemedi.';
+const scipyOutput = [
+  `Kruskal-Wallis H(${df}) = ${H.toFixed(2)}, p = ${p.toFixed(4)}, ε² = ${epsilonSquared.toFixed(2)}`,
+  verdictLine,
 ];
+const rVector = (values: number[]) => `c(${values.map((v) => v.toFixed(1)).join(', ')})`;
+const medians = `{'A': ${median(sampleGroups.A)}, 'B': ${median(sampleGroups.B)}, 'C': ${median(sampleGroups.C)}}`;
 
 export const snippets: CodeSnippet[] = [
   {
@@ -12,20 +25,21 @@ export const snippets: CodeSnippet[] = [
     filename: 'analiz.py',
     runtime: 'Python 3.11 · SciPy 1.11',
     language: 'python',
-    duration: '14.8 ms',
-    output,
-    code: `# analiz.py - Otomatik hipotez doğrulama ve non-parametrik test
+    output: scipyOutput,
+    code: `# analiz.py - Üç grubun Kruskal-Wallis ile karşılaştırılması
 import numpy as np
 from scipy import stats
 
-# Veri ön yükleme: Klinik_Veri_Faz3 (Grup A, B, C)
-grup_a = np.array([14.2, 18.5, 12.1, 16.4, 15.0])
-grup_b = np.array([22.1, 24.6, 27.3, 20.8, 26.0])
-grup_c = np.array([31.4, 29.8, 35.2, 33.1, 30.5])
+# Örnek veri: biyobelirteç X, her grupta 15 gözlem
+grup_a = np.array(${pyList(sampleGroups.A)})
+grup_b = np.array(${pyList(sampleGroups.B)})
+grup_c = np.array(${pyList(sampleGroups.C)})
 
-# Normallik sağlanmadı (Shapiro-Wilk p = 0.012) -> Kruskal-Wallis
+# Normallik varsayımı sağlanmadığı için (Shapiro-Wilk) non-parametrik test
 h_stat, p_val = stats.kruskal(grup_a, grup_b, grup_c)
-print(f"Kruskal-Wallis H-Skoru: {h_stat:.2f}, p-değeri: {p_val:.4f}")
+n = len(grup_a) + len(grup_b) + len(grup_c)
+epsilon_kare = h_stat / (n - 1)  # etki büyüklüğü
+print(f"Kruskal-Wallis H(2) = {h_stat:.2f}, p = {p_val:.4f}, ε² = {epsilon_kare:.2f}")
 
 if p_val < 0.05:
     print("Sonuç: Gruplar arasında istatistiksel olarak anlamlı fark var.")
@@ -33,27 +47,27 @@ else:
     print("Sonuç: Gruplar arasında anlamlı bir fark tespit edilemedi.")`,
   },
   {
-    id: 'statsmodels',
-    label: 'Statsmodels',
-    filename: 'analiz_sm.py',
-    runtime: 'Python 3.11 · Statsmodels 0.14',
+    id: 'pandas',
+    label: 'Pandas + SciPy',
+    filename: 'analiz_pandas.py',
+    runtime: 'Python 3.11 · pandas 2.2 · SciPy 1.11',
     language: 'python',
-    duration: '21.2 ms',
-    output,
+    output: [`Medyanlar: ${medians}`, scipyOutput[0]!],
     code: `import pandas as pd
 from scipy import stats
-from statsmodels.stats.multitest import multipletests
-import scikit_posthocs as sp
 
-df = pd.read_csv("Klinik_Veri_Faz3.csv")
-gruplar = [g["tansiyon"].values for _, g in df.groupby("grup")]
+df = pd.DataFrame({
+    "grup": ["A"] * 15 + ["B"] * 15 + ["C"] * 15,
+    "biyobelirtec": ${pyList(pooled)},
+})
 
+medyanlar = df.groupby("grup")["biyobelirtec"].median().round(1).to_dict()
+print(f"Medyanlar: {medyanlar}")
+
+gruplar = [g["biyobelirtec"].to_numpy() for _, g in df.groupby("grup")]
 h_stat, p_val = stats.kruskal(*gruplar)
-print(f"Kruskal-Wallis H-Skoru: {h_stat:.2f}, p-değeri: {p_val:.4f}")
-
-# Post-hoc: Dunn testi + Bonferroni düzeltmesi
-dunn = sp.posthoc_dunn(df, val_col="tansiyon", group_col="grup", p_adjust="bonferroni")
-print(dunn.round(4))`,
+epsilon_kare = h_stat / (len(df) - 1)
+print(f"Kruskal-Wallis H(2) = {h_stat:.2f}, p = {p_val:.4f}, ε² = {epsilon_kare:.2f}")`,
   },
   {
     id: 'sklearn',
@@ -61,21 +75,27 @@ print(dunn.round(4))`,
     filename: 'pipeline_model_auditor.py',
     runtime: 'Python 3.11 · Scikit-learn 1.5 · Imbalanced-learn',
     language: 'python',
-    duration: '1.82 s',
-    output: ['Sağlamlaştırılmış CV F1-Skoru: 0.871 (± 0.018)'],
+    output: ['X ve y kendi veri setinizden gelir; çıktı verinize göre oluşur.'],
     code: `from imblearn.over_sampling import SMOTE
+from imblearn.pipeline import Pipeline
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import StratifiedKFold, cross_val_score
 
-# Sınıf dengesizliği: SMOTE ile azınlık sınıfını çoğalt
-smote = SMOTE(sampling_strategy=0.5, random_state=42)
-X_res, y_res = smote.fit_resample(X_train, y_train)
+# X, y: kendi veri setinizden (özellik matrisi ve hedef sınıf)
 
-# Aşırı öğrenme: 5 katlı tabakalı çapraz doğrulama
-rf_model = RandomForestClassifier(n_estimators=300, random_state=42)
+# SMOTE, Pipeline içinde olduğu için her katın yalnızca eğitim kısmına uygulanır;
+# test katına sentetik örnek sızmaz.
+model = Pipeline([
+    ("smote", SMOTE(sampling_strategy=0.5, random_state=42)),
+    ("rf", RandomForestClassifier(n_estimators=300, random_state=42)),
+])
+
 cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
-scores = cross_val_score(rf_model, X_res, y_res, cv=cv, scoring="f1_weighted")
-print(f"Sağlamlaştırılmış CV F1-Skoru: {scores.mean():.3f} (± {scores.std():.3f})")`,
+
+# Dengesiz veride doğruluk yanıltıcıdır: azınlık sınıfı için F1 ve PR-AUC'a bakın
+for metrik in ("f1", "average_precision"):
+    skorlar = cross_val_score(model, X, y, cv=cv, scoring=metrik)
+    print(f"{metrik}: {skorlar.mean():.3f} (± {skorlar.std():.3f})")`,
   },
   {
     id: 'r',
@@ -83,20 +103,22 @@ print(f"Sağlamlaştırılmış CV F1-Skoru: {scores.mean():.3f} (± {scores.std
     filename: 'analiz.R',
     runtime: 'R 4.4 · stats',
     language: 'r',
-    duration: '9.4 ms',
-    output: ['Kruskal-Wallis chi-squared = 11.6, df = 2, p-value = 0.0031'],
-    code: `# analiz.R - Kruskal-Wallis ve Dunn post-hoc
-veri <- read.csv("Klinik_Veri_Faz3.csv")
-veri$grup <- factor(veri$grup)
+    output: [
+      'Kruskal-Wallis rank sum test',
+      'data:  biyobelirtec by grup',
+      `Kruskal-Wallis chi-squared = ${H.toPrecision(5)}, df = ${df}, p-value = ${Number(p.toPrecision(4))}`,
+    ],
+    code: `# analiz.R - Kruskal-Wallis
+veri <- data.frame(
+  grup = factor(rep(c("A", "B", "C"), each = 15)),
+  biyobelirtec = ${rVector(pooled)}
+)
 
-sonuc <- kruskal.test(tansiyon ~ grup, data = veri)
-print(sonuc)
-
-# Post-hoc
-library(FSA)
-dunnTest(tansiyon ~ grup, data = veri, method = "bonferroni")`,
+sonuc <- kruskal.test(biyobelirtec ~ grup, data = veri)
+print(sonuc)`,
   },
 ];
+
 
 export const cleaningSnippet: CodeSnippet = {
   id: 'cleaning',
@@ -104,8 +126,7 @@ export const cleaningSnippet: CodeSnippet = {
   filename: 'veri_temizleme_otomasyonu.py',
   runtime: 'SciPy & Pandas',
   language: 'python',
-  duration: '38 ms',
-  output: ['İşlem tamamlandı: Kalite skoru %99’a yükseltildi.'],
+  output: [],
   code: `import pandas as pd
 from sklearn.impute import KNNImputer
 
@@ -120,7 +141,7 @@ df = df[~((df["kan_basinci"] < q1 - 1.5 * iqr) | (df["kan_basinci"] > q3 + 1.5 *
 # 2. Gelir düzeyi için {{IMPUTATION}}
 {{IMPUTATION_CODE}}
 
-print("İşlem tamamlandı: Kalite skoru %99'a yükseltildi.")`,
+print(f"Temizlenen veri: {len(df)} satır")`,
 };
 
 export const imputationCode: Record<'median' | 'knn', { title: string; code: string }> = {
@@ -143,8 +164,7 @@ export const reportFormats: ReportFormat[] = [
   { id: 'html', title: 'HTML belgesi', description: 'Web / pano', fileName: 'rapor_hipotez_sonuclari.html', size: '268 KB' },
 ];
 
-export const apaSummary =
-  'Verilerin normallik varsayımı Shapiro-Wilk testi ile incelenmiş ve varsayımın karşılanmadığı tespit edilmiştir (p = .012). Gruplar arası farklılıkları değerlendirmek amacıyla non-parametrik Kruskal-Wallis H testi uygulanmıştır. Test sonucunda üç bağımsız grup arasında istatistiksel olarak anlamlı bir fark bulunmuştur, H(2) = 11.60, p = .003, ε² = 0.21. Post-hoc Dunn-Bonferroni ikili karşılaştırmalarında Grup A ile Grup C arasındaki farkın anlamlı olduğu saptanmıştır (p < .01).';
+export const apaSummary = `Verilerin normallik varsayımı Shapiro-Wilk testi ile incelenmiş ve varsayımın karşılanmadığı görülmüştür. Gruplar arası farklılıkları değerlendirmek amacıyla non-parametrik Kruskal-Wallis H testi uygulanmıştır. Üç bağımsız grup arasında istatistiksel olarak anlamlı bir fark bulunmuştur, H(${df}) = ${H.toFixed(2)}, p = ${formatP(p, true)}, ε² = ${epsilonSquared.toFixed(2)}, N = ${n}. Hangi grupların birbirinden ayrıştığını belirlemek için Dunn testi (Holm düzeltmeli) uygulanmalıdır.`;
 
 export const citation = 'Kruskal, W. H., & Wallis, W. A. (1952). Use of ranks in one-criterion variance analysis. JASA, 47(260), 583–621.';
 
@@ -157,5 +177,6 @@ export const reportSections: ReportSection[] = [
 
 export const requirements = `scipy==1.11.4
 numpy>=1.24
-statsmodels==0.14.2
-scikit-posthocs==0.9.0`;
+pandas>=2.0
+scikit-learn>=1.3
+imbalanced-learn>=0.11`;

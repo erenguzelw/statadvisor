@@ -97,7 +97,7 @@ export function DecisionWizardPage() {
                   <HistogramWithNormal
                     bins={a.distribution.bins}
                     normal={{ mean: a.distribution.mean, sd: a.distribution.sd }}
-                    annotation="Aşırı yoğunlaşma (sola eğim)"
+                    annotation="Sağa çarpık (uzun sağ kuyruk)"
                     summary="Gözlenen veri sağa çarpık; tepe noktası beklenen normal eğrinin solunda."
                     className="p-0!"
                   />

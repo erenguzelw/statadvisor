@@ -13,7 +13,7 @@ export function InterpretationCard({ result, footer }: { result: Interpretation;
         <Tag tone="secondary">{result.metric}</Tag>
         {result.threshold && <span className="text-caption text-fg-subtle">Anlamlılık eşiği <span className="font-mono">{result.threshold}</span></span>}
         {result.verdict && (
-          <StatusChip status="success" className="ml-auto">
+          <StatusChip status={result.significant === false ? 'neutral' : 'info'} className="ml-auto">
             {result.verdict}
           </StatusChip>
         )}
