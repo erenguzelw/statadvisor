@@ -4,7 +4,7 @@
  */
 
 /** Düzenlenmiş alt tamamlanmamış gama fonksiyonunun üst kuyruğu Q(a, x). */
-function gammaQ(a: number, x: number): number {
+export function gammaQ(a: number, x: number): number {
   if (x <= 0) return 1;
   const lnGammaA = lnGamma(a);
   if (x < a + 1) {
@@ -39,7 +39,7 @@ function gammaQ(a: number, x: number): number {
   return Math.exp(-x + a * Math.log(x) - lnGammaA) * h;
 }
 
-function lnGamma(z: number): number {
+export function lnGamma(z: number): number {
   const g = 7;
   const coef = [
     0.99999999999980993, 676.5203681218851, -1259.1392167224028, 771.32342877765313, -176.61502916214059,

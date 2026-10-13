@@ -2,6 +2,7 @@
  * StatAdvisor domain tipleri.
  * Sunucu aşamasında packages/shared altına taşınacak; arayüz yalnızca bu tiplere bağımlıdır.
  */
+import type { AssumptionInput, WizardAnswers } from '@/lib/decision';
 
 export type Expertise = 'novice' | 'expert';
 
@@ -18,12 +19,6 @@ export interface Dataset {
   columns: number;
 }
 
-export interface WizardStep {
-  id: string;
-  question: string;
-  answer: string;
-}
-
 export interface DecisionPath {
   /** Kararı belirleyen seçimler, ör. "Amaç: Karşılaştırma". */
   conditions: string[];
@@ -31,15 +26,23 @@ export interface DecisionPath {
   finalTest: string;
   /** Plan neden değişti; değişmediyse undefined. */
   rerouteReason?: string;
+  /** Yöntemsel uyarılar (ön test sınırlamaları, bağımsızlık, örneklem büyüklüğü). */
+  warnings: string[];
 }
 
 export interface AssumptionTest {
   id: string;
   name: string;
+  /** Testin neye uygulandığı, ör. "grup içi kalıntılar, n = 45". */
+  subject: string;
+  /** Test istatistiği, ör. "W = 0.919". */
+  statistic: string;
   p: number;
   alpha: number;
   passed: boolean;
   verdict: string;
+  /** "Bu ne demek?" açıklaması; seviyeye göre iki anlatım. */
+  explain: Narrated;
 }
 
 export interface HistogramBin {
@@ -54,6 +57,14 @@ export interface DistributionSample {
   sd: number;
   skewness: number;
   n: number;
+}
+
+export interface GroupDescriptive {
+  group: string;
+  n: number;
+  median: number;
+  mean: number;
+  sd: number;
 }
 
 export interface Interpretation {
@@ -74,19 +85,43 @@ export interface RocPoint {
   tpr: number;
 }
 
+export interface ModelMetrics {
+  /** Test seti doğruluğu (0–1). */
+  accuracy: number;
+  trainAccuracy: number;
+  /** Azınlık (pozitif) sınıf için, 0.5 eşiğinde. */
+  precision: number;
+  recall: number;
+  f1: number;
+  rocAuc: number;
+  /** Ortalama kesinlik (PR-AUC). */
+  prAuc: number;
+}
+
 export interface Model {
   id: string;
   name: string;
   family: string;
   summary: string;
-  speed: number;
-  interpretability: number;
-  accuracy: number;
-  f1: number;
-  rocAuc: number;
-  recommended?: boolean;
+  /** 1–5 niteliksel değerlendirme; ölçüm değildir. */
+  speedRating: number;
+  interpretabilityRating: number;
+  metrics: ModelMetrics;
   roc: RocPoint[];
+  recommended?: boolean;
   detailAction: string;
+}
+
+export interface ModelDataFacts {
+  rows: number;
+  positives: number;
+  features: number;
+  testRows: number;
+  testPositives: number;
+  /** Test setinde, hep çoğunluk sınıfını tahmin eden modelin doğruluğu (0–1). */
+  baselineAccuracy: number;
+  /** PR-AUC için rastgele sıralamanın beklenen değeri (pozitif oranı). */
+  prevalence: number;
 }
 
 export type FlagCategory = 'Tip I hata riski' | 'Sınıf dengesizliği' | 'Genellenebilirlik';
@@ -101,20 +136,32 @@ export interface RedFlag {
   resolvedLabel: string;
 }
 
+export interface OutlierColumn {
+  column: 'bloodPressure' | 'biomarker';
+  label: string;
+  count: number;
+  lower: number;
+  upper: number;
+}
+
 export interface QualitySummary {
-  score: number;
-  grade: string;
-  projectedScore: number;
   observations: number;
   variables: number;
-  dataPoints: number;
+  /** Sayısal hücre sayısı (satır × sayısal sütun). */
+  cells: number;
   outliers: number;
-  outlierRate: number;
-  outlierColumns: string[];
+  outlierColumns: OutlierColumn[];
   missing: number;
   missingRate: number;
   missingColumn: string;
-  missingPattern: string;
+  /** Temiz hücre oranı (%): 1 − (aykırı + eksik) / hücre. */
+  integrityBefore: number;
+  integrityAfter: number;
+  removedRows: number;
+  cleanedRows: number;
+  removedRate: number;
+  shapiroBefore: { W: number; p: number };
+  shapiroAfter: { W: number; p: number };
 }
 
 export interface RawRow {
@@ -138,11 +185,12 @@ export interface ImputationMethod {
 export interface BoxStats {
   group: string;
   n: number;
-  min: number;
+  /** Tukey bıyıkları: sınırlar içindeki en uç gözlemler. */
+  whiskerLow: number;
   q1: number;
   median: number;
   q3: number;
-  max: number;
+  whiskerHigh: number;
   outliers: number[];
 }
 
@@ -154,24 +202,25 @@ export interface CodeSnippet {
   language: 'python' | 'r';
   code: string;
   output: string[];
-  duration?: string;
 }
 
 export interface ReportFormat {
-  id: 'pdf' | 'docx' | 'html';
+  id: 'html' | 'print' | 'word';
   title: string;
   description: string;
   fileName: string;
-  size: string;
-  pages?: number;
 }
 
 export interface AnalysisSummary {
   dataset: Dataset;
-  wizard: WizardStep[];
+  /** Sihirbazın varsayılan yanıtları ve hangilerinin veriden çıkarıldığı. */
+  defaultAnswers: WizardAnswers;
+  inferred: (keyof WizardAnswers)[];
   decision: DecisionPath;
   assumptions: AssumptionTest[];
+  assumptionInput: AssumptionInput;
   distribution: DistributionSample;
+  descriptives: GroupDescriptive[];
   result: Interpretation;
   testStatistic: { name: string; value: number; df: number; p: number; effect: string; effectValue: number; n: number };
 }
@@ -179,5 +228,4 @@ export interface AnalysisSummary {
 export interface ReportSection {
   id: string;
   label: string;
-  page: number;
 }

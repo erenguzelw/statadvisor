@@ -1,5 +1,6 @@
 import { formatP } from '@/lib/stats';
 import type { CodeSnippet, ReportFormat, ReportSection } from '../types';
+import { analysis } from './analysis';
 import { kruskal, median, pooled, pyList, sampleGroups } from './sample';
 
 /**
@@ -7,6 +8,10 @@ import { kruskal, median, pooled, pyList, sampleGroups } from './sample';
  * Çalıştırma süresi ölçülmediği için gösterilmez.
  */
 const { H, df, p, n, epsilonSquared } = kruskal;
+const shapiro = analysis.assumptions.find((a) => a.id === 'shapiro')!;
+const levene = analysis.assumptions.find((a) => a.id === 'levene')!;
+const shapiroPass = shapiro.passed;
+const shapiroW = shapiro.statistic.replace('W = ', '');
 const significant = p < 0.05;
 const verdictLine = significant
   ? 'Sonuç: Gruplar arasında istatistiksel olarak anlamlı fark var.'
@@ -132,11 +137,13 @@ from sklearn.impute import KNNImputer
 
 df = pd.read_csv("Klinik_Veri_Faz3.csv")
 
-# 1. IQR yöntemiyle aykırı değer budama (tansiyon)
-q1 = df["kan_basinci"].quantile(0.25)
-q3 = df["kan_basinci"].quantile(0.75)
-iqr = q3 - q1
-df = df[~((df["kan_basinci"] < q1 - 1.5 * iqr) | (df["kan_basinci"] > q3 + 1.5 * iqr))]
+# 1. Tukey sınırlarıyla (1.5 x IQR) aykırı değer işaretleme; sınırlar tüm veri üzerinden hesaplanır
+dis = pd.Series(False, index=df.index)
+for sutun in ["kan_basinci", "biyobelirtec_x"]:
+    q1, q3 = df[sutun].quantile([0.25, 0.75])
+    iqr = q3 - q1
+    dis |= (df[sutun] < q1 - 1.5 * iqr) | (df[sutun] > q3 + 1.5 * iqr)
+df = df[~dis]  # silmeden önce klinik geçerliliği kontrol edin
 
 # 2. Gelir düzeyi için {{IMPUTATION}}
 {{IMPUTATION_CODE}}
@@ -159,20 +166,21 @@ df[sayisal] = KNNImputer(n_neighbors=5).fit_transform(df[sayisal])`,
 export const comparisonSnippet: CodeSnippet = snippets[2]!;
 
 export const reportFormats: ReportFormat[] = [
-  { id: 'pdf', title: 'PDF raporu', description: 'Akademik, APA 7', fileName: 'rapor_hipotez_sonuclari.pdf', size: '1.84 MB', pages: 4 },
-  { id: 'docx', title: 'Word (.docx)', description: 'Düzenlenebilir', fileName: 'rapor_hipotez_sonuclari.docx', size: '412 KB', pages: 4 },
-  { id: 'html', title: 'HTML belgesi', description: 'Web / pano', fileName: 'rapor_hipotez_sonuclari.html', size: '268 KB' },
+  { id: 'html', title: 'HTML belgesi', description: 'Tarayıcıda açılır, indirilir', fileName: 'rapor_hipotez_sonuclari.html' },
+  { id: 'print', title: 'PDF (yazdır)', description: 'Tarayıcının “PDF olarak kaydet” seçeneği', fileName: 'rapor_hipotez_sonuclari.pdf' },
+  { id: 'word', title: 'Word (.doc)', description: 'HTML tabanlı, Word’de açılır', fileName: 'rapor_hipotez_sonuclari.doc' },
 ];
 
-export const apaSummary = `Verilerin normallik varsayımı Shapiro-Wilk testi ile incelenmiş ve varsayımın karşılanmadığı görülmüştür. Gruplar arası farklılıkları değerlendirmek amacıyla non-parametrik Kruskal-Wallis H testi uygulanmıştır. Üç bağımsız grup arasında istatistiksel olarak anlamlı bir fark bulunmuştur, H(${df}) = ${H.toFixed(2)}, p = ${formatP(p, true)}, ε² = ${epsilonSquared.toFixed(2)}, N = ${n}. Hangi grupların birbirinden ayrıştığını belirlemek için Dunn testi (Holm düzeltmeli) uygulanmalıdır.`;
+export const apaSummary = `Normallik varsayımı, grup içi kalıntılar üzerinde Shapiro-Wilk testiyle incelenmiş ve ${shapiroPass ? 'karşılandığı' : 'karşılanmadığı'} görülmüştür, W = ${shapiroW}, p = ${formatP(shapiro.p, true)}. Varyansların homojenliği Levene (Brown-Forsythe) testiyle sınanmıştır, ${levene.statistic}, p = ${formatP(levene.p, true)}. Gruplar arası farklılıkları değerlendirmek amacıyla non-parametrik Kruskal-Wallis H testi uygulanmıştır. Üç bağımsız grup arasında istatistiksel olarak anlamlı bir fark bulunmuştur, H(${df}) = ${H.toFixed(2)}, p = ${formatP(p, true)}, ε² = ${epsilonSquared.toFixed(2)}, N = ${n}. Hangi grupların birbirinden ayrıştığını belirlemek için Dunn testi (Holm düzeltmeli) uygulanmalıdır.`;
 
 export const citation = 'Kruskal, W. H., & Wallis, W. A. (1952). Use of ranks in one-criterion variance analysis. JASA, 47(260), 583–621.';
 
 export const reportSections: ReportSection[] = [
-  { id: 'desc', label: 'Tanımlayıcı istatistikler ve çeyreklikler (IQR)', page: 1 },
-  { id: 'assump', label: 'Varsayım test matrisi (Shapiro-Wilk ve Levene)', page: 2 },
-  { id: 'plots', label: 'Grup kutu grafikleri ve dağılım eğrileri', page: 3 },
-  { id: 'posthoc', label: 'Post-hoc ikili karşılaştırmalar ve etki büyüklüğü (ε²)', page: 4 },
+  { id: 'desc', label: 'Tanımlayıcı istatistikler (n, medyan, ortalama, standart sapma)' },
+  { id: 'assump', label: 'Varsayım testleri (Shapiro-Wilk, Levene) ve karar notları' },
+  { id: 'result', label: 'Test sonucu ve etki büyüklüğü (ε²)' },
+  { id: 'apa', label: 'APA 7 stilinde metin özeti' },
+  { id: 'refs', label: 'Kaynakça' },
 ];
 
 export const requirements = `scipy==1.11.4

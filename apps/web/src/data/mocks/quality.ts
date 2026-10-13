@@ -1,47 +1,169 @@
+import { mean, median, shapiroWilk, tukeyFences } from '@/lib/assumptions';
+import { gaussian, mulberry32 } from '@/lib/ml';
+import { histogram } from '@/lib/stats';
 import type { BoxStats, HistogramBin, ImputationMethod, QualitySummary, RawRow } from '../types';
-
-export const qualitySummary: QualitySummary = {
-  score: 88,
-  grade: 'B',
-  projectedScore: 99,
-  observations: 1420,
-  variables: 8,
-  dataPoints: 11360,
-  outliers: 14,
-  outlierRate: 0.99,
-  outlierColumns: ['Tansiyon', 'Yaş'],
-  missing: 60,
-  missingRate: 4.2,
-  missingColumn: 'gelir_duzeyi',
-  missingPattern: 'MCAR (tamamen rastlantısal)',
-};
-
-export const rawRows: RawRow[] = [
-  { id: '#001', group: 'A', age: 42, bloodPressure: 122.4, income: 38500, biomarker: 4.12 },
-  { id: '#002', group: 'B', age: 39, bloodPressure: 248.0, income: 44200, biomarker: 3.88, outlierIn: 'bloodPressure', outlierNote: 'IQR > 3.0' },
-  { id: '#003', group: 'A', age: 58, bloodPressure: 134.1, income: 51000, biomarker: 5.04 },
-  { id: '#004', group: 'C', age: 47, bloodPressure: 118.0, income: null, biomarker: 4.45 },
-  { id: '#005', group: 'B', age: 51, bloodPressure: 129.5, income: 62800, biomarker: 3.9 },
-  { id: '#006', group: 'C', age: 64, bloodPressure: 142.2, income: 29100, biomarker: 18.9, outlierIn: 'biomarker', outlierNote: 'Uç değer' },
-  { id: '#007', group: 'A', age: 33, bloodPressure: 115.8, income: null, biomarker: 4.01 },
-];
 
 export const imputationMethods: ImputationMethod[] = [
   { id: 'median', label: 'Medyan ile doldurma', hint: 'Hızlı' },
   { id: 'knn', label: 'KNN imputasyon (k=5)', hint: 'Hassas' },
 ];
 
-export const groupBoxes: BoxStats[] = [
-  { group: 'Grup A', n: 472, min: 104, q1: 116, median: 123, q3: 131, max: 142, outliers: [] },
-  { group: 'Grup B', n: 480, min: 108, q1: 121, median: 129, q3: 137, max: 150, outliers: [248] },
-  { group: 'Grup C', n: 468, min: 112, q1: 125, median: 133, q3: 141, max: 155, outliers: [] },
+const GROUPS = [
+  { id: 'A' as const, n: 472, shift: 0 },
+  { id: 'B' as const, n: 480, shift: 4 },
+  { id: 'C' as const, n: 468, shift: 8 },
 ];
+const MISSING_COUNT = 60;
+const VARIABLES = 6; // id, grup, yaş, kan basıncı, gelir, biyobelirteç
 
-/** Temizleme sonrası yaklaşık normal dağılım. */
-export const cleanedBins: HistogramBin[] = [3, 7, 14, 24, 34, 40, 33, 22, 13, 6, 3].map((count, i) => ({
-  x0: i,
-  x1: i + 1,
-  count,
-}));
+export interface QualityReport {
+  summary: QualitySummary;
+  rows: RawRow[];
+  boxes: BoxStats[];
+  boxesCleaned: BoxStats[];
+  histBefore: { bins: HistogramBin[]; mean: number; sd: number };
+  histAfter: { bins: HistogramBin[]; mean: number; sd: number };
+  skewBefore: number;
+  skewAfter: number;
+}
 
-export const cleanedStats = { shapiroP: 0.082, skewness: 0.14, validRows: 1406 };
+interface Row extends RawRow {
+  removed: boolean;
+}
+
+function build(): QualityReport {
+  const rng = mulberry32(2026);
+  const raw: Omit<RawRow, 'id'>[] = [];
+  for (const g of GROUPS) {
+    for (let i = 0; i < g.n; i++) {
+      raw.push({
+        group: g.id,
+        age: Math.max(18, Math.min(90, Math.round(50 + 12 * gaussian(rng)))),
+        bloodPressure: Math.round((124 + g.shift + 12 * gaussian(rng)) * 10) / 10,
+        income: Math.round(Math.exp(10.5 + 0.45 * gaussian(rng)) / 100) * 100,
+        biomarker: Math.round(Math.exp(1.35 + 0.25 * gaussian(rng)) * 100) / 100,
+      });
+    }
+  }
+  // Gruplar karışık sırada görünsün (Fisher-Yates, tohumlu).
+  for (let i = raw.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [raw[i], raw[j]] = [raw[j]!, raw[i]!];
+  }
+  // Örnek sorunlar: belirli satırlara bilinçli olarak yerleştirilir ve bu yalnızca bu demo veri setine aittir.
+  raw[1]!.bloodPressure = 248;
+  raw[5]!.biomarker = 18.9;
+  for (let k = 0; k < 8; k++) raw[40 + k * 150]!.bloodPressure = 205 + k * 7;
+  for (let k = 0; k < 3; k++) raw[90 + k * 400]!.biomarker = 12 + k * 1.5;
+  const missingIdx = new Set<number>([3, 6]);
+  while (missingIdx.size < MISSING_COUNT) missingIdx.add(Math.floor(rng() * raw.length));
+  const rows: Row[] = raw.map((r, i) => ({
+    ...r,
+    id: `#${String(i + 1).padStart(3, '0')}`,
+    income: missingIdx.has(i) ? null : r.income,
+    removed: false,
+  }));
+
+  const bp = rows.map((r) => r.bloodPressure);
+  const bio = rows.map((r) => r.biomarker);
+  const bpF = tukeyFences(bp);
+  const bioF = tukeyFences(bio);
+  const bpOut = (v: number) => v < bpF.lower || v > bpF.upper;
+  const bioOut = (v: number) => v < bioF.lower || v > bioF.upper;
+  const bpCount = bp.filter(bpOut).length;
+  const bioCount = bio.filter(bioOut).length;
+
+  for (const r of rows) {
+    if (bpOut(r.bloodPressure)) {
+      r.outlierIn = 'bloodPressure';
+      r.outlierNote = `Sınır dışı (> ${bpF.upper.toFixed(0)})`;
+    } else if (bioOut(r.biomarker)) {
+      r.outlierIn = 'biomarker';
+      r.outlierNote = `Sınır dışı (> ${bioF.upper.toFixed(1)})`;
+    }
+    r.removed = bpOut(r.bloodPressure) || bioOut(r.biomarker);
+  }
+  const cleaned = rows.filter((r) => !r.removed);
+
+  const residuals = (rs: Row[]) =>
+    rs.flatMap((r) => {
+      const m = mean(rs.filter((x) => x.group === r.group).map((x) => x.bloodPressure));
+      return [r.bloodPressure - m];
+    });
+  const resBefore = residuals(rows);
+  const resAfter = residuals(cleaned);
+  const sw = (v: number[]) => {
+    const { W, p } = shapiroWilk(v);
+    return { W, p };
+  };
+
+  const cells = rows.length * VARIABLES;
+  const flaggedCells = bpCount + bioCount + MISSING_COUNT;
+  const mkHist = (res: number[]) => {
+    const lo = Math.floor(Math.min(...res) / 5) * 5;
+    const hi = Math.ceil(Math.max(...res) / 5) * 5;
+    const m = mean(res);
+    const sd = Math.sqrt(res.reduce((s, v) => s + (v - m) ** 2, 0) / (res.length - 1));
+    return { bins: histogram(res, Math.max(1, (hi - lo) / 5), lo, 5), mean: m, sd };
+  };
+  const skew = (v: number[]) => {
+    const m = mean(v);
+    const m2 = v.reduce((s, x) => s + (x - m) ** 2, 0) / v.length;
+    return v.reduce((s, x) => s + (x - m) ** 3, 0) / v.length / m2 ** 1.5;
+  };
+
+  const boxFor = (rs: Row[]): BoxStats[] =>
+    GROUPS.map((g) => {
+      const v = rs.filter((r) => r.group === g.id).map((r) => r.bloodPressure);
+      const f = tukeyFences(v);
+      const inside = v.filter((x) => x >= f.lower && x <= f.upper);
+      return {
+        group: `Grup ${g.id}`,
+        n: v.length,
+        whiskerLow: Math.min(...inside),
+        q1: f.q1,
+        median: median(v),
+        q3: f.q3,
+        whiskerHigh: Math.max(...inside),
+        outliers: v.filter((x) => x < f.lower || x > f.upper).sort((a, b) => a - b),
+      };
+    });
+
+  const summary: QualitySummary = {
+    observations: rows.length,
+    variables: VARIABLES,
+    cells,
+    outliers: bpCount + bioCount,
+    outlierColumns: [
+      { column: 'bloodPressure', label: 'Kan basıncı', count: bpCount, lower: bpF.lower, upper: bpF.upper },
+      { column: 'biomarker', label: 'Biyobelirteç X', count: bioCount, lower: bioF.lower, upper: bioF.upper },
+    ],
+    missing: MISSING_COUNT,
+    missingRate: (MISSING_COUNT / rows.length) * 100,
+    missingColumn: 'gelir_duzeyi',
+    integrityBefore: (1 - flaggedCells / cells) * 100,
+    integrityAfter: 100,
+    removedRows: rows.length - cleaned.length,
+    cleanedRows: cleaned.length,
+    removedRate: ((rows.length - cleaned.length) / rows.length) * 100,
+    shapiroBefore: sw(resBefore),
+    shapiroAfter: sw(resAfter),
+  };
+
+  return {
+    summary,
+    // Önizleme: ilk 7 gözlem
+    rows: rows.slice(0, 7).map((r) => ({ id: r.id, group: r.group, age: r.age, bloodPressure: r.bloodPressure, income: r.income, biomarker: r.biomarker, outlierIn: r.outlierIn, outlierNote: r.outlierNote })),
+    boxes: boxFor(rows),
+    boxesCleaned: boxFor(cleaned),
+    histBefore: mkHist(resBefore),
+    histAfter: mkHist(resAfter),
+    skewBefore: skew(resBefore),
+    skewAfter: skew(resAfter),
+  };
+}
+
+let cached: QualityReport | undefined;
+export function getQualityReport(): QualityReport {
+  return (cached ??= build());
+}

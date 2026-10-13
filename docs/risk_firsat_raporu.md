@@ -92,6 +92,24 @@
 4. Kural motoru, R ve SciPy çıktılarıyla karşılaştırılan referans veri setleriyle test edilmeli; kütüphane sürümleri ekranda gösterilmeli.
 5. "Karar destek aracıdır, onay sizindir" sınırlaması ve yerel çalışma garantisi yazılı olmalı; veri gizliliği gereksinimleri bu ürün için ayrıca tanımlanmalı.
 
+## Güncelleme: Giderilen Bulgular
+
+Rapordaki kritik ve orta bulguların tamamı arayüzde giderilmiştir. Doğrulama, 47 birim testi ve 16 uçtan uca/erişilebilirlik testiyle yapılmıştır.
+
+| Bulgu | Durum |
+|---|---|
+| Ekrandaki sayılar koddan üretilemiyor | Giderildi: H, p, ε², n, histogram ve çarpıklık tek örnek veriden hesaplanır; kod çıktıları aynı veriden türetilir. |
+| SMOTE çapraz doğrulamadan önce | Giderildi: kod `imblearn.pipeline.Pipeline` kullanır; "sızıntı: temiz" beyanı kaldırıldı. |
+| p-değeri yanlış yorumu | Giderildi: yeni metin "Gruplar gerçekte aynı olsaydı…" biçimindedir; etki büyüklüğü eklendi. |
+| Ön test ve test seçimi | Giderildi: Shapiro-Wilk (grup içi kalıntılar) ve Levene gerçekten hesaplanır; kural motoru Welch'i varsayılan yapar ve ön test sınırlamalarını uyarı olarak gösterir. Gerçek değerler: Shapiro W = 0.919, p = .004; Levene F(2, 42) = 2.14, p = .131 (eski elle yazılmış 0.012 ve 0.41 yanlıştı). |
+| Model paneli ölçümsüz puanlar, üretilmiş ROC | Giderildi: üç model tohumlu dengesiz veride gerçekten eğitilir; doğruluk taban çizgisiyle, F1, PR-AUC ve ROC AUC ile birlikte gösterilir. Hız ve yorumlanabilirlik "niteliksel" olarak etiketlidir. |
+| Doğruluk taban çizgisinin altında | Giderildi: taban çizgisi her ekranda gösterilir. |
+| Sihirbaz etkileşimsiz | Giderildi: gerçek soru-cevap akışı; yanıtlar test önerisini anında değiştirir, bilinmeyen bağımsızlık uyarılır. |
+| Veri kalitesi: dayanaksız iddialar (güç kaybı, MCAR, kalite notu) | Giderildi: sayılar 1.420 satırlık veriden hesaplanır; "dallanan yol" uyarısı gerçek Shapiro sonuçlarıyla gösterilir. |
+| Sahte rapor boyutu, süre ve ilerleme | Giderildi: HTML, yazdır/PDF ve Word (.doc) raporları gerçekten üretilir. |
+
+**Hâlâ açık:** post-hoc testlerin (Dunn, Holm) hesaplanması, PDF'in sunucu tarafında üretilmesi, gerçek CSV yükleme ve bağımsız bir istatistikçi incelemesi. Model panelindeki eğitim, sentetik bir veri setindedir; gerçek veriyle yeniden değerlendirilmelidir.
+
 ## Kaynakça
 
 Benjamini, Y., & Hochberg, Y. (1995). Controlling the false discovery rate: A practical and powerful approach to multiple testing. *Journal of the Royal Statistical Society: Series B, 57*(1), 289–300.

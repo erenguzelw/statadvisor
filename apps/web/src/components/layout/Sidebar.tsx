@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { CheckCircle2, Settings } from 'lucide-react';
+import { Settings } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { IconButton } from '@/components/ui';
 import { navItems } from './navigation';
@@ -10,7 +10,7 @@ export function Sidebar({ onNavigate, className }: { onNavigate?: () => void; cl
       <div className="flex flex-col gap-6">
         <p className="flex items-center gap-2 px-3 text-caption text-fg-subtle">
           <span className="size-2 rounded-full bg-secondary motion-safe:animate-pulse" aria-hidden />
-          İstatistik çekirdeği <span className="font-mono">v4.2</span>
+          İstatistik çekirdeği <span className="font-mono">v0.1</span>
         </p>
         <nav aria-label="Ana menü">
           <ul className="flex flex-col gap-1.5">
@@ -43,17 +43,11 @@ export function Sidebar({ onNavigate, className }: { onNavigate?: () => void; cl
 
       <div className="flex flex-col gap-3">
         <div className="rounded-card bg-surface-lowest p-3">
-          <div className="mb-1.5 flex items-center justify-between gap-2">
-            <p className="text-caption font-medium text-fg-subtle">Doğrulama durumu</p>
-            <p className="flex items-center gap-1 text-caption text-secondary">
-              <CheckCircle2 size={12} aria-hidden />
-              Geçerli
-            </p>
-          </div>
-          <p className="text-caption text-fg-muted">Normallik (Shapiro-Wilk) ve Levene testleri senkronize edildi.</p>
+          <p className="mb-1.5 text-caption font-medium text-fg-subtle">Hesaplama</p>
+          <p className="text-caption text-fg-muted">Shapiro-Wilk, Levene ve Kruskal-Wallis, örnek veri üzerinde tarayıcıda hesaplanır.</p>
         </div>
         <div className="flex items-center justify-between px-1">
-          <p className="font-mono text-caption text-fg-subtle">PyTorch / SciPy Stats</p>
+          <p className="font-mono text-caption text-fg-subtle">Örnek veri, tarayıcıda hesap</p>
           <IconButton icon={Settings} label="Ayarlar" className="size-8" />
         </div>
       </div>

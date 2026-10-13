@@ -26,12 +26,6 @@ export function toNotebook(code: string, title: string) {
   );
 }
 
-const escapeHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-
-/** Basit, bağımsız bir HTML raporu üretir. */
-export function htmlReport(title: string, summary: string, citation: string) {
-  return `<!doctype html><html lang="tr"><meta charset="utf-8"><title>${escapeHtml(title)}</title><body style="font-family:Georgia,serif;max-width:42rem;margin:3rem auto;padding:0 1rem;line-height:1.7"><h1>${escapeHtml(title)}</h1><p>${escapeHtml(summary)}</p><h2>Kaynakça</h2><p>${escapeHtml(citation)}</p></body></html>`;
-}
 
 /** HTML içeriği yeni sekmede açar. */
 export function openHtml(content: string) {
