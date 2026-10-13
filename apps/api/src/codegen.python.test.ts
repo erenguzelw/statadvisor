@@ -136,6 +136,36 @@ suite('üretilen Python kodu, ekrandaki sonucu birebir yeniden üretir', () => {
     await verify(id, cmp({ target: 'categorical', group: 'bolum', value: 'tavsiye' }));
   });
 
+  it('kodlu Likert etiketleri ("2:Bazen katılıyorum") sıralı sayıya çevrilir ve kod aynısını yapar', { timeout: T }, async () => {
+    const labels = ['Hiç katılmıyorum', 'Çok az katılıyorum', 'Bazen katılıyorum', 'Genellikle katılıyorum', 'Tamamen katılıyorum'];
+    const rows = Array.from({ length: 90 }, (_, i) => {
+      const grup = ['kadın', 'erkek'][i % 2]!;
+      const k = Math.min(4, Math.max(0, Math.round(2 + (grup === 'erkek' ? 0.8 : 0) + gaussian(rng))));
+      return [grup, `${k}:${labels[k]}`];
+    });
+    const id = await uploadCsv(csv(['cinsiyet', 'madde'], rows), 'likert.csv');
+    const ds = (await app.inject({ url: `/api/datasets/${id}` })).json();
+    expect(ds.columns.find((c: { name: string }) => c.name === 'madde')).toMatchObject({ type: 'ordinal', numeric: true, prefixCoded: true });
+    const { code } = await verify(id, cmp({ target: 'ordinal', value: 'madde', group: 'cinsiyet' }));
+    expect(code.code).toContain('KODLU');
+  });
+
+  it('aralık etiketleri ("18-23", "1 saatten az", "7 ve üzeri") sıralanır ve kod aynısını yapar', { timeout: T }, async () => {
+    const sure = ['4-6', '1 saatten az', '7 ve üzeri', '1-3 saat'];
+    const yas = ['30-35', '18-23', '24-29'];
+    const rows = Array.from({ length: 120 }, (_, i) => {
+      const k = Math.min(3, Math.max(0, Math.round(1.5 + (i % 2) * 0.9 + gaussian(rng))));
+      return [['kadın', 'erkek'][i % 2]!, sure[[1, 3, 0, 2][k]!]!, yas[i % 3]!];
+    });
+    const id = await uploadCsv(csv(['cinsiyet', 'sure', 'yas'], rows), 'araliklar.csv');
+    const ds = (await app.inject({ url: `/api/datasets/${id}` })).json();
+    expect(ds.columns.find((c: { name: string }) => c.name === 'sure')).toMatchObject({ type: 'ordinal', numeric: true, rankLabels: ['1 saatten az', '1-3 saat', '4-6', '7 ve üzeri'] });
+    expect(ds.columns.find((c: { name: string }) => c.name === 'yas')).toMatchObject({ type: 'ordinal', rankLabels: ['18-23', '24-29', '30-35'] });
+    expect(ds.columns.find((c: { name: string }) => c.name === 'cinsiyet')).toMatchObject({ type: 'categorical' });
+    const { code } = await verify(id, cmp({ target: 'ordinal', value: 'sure', group: 'cinsiyet' }));
+    expect(code.code).toContain('SIRALI');
+  });
+
   it('küçük 2×2 tablo: Fisher kesin testi', { timeout: T }, async () => {
     const rows = [...Array(7).fill(['a', 'evet']), ...Array(2).fill(['a', 'hayir']), ...Array(1).fill(['b', 'evet']), ...Array(8).fill(['b', 'hayir'])];
     const id = await uploadCsv(csv(['grup', 'sonuc'], rows));

@@ -12,6 +12,10 @@ export interface ParsedColumn {
   examples: string[];
   /** Kimlik benzeri sütun (benzersiz tamsayı sırası); aykırı değer taramasından çıkarılır. */
   likelyId: boolean;
+  /** Değerler "2:Bazen katılıyorum" biçiminde kodlu etiketti; baştaki sayı alındı. */
+  prefixCoded: boolean;
+  /** Aralık etiketleri ("18-23", "7 ve üzeri") küçükten büyüğe sıralandı; değerler 0,1,2… sıra numarasıdır. */
+  rankLabels: string[] | null;
   warnings: string[];
 }
 
@@ -39,6 +43,8 @@ const MISSING = new Set(['', 'na', 'n/a', 'nan', 'null', 'none', '-', '?', '#n/a
 const DELIMITERS = [',', ';', '\t', '|'] as const;
 /** Ondalık ayracı virgül olan sayı belirteci, ör. "3,5". */
 const DECIMAL_COMMA = /^-?\d+,\d+$/;
+/** Likert benzeri kodlu etiket, ör. "2:Bazen katılıyorum" (sayı + iki nokta ile başlar). */
+export const CODED_LABEL = /^\s*(-?\d+)\s*:/;
 
 function detectDelimiter(text: string): string {
   const lines = text.split(/\r?\n/).filter((l) => l.trim() !== '').slice(0, 8);
@@ -60,6 +66,27 @@ function detectDelimiter(text: string): string {
     if (score > best.score) best = { d, score };
   }
   return best.d;
+}
+
+/**
+ * Aralık etiketlerini ("18-23", "1-3 saat", "1 saatten az", "7 ve üzeri") sayısal alt sınıra göre sıralar.
+ * Tüm etiketler tanınmaz ya da sıra belirsizse null döner (sütun kategorik kalır).
+ */
+export function rankOrder(labels: string[]): string[] | null {
+  if (labels.length < 2 || labels.length > 12) return null;
+  const keyed = labels.map((label) => {
+    const range = /^(\d+(?:[.,]\d+)?)\s*[-–]\s*\d+(?:[.,]\d+)?/.exec(label);
+    if (range) return { label, key: Number(range[1]!.replace(',', '.')) };
+    const open = /^(\d+(?:[.,]\d+)?)\s*(\+|ve\s+(üzeri|üstü|üstünde|fazla)|ve\s+üzerinde)/i.exec(label);
+    if (open) return { label, key: Number(open[1]!.replace(',', '.')) };
+    const below = /^(\d+(?:[.,]\d+)?)\s*\S*\s*(den|dan)?\s*(az|altı|altında|daha az)\b/i.exec(label);
+    if (below) return { label, key: Number(below[1]!.replace(',', '.')) - 0.5 };
+    return null;
+  });
+  if (keyed.some((k) => k === null)) return null;
+  const ks = keyed as { label: string; key: number }[];
+  if (new Set(ks.map((k) => k.key)).size !== ks.length) return null;
+  return ks.sort((a, b) => a.key - b.key).map((k) => k.label);
 }
 
 function uniqueNames(raw: string[]): string[] {
@@ -107,36 +134,45 @@ export function parseCsv(buffer: Buffer, limits: CsvLimits): ParsedCsv {
   const columns: ParsedColumn[] = names.map((name, c) => {
     const tokens = body.map((r) => (r[c] ?? '').trim());
     const present = tokens.filter((t) => !MISSING.has(t.toLowerCase()));
-    const nums = present.map((t) => toNumber(t, decimalComma));
+    const prefixCoded = present.length > 0 && present.filter((t) => CODED_LABEL.test(t)).length / present.length >= 0.95;
+    const num = (t: string) => (prefixCoded ? toNumber(CODED_LABEL.exec(t)?.[1] ?? '', false) : toNumber(t, decimalComma));
+    const nums = present.map(num);
     const numericShare = present.length ? nums.filter((n) => n !== null).length / present.length : 0;
     const numeric = present.length > 0 && numericShare >= 0.95;
+    const rankLabels = numeric ? null : rankOrder([...new Set(present)]);
     const warnings: string[] = [];
     let values: (number | string | null)[];
     if (numeric) {
-      if (decimalComma && present.some((t, i) => nums[i] !== null && DECIMAL_COMMA.test(t))) usedDecimalComma = true;
-      values = tokens.map((t) => (MISSING.has(t.toLowerCase()) ? null : toNumber(t, decimalComma)));
+      if (!prefixCoded && decimalComma && present.some((t, i) => nums[i] !== null && DECIMAL_COMMA.test(t))) usedDecimalComma = true;
+      values = tokens.map((t) => (MISSING.has(t.toLowerCase()) ? null : num(t)));
       const invalid = present.length - nums.filter((n) => n !== null).length;
       if (invalid > 0) warnings.push(`${invalid} sayısal olmayan değer eksik sayıldı.`);
+    } else if (rankLabels) {
+      values = tokens.map((t) => (MISSING.has(t.toLowerCase()) ? null : rankLabels.indexOf(t)));
+      warnings.push(`Aralık etiketleri küçükten büyüğe sıralandı: ${rankLabels.join(' < ')}.`);
     } else {
       values = tokens.map((t) => (MISSING.has(t.toLowerCase()) ? null : t));
     }
+    const isNum = numeric || rankLabels !== null;
     const filled = values.filter((v) => v !== null);
     const uniqueSet = new Set(filled.map(String));
-    const allInt = numeric && filled.every((v) => Number.isInteger(v));
-    const type: ColumnType = numeric ? (allInt && uniqueSet.size <= 7 ? 'ordinal' : 'continuous') : 'categorical';
+    const allInt = isNum && filled.every((v) => Number.isInteger(v));
+    const type: ColumnType = rankLabels ? 'ordinal' : numeric ? (allInt && uniqueSet.size <= 7 ? 'ordinal' : 'continuous') : 'categorical';
     const sortedInts = numeric && allInt ? (filled as number[]) : [];
     const sequential = sortedInts.length > 1 && sortedInts.every((v, i) => i === 0 || v === sortedInts[i - 1]! + 1);
     const idName = /(^|[_\s-])(id|kimlik|no|index|sıra|sira)$/i.test(name);
     return {
       name,
       type,
-      numeric,
+      numeric: isNum,
       values,
       unique: uniqueSet.size,
       missing: values.length - filled.length,
-      examples: [...uniqueSet].slice(0, 3),
+      examples: rankLabels ? rankLabels.slice(0, 3) : [...uniqueSet].slice(0, 3),
+      rankLabels,
+      prefixCoded: numeric && prefixCoded,
       likelyId: numeric && allInt && uniqueSet.size === filled.length && (idName || sequential),
-      warnings,
+      warnings: numeric && prefixCoded ? [...warnings, 'Değerler kodlu etiketti (ör. “2:Bazen katılıyorum”); baştaki sayı kullanıldı.'] : warnings,
     };
   });
 

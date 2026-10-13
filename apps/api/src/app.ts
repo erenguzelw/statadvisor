@@ -173,7 +173,7 @@ export function buildApp(opts: AppOptions): FastifyInstance {
     parent_id: string | null;
     operations_json: string | null;
   }
-  const columnSummary = (c: ParsedColumn) => ({ name: c.name, type: c.type, numeric: c.numeric, unique: c.unique, missing: c.missing, examples: c.examples, likelyId: c.likelyId, warnings: c.warnings });
+  const columnSummary = (c: ParsedColumn) => ({ name: c.name, type: c.type, numeric: c.numeric, unique: c.unique, missing: c.missing, examples: c.examples, likelyId: c.likelyId, prefixCoded: c.prefixCoded, rankLabels: c.rankLabels, warnings: c.warnings });
   const datasetJson = (r: DatasetRow) => ({ id: r.id, name: r.name, size: r.size, rows: r.rows, columns: JSON.parse(r.columns_json) as unknown[], createdAt: r.created_at, parentId: r.parent_id, operations: r.operations_json ? (JSON.parse(r.operations_json) as unknown) : null });
 
   /* ---------- Veri setleri ---------- */
@@ -279,7 +279,7 @@ export function buildApp(opts: AppOptions): FastifyInstance {
     return readFile(row.sha256);
   });
 
-  const fileInfo = (row: DatasetRow, csv: ParsedCsv) => ({ fileName: row.name, delimiter: csv.delimiter, decimalComma: csv.decimalComma });
+  const fileInfo = (row: DatasetRow, csv: ParsedCsv) => ({ fileName: row.name, delimiter: csv.delimiter, decimalComma: csv.decimalComma, prefixCoded: csv.columns.filter((c) => c.prefixCoded).map((c) => c.name), rankCoded: Object.fromEntries(csv.columns.filter((c) => c.rankLabels).map((c) => [c.name, c.rankLabels!])) });
 
   /** Temizleme işleminin Python karşılığı. */
   app.get('/api/datasets/:id/cleaning-code', async (req) => {
