@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Lightbulb, MessageSquareQuote } from 'lucide-react';
-import type { Interpretation } from '@/data/types';
+import type { Interpretation } from '@statadvisor/shared';
 import { useApp } from '@/context/AppContext';
 import { StatusChip, Tag } from '@/components/ui';
 

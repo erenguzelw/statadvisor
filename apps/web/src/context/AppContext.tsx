@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
-import type { Expertise, Narrated } from '@/data/types';
+import type { Expertise, Narrated } from '@statadvisor/shared';
 
 const STORAGE_KEY = 'statadvisor.expertise';
 

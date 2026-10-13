@@ -1,4 +1,4 @@
-import { averagePrecision, fSurvival, levene, normalCdf, normalQuantile, quantile, rocAuc, shapiroWilk, tukeyFences } from './assumptions';
+import { averagePrecision, fSurvival, levene, normalCdf, normalQuantile, quantile, rocAuc, shapiroWilk, tukeyFences } from './assumptions.ts';
 
 describe('normal dağılım', () => {
   it('bilinen değerleri verir', () => {

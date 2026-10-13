@@ -1,5 +1,5 @@
 import { AlertTriangle } from 'lucide-react';
-import type { RawRow } from '@/data/types';
+import type { RawRow } from '@statadvisor/shared';
 import { DataTable, StatusChip, type Column } from '@/components/ui';
 
 const nf = new Intl.NumberFormat('tr-TR');

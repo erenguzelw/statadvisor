@@ -1,6 +1,6 @@
 import { useId } from 'react';
 import { scaleBand, scaleLinear } from 'd3-scale';
-import type { BoxStats } from '@/data/types';
+import type { BoxStats } from '@statadvisor/shared';
 
 const W = 420;
 const H = 230;

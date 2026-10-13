@@ -2,7 +2,7 @@
  * StatAdvisor domain tipleri.
  * Sunucu aşamasında packages/shared altına taşınacak; arayüz yalnızca bu tiplere bağımlıdır.
  */
-import type { AssumptionInput, WizardAnswers } from '@/lib/decision';
+import type { AssumptionInput, WizardAnswers } from './decision.ts';
 
 export type Expertise = 'novice' | 'expert';
 

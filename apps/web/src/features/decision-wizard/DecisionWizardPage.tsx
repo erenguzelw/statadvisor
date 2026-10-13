@@ -17,7 +17,7 @@ import {
 } from '@/components/domain';
 import { useApp } from '@/context/AppContext';
 import { useAnalysis, useCodeReport, useModelComparison } from '@/data/queries';
-import { recommendTest, type WizardAnswers } from '@/lib/decision';
+import { recommendTest, type WizardAnswers } from '@statadvisor/shared';
 
 export function DecisionWizardPage() {
   const { datasetId } = useApp();

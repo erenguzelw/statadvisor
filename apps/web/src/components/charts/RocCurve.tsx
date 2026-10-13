@@ -1,7 +1,7 @@
 import { useId } from 'react';
 import { scaleLinear } from 'd3-scale';
 import { line } from 'd3-shape';
-import type { RocPoint } from '@/data/types';
+import type { RocPoint } from '@statadvisor/shared';
 
 export interface RocSeries {
   id: string;

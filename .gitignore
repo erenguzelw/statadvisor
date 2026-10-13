@@ -4,3 +4,9 @@ dist/
 *.tsbuildinfo
 test-results/
 playwright-report/
+tools/reference/.venv/
+tools/reference/.install.log
+__pycache__/
+*.pyc
+data/
+!packages/shared/fixtures/

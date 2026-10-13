@@ -1,5 +1,5 @@
 import { ChevronDown } from 'lucide-react';
-import type { AssumptionTest } from '@/data/types';
+import type { AssumptionTest } from '@statadvisor/shared';
 import { useApp } from '@/context/AppContext';
 import { StatusChip, StatusLine, Tag } from '@/components/ui';
 import { PValue } from './PValue';

@@ -2,7 +2,7 @@
  * Tarayıcıda çalışan küçük sınıflandırıcılar. Model karşılaştırma panelindeki ölçütler,
  * bu modellerin tohumlu (tekrarlanabilir) bir dengesiz veri setinde gerçekten eğitilmesiyle elde edilir.
  */
-import { averagePrecision, rocAuc, rocCurve } from './assumptions';
+import { averagePrecision, rocAuc, rocCurve } from './assumptions.ts';
 
 export function mulberry32(seed: number) {
   let a = seed >>> 0;

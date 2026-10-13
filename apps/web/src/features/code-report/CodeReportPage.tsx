@@ -6,10 +6,10 @@ import { Button, Checklist, CodeBlock, ConsoleOutput, CopyButton, Panel, RadioCa
 import { DecisionPath } from '@/components/domain';
 import { useApp } from '@/context/AppContext';
 import { useCodeReport } from '@/data/queries';
-import type { ReportFormat } from '@/data/types';
+import type { ReportFormat } from '@statadvisor/shared';
 import { downloadText, openHtml, toNotebook } from '@/lib/download';
-import { buildReport } from '@/lib/report';
-import { effectLabel, formatP } from '@/lib/stats';
+import { buildReport } from '@statadvisor/shared';
+import { effectLabel, formatP } from '@statadvisor/shared';
 
 const formatIcons = { html: Globe, print: FileText, word: FileType2 } as const;
 const kb = (bytes: number) => `${(bytes / 1024).toFixed(1)} KB`;

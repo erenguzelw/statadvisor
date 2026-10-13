@@ -7,8 +7,8 @@ import {
   stratifiedSplit,
   subset,
   type Evaluation,
-} from '@/lib/ml';
-import type { Interpretation, Model, ModelDataFacts, RedFlag } from '../types';
+} from '@statadvisor/shared';
+import type { Interpretation, Model, ModelDataFacts, RedFlag } from '@statadvisor/shared';
 
 /** Oturum günlüğündeki hipotez testi sayısı (örnek). Çoklu karşılaştırma uyarısı buna göre hesaplanır. */
 export const SESSION_TEST_COUNT = 14;

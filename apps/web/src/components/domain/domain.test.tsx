@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { ExpertiseToggle } from '@/components/layout/ExpertiseToggle';
 import { analysis } from '@/data/mocks/analysis';
 import { getModelReport } from '@/data/mocks/models';
-import { defaultAnswers, type WizardAnswers } from '@/lib/decision';
+import { defaultAnswers, type WizardAnswers } from '@statadvisor/shared';
 import { renderWithApp } from '@/test/render';
 import { AssumptionTestCard } from './AssumptionTestCard';
 import { DecisionWizard } from './Decision';

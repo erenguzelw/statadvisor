@@ -1,5 +1,5 @@
-import { formatP } from '@/lib/stats';
-import type { CodeSnippet, ReportFormat, ReportSection } from '../types';
+import { formatP } from '@statadvisor/shared';
+import type { CodeSnippet, ReportFormat, ReportSection } from '@statadvisor/shared';
 import { analysis } from './analysis';
 import { kruskal, median, pooled, pyList, sampleGroups } from './sample';
 
