@@ -146,6 +146,8 @@ export interface QualityOptions {
   groupColumn?: string;
   rules?: CleanRule[];
   k?: number;
+  /** Önceden hesaplanmış eksiklik tanılaması (kurallardan bağımsızdır; sunucu önbelleğe alır). */
+  missingness?: MissingnessReport;
 }
 
 const collator = new Intl.Collator('tr', { numeric: true });
@@ -347,6 +349,11 @@ function safeShapiro(values: number[]) {
   return { W: r.W, p: r.p, n: r.n };
 }
 
+/** Eksiklik tanılaması: etkin sütun türlerine göre (kategorik sütunlar ki-kare ile). */
+export function missingnessOf(columns: QualityColumn[]): MissingnessReport {
+  return analyzeMissingness(columns.map((c) => ({ name: c.name, numeric: c.numeric, categorical: kindOf(c) === 'categorical', values: c.values, skip: c.skip })));
+}
+
 export function analyzeQuality(columns: QualityColumn[], opts: QualityOptions = {}): DatasetQuality {
   const rows = columns[0]?.values.length ?? 0;
   const rules = opts.rules ?? [];
@@ -434,7 +441,7 @@ export function analyzeQuality(columns: QualityColumn[], opts: QualityOptions = 
       reviewThreshold: ROW_LOSS_REVIEW,
       confirmThreshold: ROW_LOSS_CONFIRM,
     },
-    missingness: analyzeMissingness(columns.map((c) => ({ name: c.name, numeric: c.numeric, categorical: kindOf(c) === 'categorical', values: c.values, skip: c.skip }))),
+    missingness: opts.missingness ?? missingnessOf(columns),
     focus,
   };
 }

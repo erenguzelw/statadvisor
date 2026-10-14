@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { balanceOf, correctedPairedT, gaussian, interpretComparison, mulberry32, prepareData, runCrossValidation, type MlFeature } from './index.ts';
+import { balanceOf, correctedPairedT, stratifiedKFold, gaussian, interpretComparison, mulberry32, prepareData, runCrossValidation, type MlFeature } from './index.ts';
 
 function make(n: number, classWeights: number[], seed = 3) {
   const rng = mulberry32(seed);
@@ -32,6 +32,24 @@ describe('balanceOf', () => {
     expect(balanceOf([100, 110, 105, 95], ['a', 'b', 'c', 'd']).label).toBe('dengeli');
     expect(balanceOf([100, 200, 150], ['a', 'b', 'c']).label).toBe('hafif dengesiz');
     expect(balanceOf([900, 100], ['a', 'b']).label).toBe('dengesiz');
+  });
+});
+
+describe('büyük veri', () => {
+  it('k-NN maliyet sınırını aşınca açık gerekçeyle atlanır', async () => {
+    const r = await runCrossValidation(make(300, [1, 1, 1]), { folds: 3, seed: 1, models: ['baseline', 'knn'], knnMaxOps: 1000 });
+    const knn = r.models.find((m) => m.id === 'knn')!;
+    expect(knn.skipped).toMatch(/karesiyle/);
+    expect(knn.folds).toHaveLength(0);
+    expect(interpretComparison(r).notes.some((n) => n.title === 'k-En Yakın Komşu atlandı')).toBe(true);
+  });
+
+  it('stratifiedKFold 200 bin satırda yığın taşması olmadan çalışır', () => {
+    const y = Int32Array.from({ length: 200_000 }, (_, i) => i % 3);
+    const f = stratifiedKFold(y, 5, 1);
+    const counts = [0, 0, 0, 0, 0];
+    f.forEach((v) => counts[v]!++);
+    expect(Math.max(...counts) - Math.min(...counts)).toBeLessThanOrEqual(3);
   });
 });
 

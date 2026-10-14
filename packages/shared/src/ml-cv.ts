@@ -104,6 +104,11 @@ export interface CvOptions {
   svmMaxTrain?: number;
   /** Eğitim doğruluğunun hesaplandığı en çok gözlem sayısı. */
   trainEvalMax?: number;
+  /**
+   * k-NN'in tüm katmanlardaki tahmini uzaklık hesabı sayısı (n² · (k−1)/k · p) bu sınırı aşarsa model atlanır.
+   * 3·10¹⁰ ≈ birkaç dakika; 12 özellikte yaklaşık 55 bin satıra karşılık gelir.
+   */
+  knnMaxOps?: number;
   /** Dışarıdan verilen katman numaraları (verilirse `folds` ve `seed` ile üretilen ayrım kullanılmaz). */
   foldOf?: ArrayLike<number>;
 }
@@ -205,11 +210,16 @@ function confusionOf(y: Int32Array, pred: Int32Array, K: number, rows: number[])
 }
 
 export async function runCrossValidation(data: PreparedData, opts: CvOptions = {}, hooks: CvHooks = {}): Promise<CvResult> {
-  const k = opts.foldOf ? Math.max(...Array.from(opts.foldOf)) + 1 : (opts.folds ?? 5);
+  let k = opts.folds ?? 5;
+  if (opts.foldOf) {
+    k = 0;
+    for (let i = 0; i < opts.foldOf.length; i++) if (opts.foldOf[i]! + 1 > k) k = opts.foldOf[i]! + 1;
+  }
   const seed = opts.seed ?? 42;
   const ids = opts.models ?? ALL_MODELS;
   const svmMaxTrain = opts.svmMaxTrain ?? 15000;
   const trainEvalMax = opts.trainEvalMax ?? 3000;
+  const knnMaxOps = opts.knnMaxOps ?? 3e10;
   const K = data.classes.length;
   const foldOf = opts.foldOf ? Int32Array.from(opts.foldOf) : stratifiedKFold(data.y, k, seed);
   if (foldOf.length !== data.n) throw new Error('foldOf uzunluğu gözlem sayısıyla aynı olmalı.');
@@ -217,10 +227,15 @@ export async function runCrossValidation(data: PreparedData, opts: CvOptions = {
   const classCounts = new Array<number>(K).fill(0);
   data.y.forEach((c) => classCounts[c]!++);
 
+  // k-NN maliyeti: her test gözlemi tüm eğitim gözlemlerine uzaklık hesaplar (özellik sayısı, kodlama sonrası sütun sayısıdır)
+  const pEncoded = data.features.reduce((s, f) => s + (f.kind === 'numeric' ? 1 : new Set(f.values.filter((v) => v !== null && v !== undefined).map(String)).size), 0);
+  const knnOps = data.n * data.n * ((k - 1) / k) * pEncoded;
   const results: ModelCv[] = ids.map((id) => {
     const info = MODEL_INFO[id];
     const skip =
-      id === 'svm' && Math.round((data.n * (k - 1)) / k) > svmMaxTrain
+      id === 'knn' && knnOps > knnMaxOps
+        ? `k-NN her test gözlemi için tüm eğitim gözlemlerine uzaklık hesaplar; bu veride yaklaşık ${(knnOps / 1e9).toFixed(0)} milyar işlem (birkaç dakikayı aşar). Süre gözlem sayısının karesiyle büyüdüğü için atlandı; daha küçük bir örneklemle deneyin.`
+        : id === 'svm' && Math.round((data.n * (k - 1)) / k) > svmMaxTrain
         ? `Eğitim katmanı yaklaşık ${Math.round((data.n * (k - 1)) / k).toLocaleString('tr-TR')} gözlem; destek vektör makinesinin süresi gözlem sayısının karesiyle büyür, bu yüzden ${svmMaxTrain.toLocaleString('tr-TR')} gözlemin üzerinde atlanır. Daha küçük bir örneklemle deneyin.`
         : undefined;
     return {

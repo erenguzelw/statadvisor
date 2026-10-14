@@ -1,6 +1,6 @@
 # StatAdvisor AI
 
-Akıllı hipotez testi ve model seçim danışmanı. Verinizi (Excel .xlsx ya da CSV) yükleyin; uygulama veri kalitesini denetler, doğru istatistiksel testi önerir, hesaplar, Python kodunu ve raporu (HTML, PDF, DOCX) üretir. **Her şey bu bilgisayarda çalışır; veriniz dışarı gönderilmez.**
+Akıllı hipotez testi ve model seçim danışmanı. Verinizi (Excel .xlsx ya da CSV) yükleyin; uygulama veri kalitesini denetler, doğru istatistiksel testi önerir, hesaplar; doğrusal ve lojistik regresyon kurar, sınıflandırma modellerini çapraz doğrulamayla karşılaştırır; Python kodunu ve raporu (HTML, PDF, DOCX) üretir. **Her şey bu bilgisayarda çalışır; veriniz dışarı gönderilmez.**
 
 ## Gereksinimler
 
@@ -22,12 +22,13 @@ npm run dev          # geliştirme: API 3001, arayüz http://localhost:5173
 |---|---|
 | `npm run check` | Tip denetimi + lint + tüm birim testleri |
 | `npm run e2e` | Playwright uçtan uca + erişilebilirlik testleri |
+| `STATADVISOR_SLOW=1 npm test -w @statadvisor/api` | Yavaş kabul testi dahil: bodyPerformance verisi (`STATADVISOR_BODYPERFORMANCE` ya da masaüstündeki `statadvisor/bodyPerformance.csv`) üzerinde raporun yeniden üretimi |
 | `npm run backup` | Veritabanının tutarlı yedeğini `apps/api/backups/` altına yazar |
 | `npm run reset-data` | Yedek alır, sonra tüm yerel veriyi siler (sunucu kapalıyken) |
 
 ## Mimari
 
-- `packages/shared`: istatistik motoru (testler, varsayımlar, karar kuralları), veri temizleme, kod ve rapor üretimi. SciPy/statsmodels/scikit-learn ile üretilmiş 1094 referans vakayla doğrulanır.
+- `packages/shared`: istatistik motoru (testler, varsayımlar, karar kuralları), doğrusal/lojistik regresyon, sınıflandırma modelleri ve çapraz doğrulama, veri temizleme, kod ve rapor üretimi. SciPy/statsmodels/scikit-learn ile üretilmiş 1198 referans vakayla doğrulanır (regresyonlar statsmodels ile 1e-7 içinde; lojistik, k-NN ve SVM scikit-learn ile aynı katmanlarda birebir).
 - `apps/api`: Fastify sunucusu + SQLite. Yalnızca `127.0.0.1` dinler; Host ve Origin denetimi yapar.
 - `apps/web`: React + Tailwind arayüzü (`ui/` klasöründeki tasarımlardan).
 - `docs/`: gereksinimler, uygulama planı, risk ve fırsat raporu, gizlilik notu.
@@ -49,8 +50,9 @@ npm run render   # out/statadvisor-tanitim.mp4
 
 ## Sınırlamalar
 
-- Model karşılaştırma sayfası gerçek verinize bağlı değildir; tarayıcıda eğitilen sentetik veriyle çalışır.
+- Model karşılaştırmada hiper-parametre ayarı yoktur (scikit-learn varsayılanları). Ağaç, orman ve gradyan artırma rastgelelik içerdiğinden scikit-learn'den birkaç binde ayrışabilir. SVM 15 bin eğitim gözleminin, k-NN ise yaklaşık 3·10¹⁰ uzaklık hesabının üzerinde atlanır (süre gözlem sayısının karesiyle büyür).
+- Regresyonda dayanıklı (HC) standart hata ve Firth/ceza lojistik regresyonu yoktur; bunlar gerektiğinde uyarı verilir.
 - Tukey HSD / Games-Howell yok (yerine ikili Welch + Holm); tekrarlı ölçümlü ANOVA'da Greenhouse-Geisser düzeltmesi yok.
 - R kodu üretilmez; yalnızca doğrulanabilen Python kodu üretilir.
-- DOCX raporu grafik içermez (HTML/PDF içerir).
+- Regresyon ve model karşılaştırma raporları (HTML/DOCX/PDF) grafik içermez; grafikler arayüzdedir.
 - Kaynakça künyeleri yayın öncesi doğrulanmalıdır; bağımsız bir istatistikçi incelemesi önerilir.
