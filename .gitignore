@@ -11,3 +11,4 @@ __pycache__/
 apps/api/.data/
 !packages/shared/fixtures/
 apps/api/backups/
+video/out/

@@ -32,6 +32,17 @@ npm run dev          # geliştirme: API 3001, arayüz http://localhost:5173
 - `apps/web`: React + Tailwind arayüzü (`ui/` klasöründeki tasarımlardan).
 - `docs/`: gereksinimler, uygulama planı, risk ve fırsat raporu, gizlilik notu.
 
+## Tanıtım videosu
+
+`video/` klasöründe [Remotion](https://github.com/remotion-dev/remotion) ile yazılmış 60 saniyelik tanıtım videosu vardır (ana uygulamadan bağımsız, kendi `npm install`'ı ile):
+
+```
+cd video
+npm install
+npm run studio   # tarayıcıda önizleme ve düzenleme
+npm run render   # out/statadvisor-tanitim.mp4
+```
+
 ## Veri nerede?
 
 `apps/api/.data/` (SQLite). `STATADVISOR_DATA` ile değiştirilir. Yedek ve silme için komutlara bakın. Ayrıntı: `docs/gizlilik.md`.
