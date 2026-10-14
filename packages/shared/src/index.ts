@@ -10,6 +10,8 @@ export * from './decision.ts';
 export * from './extent.ts';
 export * from './inference.ts';
 export * from './ml.ts';
+export * from './logistic.ts';
+export * from './logistic-report.ts';
 export * from './missingness.ts';
 export * from './quality.ts';
 export * from './regression.ts';

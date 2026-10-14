@@ -168,7 +168,7 @@ function invUpper(R: number[][]): number[][] {
 }
 
 /** y'yi X'e EKK ile uydurur; R², kalıntılar ve (XᵀX)⁻¹ döndürür. */
-function olsCore(X: number[][], y: number[]) {
+export function olsCore(X: number[][], y: number[]) {
   const n = X.length;
   const p = X[0]!.length;
   const { R, qty, rank } = qrDecompose(X, y);
@@ -242,6 +242,30 @@ export function buildDesign(y: (number | null)[], predictors: RegressionPredicto
   return { used, columns, y: yv, dropped: total - used.length, categories };
 }
 
+/**
+ * Varyans şişirme çarpanı: her yordayıcı terim için, sabit terim dahil diğer terimlere göre R²; VIF = 1/(1−R²).
+ * Yalnızca tasarım matrisine bağlıdır (bağımlı değişkene değil). Sonuç, sabit terim hariç terim sırasındadır.
+ */
+export function computeVifs(cols: DesignColumn[]): number[] {
+  const rows = cols[0]?.values.length ?? 0;
+  const vifs: number[] = [];
+  for (let j = 1; j < cols.length; j++) {
+    const others = cols.map((_, c) => c).filter((c) => c !== j);
+    const Xo = Array.from({ length: rows }, (_, r) => others.map((c) => cols[c]!.values[r]!));
+    const target = cols[j]!.values;
+    const f2 = olsCore(Xo, target);
+    if (!('resid' in f2) || !f2.resid) {
+      vifs.push(Infinity);
+      continue;
+    }
+    const tm = mean(target);
+    const sstj = target.reduce((s, v) => s + (v - tm) ** 2, 0);
+    const ssej = f2.resid.reduce((s, e) => s + e * e, 0);
+    vifs.push(sstj === 0 ? Infinity : 1 / (ssej / sstj));
+  }
+  return vifs;
+}
+
 export function fitLinearRegression(y: (number | null)[], predictors: RegressionPredictor[], opts: RegressionOptions = {}): RegressionResult {
   const alpha = opts.alpha ?? 0.05;
   if (predictors.length === 0) throw new AnalysisError('En az bir yordayıcı seçin.');
@@ -276,22 +300,7 @@ export function fitLinearRegression(y: (number | null)[], predictors: Regression
 
   const sdY = sdOf(design.y);
 
-  // VIF: her yordayıcı terim için, sabit terim dahil diğer terimlere göre R²; VIF = 1/(1−R²)
-  const vifs: number[] = [];
-  for (let j = 1; j < k; j++) {
-    const others = cols.map((_, c) => c).filter((c) => c !== j);
-    const Xo = design.used.map((_, r) => others.map((c) => cols[c]!.values[r]!));
-    const target = cols[j]!.values;
-    const f2 = olsCore(Xo, target);
-    if (!('resid' in f2) || !f2.resid) {
-      vifs.push(Infinity);
-      continue;
-    }
-    const tm = mean(target);
-    const sstj = target.reduce((s, v) => s + (v - tm) ** 2, 0);
-    const ssej = f2.resid.reduce((s, e) => s + e * e, 0);
-    vifs.push(sstj === 0 ? Infinity : 1 / (ssej / sstj));
-  }
+  const vifs = computeVifs(cols);
 
   const coefficients: Coefficient[] = cols.map((c, j) => {
     const se = Math.sqrt(s2 * xtxInv[j]![j]!);
