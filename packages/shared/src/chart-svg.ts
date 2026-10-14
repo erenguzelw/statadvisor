@@ -34,7 +34,7 @@ export function histogramSvg(d: DistributionSample, title: string): string {
     .join('');
   const path = curve.map((c, i) => `${i === 0 ? 'M' : 'L'}${n2(sx(c.x))} ${n2(sy(c.y))}`).join(' ');
   const ticks = [first.x0, (first.x0 + last.x1) / 2, last.x1]
-    .map((t) => `<text x="${n2(sx(t))}" y="${H - 10}" text-anchor="middle" font-size="10" fill="#555">${n2(t)}</text>`)
+    .map((t, i) => `<text x="${n2(sx(t))}" y="${H - 10}" text-anchor="${i === 2 ? 'end' : 'middle'}" font-size="10" fill="#555">${n2(t)}</text>`)
     .join('');
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${esc(title)}"><title>${esc(title)}</title><line x1="${pad.left}" y1="${n2(sy(0))}" x2="${W - pad.right}" y2="${n2(sy(0))}" stroke="#999"/>${bars}<path d="${path}" fill="none" stroke="#d98a00" stroke-width="2" stroke-dasharray="6 4"/>${ticks}<text x="${pad.left - 6}" y="${n2(sy(maxY) + 10)}" text-anchor="end" font-size="10" fill="#555">${n2(maxY)}</text></svg>`;
 }

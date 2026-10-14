@@ -68,6 +68,14 @@ export function useDeleteDataset() {
   });
 }
 
+export function useDeleteAllDatasets() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.del('/api/datasets'),
+    onSuccess: () => qc.invalidateQueries(),
+  });
+}
+
 export interface CleanBody {
   outlierColumns: string[];
   impute: 'none' | 'median' | 'knn';
