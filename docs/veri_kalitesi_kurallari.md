@@ -48,3 +48,9 @@ yeniden hesaplanır; önceki turda uç değerler çıkarıldıysa dağılım dar
 
 Bu araç taramanın verinin doğru olduğunu garanti etmediğini, eksiklik mekanizmasını (MCAR vb.) sınamadığını ve araştırmacının
 kararının yerine geçmediğini açıkça belirtir.
+
+## Geçerli kategoriler, tür onayı ve eksiklik tanılaması
+
+- **Geçerli kategoriler:** Kategorik bir sütunun gözlenen değerleri sayılarıyla listelenir (`GET /api/datasets/:id/levels?column=`); kullanıcı geçerli olanları işaretler. Sistem önceden işaretleme yapmaz; kural yalnızca kullanıcı Kaydet'e bastığında “doğrulanmış” sayılır.
+- **Tür onayı:** Dosyadan çıkarılan tür kesin değildir (kategori kodu ile sıralı ölçek dosyadan ayırt edilemez). Kullanıcı türü kaydedene kadar sütun tabloda “doğrulanmadı” rozetiyle işaretli kalır (`typeConfirmed`). Ad ipucu (cinsiyet, grup, bölüm…) taşıyan ve az sayıda tamsayı kodu içeren sütunlar kategorik sayılır; bu da onay bekler.
+- **Eksiklik tanılaması:** Her eksikli sütunun eksik-gösterge değişkeni diğer sütunlarla karşılaştırılır (sayısal: Mann–Whitney U, kategorik: ki-kare; Holm düzeltmesi, α = 0,05). Sonuç “MCAR ile uyumsuz olabilir” ya da “çelişki görülmedi, MCAR kanıtlanmadı”dır. Little'ın MCAR testi uygulanmaz.

@@ -158,14 +158,18 @@ export function parseCsv(buffer: Buffer, limits: CsvLimits): ParsedCsv {
     const filled = values.filter((v) => v !== null);
     const uniqueSet = new Set(filled.map(String));
     const allInt = isNum && filled.every((v) => Number.isInteger(v));
-    const type: ColumnType = rankLabels ? 'ordinal' : numeric ? (allInt && uniqueSet.size <= 7 ? 'ordinal' : 'continuous') : 'categorical';
+    // Ad ipucu (cinsiyet, grup, kod…): az sayıda tamsayı kodu taşıyan bu sütunlar sıra değil kategori numarasıdır.
+    const nameHintsCategory = /(cinsiyet|gender|sex|grup|group|medeni|bölüm|bolum|sınıf|sinif|meslek|şehir|sehir|kategori|category)/i.test(name);
+    const codedCategory = numeric && allInt && !prefixCoded && nameHintsCategory && uniqueSet.size >= 2 && uniqueSet.size <= 12;
+    const type: ColumnType = rankLabels ? 'ordinal' : codedCategory ? 'categorical' : numeric ? (allInt && uniqueSet.size <= 7 ? 'ordinal' : 'continuous') : 'categorical';
     const sortedInts = numeric && allInt ? (filled as number[]) : [];
     const sequential = sortedInts.length > 1 && sortedInts.every((v, i) => i === 0 || v === sortedInts[i - 1]! + 1);
     const idName = /(^|[_\s-])(id|kimlik|no|index|sıra|sira)$/i.test(name);
     const isId = numeric && allInt && uniqueSet.size === filled.length && (idName || sequential);
     // Tamsayı kodlu sütunlar sürekli ölçüm olmayabilir (kategori numarası, madde kodu). Tür çıkarımı kesin değildir;
     // kullanıcıdan doğrulaması istenir ve Veri Kalitesi sayfasından türü düzeltilebilir.
-    if (numeric && allInt && !isId && !prefixCoded) {
+    if (codedCategory && !isId) warnings.push('Sütun adı bir kategoriye işaret ediyor ve değerler az sayıda tamsayı; kategorik koda benzediği için kategorik sayıldı. Türü doğrulayın.');
+    else if (numeric && allInt && !isId && !prefixCoded) {
       if (type === 'ordinal') warnings.push('Tamsayı kodlu ve az sayıda değer içeriyor; sıralı sayıldı. Kategori numarası (ör. 1 = Kadın, 2 = Erkek) ise türü kategorik yapın.');
       else if (uniqueSet.size <= 20) warnings.push('Tamsayı kodlu ve sınırlı sayıda farklı değer içeriyor; sürekli ölçüm değil sayısal kod olabilir. Türü doğrulayın.');
     }

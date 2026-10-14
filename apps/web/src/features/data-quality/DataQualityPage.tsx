@@ -23,7 +23,7 @@ import { BoxPlotGroup, HistogramWithNormal } from '@/components/charts';
 import { DataPreview } from '@/components/domain';
 import { useActiveDataset, useApp } from '@/context/AppContext';
 import type { ColumnInfo, ColumnType, DatasetInfo, DatasetOperations } from '@/data/api';
-import { useCleanDataset, useCleaningCode, useDataset, useQuality, useUpdateProfile, type ProfileEntry } from '@/data/hooks';
+import { useCleanDataset, useCleaningCode, useDataset, useLevels, useQuality, useUpdateProfile, type ProfileEntry } from '@/data/hooks';
 import { columnTypeLabel, groupColumns, numericColumns } from '@/lib/variables';
 
 const nf = new Intl.NumberFormat('tr-TR');
@@ -89,6 +89,7 @@ function validityText(c: ColQ): string {
 }
 
 function ProfileEditor({
+  datasetId,
   info,
   qcol,
   allCols,
@@ -97,6 +98,7 @@ function ProfileEditor({
   onSave,
   onClose,
 }: {
+  datasetId: string;
   info: ColumnInfo;
   qcol: ColQ | undefined;
   allCols: ColumnInfo[];
@@ -108,16 +110,27 @@ function ProfileEditor({
   const [type, setType] = useState<ColumnType>(info.type);
   const [min, setMin] = useState(info.profile?.validRange ? String(info.profile.validRange.min) : '');
   const [max, setMax] = useState(info.profile?.validRange ? String(info.profile.validRange.max) : '');
-  const [cats, setCats] = useState((info.profile?.validCategories ?? []).join('\n'));
+  const [chosen, setChosen] = useState<Set<string>>(() => new Set(info.profile?.validCategories ?? []));
+  const levelsQ = useLevels(datasetId, type === 'categorical' ? info.name : null);
   const categorical = type === 'categorical';
   const rangeGiven = min.trim() !== '' || max.trim() !== '';
   const rangeOk = !rangeGiven || (min.trim() !== '' && max.trim() !== '' && Number.isFinite(Number(min)) && Number.isFinite(Number(max)) && Number(min) <= Number(max));
-  const categories = cats.split('\n').map((s) => s.trim()).filter(Boolean);
+  const categories = [...chosen];
+  const levels = levelsQ.data?.levels ?? [];
+  const shown = [...levels, ...categories.filter((v) => !levels.some((l) => l.value === v)).map((value) => ({ value, count: 0 }))];
+  const toggle = (v: string) =>
+    setChosen((prev) => {
+      const n = new Set(prev);
+      if (n.has(v)) n.delete(v);
+      else n.add(v);
+      return n;
+    });
 
   const entryFor = (c: ColumnInfo): ProfileEntry | null => {
     if (c.name === info.name) return null;
     const e: ProfileEntry = {};
     if (c.typeOverridden) e.type = c.type;
+    if (c.typeConfirmed) e.typeConfirmed = true;
     if (c.profile?.validRange) e.validRange = c.profile.validRange;
     if (c.profile?.validCategories) e.validCategories = c.profile.validCategories;
     return Object.keys(e).length ? e : {};
@@ -128,7 +141,7 @@ function ProfileEditor({
       const e = entryFor(c);
       if (e && Object.keys(e).length) columns[c.name] = e;
     }
-    const mine: ProfileEntry = { type: type === (info.inferredType ?? info.type) ? null : type };
+    const mine: ProfileEntry = { type: type === (info.inferredType ?? info.type) ? null : type, typeConfirmed: true };
     if (!clearValidity) {
       if (!categorical && rangeGiven) mine.validRange = { min: Number(min), max: Number(max) };
       if (categorical && categories.length) mine.validCategories = categories;
@@ -181,11 +194,39 @@ function ProfileEditor({
           </div>
         )}
         {categorical && (
-          <label className="flex flex-col gap-1.5 text-caption font-medium text-fg-subtle">
-            Geçerli kategoriler (her satıra bir tane)
-            <textarea className={`${inputClass} h-28 py-2`} value={cats} onChange={(e) => setCats(e.target.value)} placeholder={info.numeric ? '1\n2' : 'Kadın\nErkek'} />
-            <span className="font-normal text-fg-subtle">Örnek değerler: {info.examples.join(', ') || '–'}. Boş bırakırsanız tanımlı kategoriler dışı değer aranmaz.</span>
-          </label>
+          <fieldset className="flex flex-col gap-2 text-caption text-fg-subtle">
+            <legend className="mb-1 font-medium">Geçerli kategoriler: gözlenen değerler ve sayıları</legend>
+            <p>Sistem öneri yapmaz; hangi değerlerin geçerli olduğunu siz işaretlersiniz. Hiçbirini işaretlemezseniz bu sütunda geçersiz hücre aranmaz. Kural yalnızca Kaydet’e basınca doğrulanmış sayılır.</p>
+            {levelsQ.isLoading && <p>Değerler yükleniyor…</p>}
+            {levelsQ.isError && <StatusLine status="danger" className="text-caption">Değerler yüklenemedi.</StatusLine>}
+            {levelsQ.data?.truncated && <p>{nf.format(levelsQ.data.total)} farklı değer var; ilk {nf.format(levels.length)} değer gösteriliyor. Bu sütun kategorik olmayabilir.</p>}
+            {shown.length > 0 && (
+              <>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button size="sm" variant="ghost" onClick={() => setChosen(new Set(shown.map((l) => l.value)))}>
+                    Tümünü işaretle
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setChosen(new Set())}>
+                    İşaretleri kaldır
+                  </Button>
+                  <span>
+                    {chosen.size} / {shown.length} değer işaretli
+                  </span>
+                </div>
+                <ul className="grid max-h-64 grid-cols-1 gap-1 overflow-y-auto rounded-card border border-line/30 p-2 sm:grid-cols-2">
+                  {shown.map((l) => (
+                    <li key={l.value}>
+                      <label className="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 text-body text-fg hover:bg-surface-low">
+                        <input type="checkbox" className="accent-[var(--color-primary-strong)]" checked={chosen.has(l.value)} onChange={() => toggle(l.value)} />
+                        <span className="font-mono">{l.value}</span>
+                        <span className="text-caption text-fg-subtle">{l.count ? `${nf.format(l.count)} gözlem` : 'veride yok'}</span>
+                      </label>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </fieldset>
         )}
       </div>
       {!rangeOk && <StatusLine status="danger" className="mt-3 text-caption">Aralık için iki sayı girin; en küçük değer en büyük değerden büyük olamaz.</StatusLine>}
@@ -378,8 +419,9 @@ function Quality({ dataset, created, onCreated }: { dataset: DatasetInfo; create
                       <span className="font-mono text-data text-fg">{c.name}</span>
                       <Tag>{KIND_LABEL[c.kind]}</Tag>
                       {info?.typeOverridden && <Tag tone="primary">tür düzeltildi</Tag>}
+                      {info && !info.typeConfirmed && !c.skipped && !c.score && <Tag tone="tertiary">tür doğrulanmadı</Tag>}
                     </span>
-                    {uncertain && !info?.typeOverridden && <span className="text-caption text-tertiary">Sayısal kod olabilir; türü doğrulayın.</span>}
+                    {uncertain && !info?.typeConfirmed && <span className="text-caption text-tertiary">Sayısal kod olabilir; türü doğrulayın.</span>}
                   </span>
                 );
               },
@@ -444,7 +486,24 @@ function Quality({ dataset, created, onCreated }: { dataset: DatasetInfo; create
           const profileColumns: Column<ColQ>[] = [
             { key: 'name', header: 'Sütun', cell: (c) => <span className="font-mono text-data text-fg">{c.name}</span> },
             { key: 'inf', header: 'Çıkarılan tür', cell: (c) => { const i = colInfo.get(c.name); return i ? columnTypeLabel[i.inferredType ?? i.type] : ''; } },
-            { key: 'eff', header: 'Etkin tür', cell: (c) => KIND_LABEL[c.kind] },
+            {
+              key: 'eff',
+              header: 'Etkin tür',
+              cell: (c) => {
+                const i = colInfo.get(c.name);
+                const unconfirmed = !c.skipped && !c.score && i && !i.typeConfirmed;
+                return (
+                  <span className="inline-flex flex-wrap items-center gap-1.5">
+                    {KIND_LABEL[c.kind]}
+                    {unconfirmed && (
+                      <span title="Tür dosyadan çıkarıldı; siz onaylamadınız. Düzenle ile türü doğrulayıp kaydedin.">
+                        <Tag>doğrulanmadı</Tag>
+                      </span>
+                    )}
+                  </span>
+                );
+              },
+            },
             { key: 'val', header: 'Geçerlilik kuralı', cell: (c) => <span className={c.validity === 'unconfirmed' ? 'text-fg-subtle' : 'text-fg'}>{validityText(c)}</span> },
             {
               key: 'edit',
@@ -507,7 +566,7 @@ function Quality({ dataset, created, onCreated }: { dataset: DatasetInfo; create
                   Tukey 1.5×IQR, {tukeyCols} sürekli sütunda. Hata olduğu varsayılmaz.
                 </MetricTile>
                 <MetricTile label="Eksik değer" value={q.missingCells} tone={q.missingCells ? 'tertiary' : 'secondary'} icon={HelpCircle}>
-                  Eksiklik mekanizması test edilmedi (MCAR doğrulanmadı).
+                  {q.missingness.incompatible > 0 ? `${q.missingness.incompatible} sütunda eksiklik başka değişkenlerle ilişkili: MCAR ile uyumsuz olabilir.` : 'MCAR kanıtlanmadı; aşağıdaki tanılamaya bakın.'}
                 </MetricTile>
               </div>
 
@@ -537,6 +596,7 @@ function Quality({ dataset, created, onCreated }: { dataset: DatasetInfo; create
                 {edited && (
                   <ProfileEditor
                     key={edited.name}
+                    datasetId={dataset.id}
                     info={edited}
                     qcol={q.columns.find((c) => c.name === edited.name)}
                     allCols={cols}
@@ -547,6 +607,43 @@ function Quality({ dataset, created, onCreated }: { dataset: DatasetInfo; create
                   />
                 )}
               </Panel>
+
+              {q.missingness.columns.length > 0 && (
+                <Panel className="mt-6">
+                  <SectionHeader
+                    icon={HelpCircle}
+                    title="Eksiklik tanılaması"
+                    level={3}
+                    description="Eksik olma durumu diğer değişkenlerle ilişkili mi? Bu, MCAR (tamamen rastgele eksiklik) kanıtı değildir; yalnızca MCAR ile çelişen bir ilişki aranır. Testler Holm yöntemiyle birlikte düzeltilir (α = 0,05)."
+                  />
+                  <ul className="flex flex-col gap-2">
+                    {q.missingness.columns.map((m) => (
+                      <li key={m.column} className="rounded-card border border-line/30 bg-surface-lowest p-3">
+                        <p className="flex flex-wrap items-center gap-2 text-body text-fg">
+                          <span className="font-mono font-semibold">{m.column}</span>
+                          <span className="text-caption text-fg-subtle">{nf.format(m.missing)} eksik</span>
+                          {m.verdict === 'incompatible' && <Tag tone="tertiary">MCAR ile uyumsuz olabilir</Tag>}
+                          {m.verdict === 'noContradiction' && <Tag>çelişki görülmedi · MCAR kanıtlanmadı</Tag>}
+                          {m.verdict === 'insufficient' && <Tag>sınanamadı</Tag>}
+                        </p>
+                        {m.verdict === 'incompatible' && (
+                          <ul className="mt-1 list-disc pl-5 text-caption text-fg-muted">
+                            {m.associations.slice(0, 5).map((a) => (
+                              <li key={a.other}>
+                                <span className="font-mono">{a.other}</span> ile ilişkili ({a.test}, düzeltilmiş {formatP(a.pAdjusted)}, etki ≈ {a.effect.toFixed(2)}). Eksik olanlar ile olmayanlar bu değişkende farklı dağılıyor.
+                              </li>
+                            ))}
+                            {m.associations.length > 5 && <li>… ve {m.associations.length - 5} ilişki daha.</li>}
+                          </ul>
+                        )}
+                        {m.verdict === 'noContradiction' && <p className="mt-1 text-caption text-fg-muted">{m.tests} karşılaştırma MCAR ile çelişmedi. Bu, eksikliğin rastgele olduğunu göstermez (güç sınırlı olabilir; gözlenmeyen nedenler sınanamaz).</p>}
+                        {m.note && <p className="mt-1 text-caption text-fg-muted">{m.note}</p>}
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="mt-3 text-caption text-fg-subtle">Little'ın MCAR testi uygulanmadı: EM tahmini gerektirir ve ilişkisel tanılamadan fazla bilgi vermez. Eksiklik başka değişkenlerle ilişkiliyse silme ya da medyan doldurma yanlılık yaratabilir; KNN gibi koşullu yöntemleri veya çoklu atamayı düşünün.</p>
+                </Panel>
+              )}
 
               <Panel tone="warning" className="mt-6">
                 <SectionHeader icon={Wrench} title="Eksik veri doldurma" description={`${nf.format(q.missingCells)} eksik hücre`} level={3} />

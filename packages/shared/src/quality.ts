@@ -13,6 +13,7 @@ import { AnalysisError, shapiroSubsample } from './analysis.ts';
 import { mean, median, shapiroWilk, tukeyFences } from './assumptions.ts';
 import { extent } from './extent.ts';
 import { histogram, skewness } from './stats.ts';
+import { analyzeMissingness, type MissingnessReport } from './missingness.ts';
 import type { BoxStats, HistogramBin } from './types.ts';
 
 export type ColumnKind = 'continuous' | 'ordinal' | 'categorical';
@@ -135,6 +136,8 @@ export interface DatasetQuality {
   extremeCells: number;
   missingCells: number;
   plan: CleanPlanSummary;
+  /** Eksik olma durumunun diğer sütunlarla ilişkisi (MCAR kanıtı değil). */
+  missingness: MissingnessReport;
   focus?: QualityFocus;
 }
 
@@ -431,6 +434,7 @@ export function analyzeQuality(columns: QualityColumn[], opts: QualityOptions = 
       reviewThreshold: ROW_LOSS_REVIEW,
       confirmThreshold: ROW_LOSS_CONFIRM,
     },
+    missingness: analyzeMissingness(columns.map((c) => ({ name: c.name, numeric: c.numeric, categorical: kindOf(c) === 'categorical', values: c.values, skip: c.skip }))),
     focus,
   };
 }

@@ -373,6 +373,22 @@ export function buildApp(opts: AppOptions): FastifyInstance {
     return datasetJson(db.prepare('SELECT * FROM datasets WHERE id = ?').get(id) as unknown as DatasetRow);
   });
 
+  /** Bir sütunun gözlenen değerleri ve sayıları: kullanıcı geçerli kategorileri bu listeden işaretler (öneri değil, seçenek listesi). */
+  app.get('/api/datasets/:id/levels', async (req) => {
+    const { id } = req.params as { id: string };
+    const { column } = z.object({ column: z.string().min(1).max(200) }).parse(req.query);
+    const { csv } = parsed(id);
+    const c = csv.columns.find((x) => x.name === column);
+    if (!c) throw new ApiError(422, 'unknown_column', `“${column}” adlı sütun bulunamadı.`);
+    const counts = new Map<string, number>();
+    for (const v of c.values) if (v !== null && v !== undefined) counts.set(String(v), (counts.get(String(v)) ?? 0) + 1);
+    const limit = 200;
+    const levels = [...counts.entries()]
+      .map(([value, count]) => ({ value, count }))
+      .sort((a, b) => (c.numeric ? Number(a.value) - Number(b.value) : b.count - a.count || a.value.localeCompare(b.value, 'tr')));
+    return { column, total: levels.length, truncated: levels.length > limit, levels: levels.slice(0, limit) };
+  });
+
   /** Ölçek puanları: araştırmacının tanımladığı alt boyutlardan yeni sütunlar ekleyen yeni bir veri sürümü üretir. */
   const ScaleBody = z.object({
     scales: z
