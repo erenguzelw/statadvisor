@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="tr">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Regresyon Yol Haritası</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&display=swap&subset=latin-ext">
+<style>
+:root {
+  --bg: #f7f8fc; --surface: #ffffff; --line: #d9dcea; --fg: #141a2e; --muted: #535a75;
+  --gap: #b91c1c; --gap-bg: #fde8e8;
+  --s1: #4338ca; --s1-bg: #eceafe;
+  --s2: #0e7490; --s2-bg: #e0f5fa;
+  --s3: #b45309; --s3-bg: #fff4e0;
+  --s4: #047857; --s4-bg: #dcf5ea;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.5 Inter, system-ui, sans-serif; }
+#page { width: 1600px; padding: 48px 56px 56px; display: grid; gap: 24px; }
+h1, h2, h3 { font-family: 'Space Grotesk', system-ui, sans-serif; margin: 0; line-height: 1.15; }
+h1 { font-size: 40px; letter-spacing: -0.02em; }
+h2 { font-size: 22px; display: flex; align-items: center; gap: 12px; }
+h3 { font-size: 18px; }
+p { margin: 0; }
+.sub { color: var(--muted); font-size: 18px; max-width: 1250px; }
+.badge { font-family: Inter, sans-serif; font-size: 13px; font-weight: 600; padding: 3px 12px; border-radius: 999px; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 22px 24px; display: grid; gap: 14px; }
+.panel.gap { border-top: 5px solid var(--gap); } .panel.gap .badge { background: var(--gap-bg); color: var(--gap); }
+.gaps { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 32px; margin: 0; padding: 0; list-style: none; }
+.gaps li { display: grid; grid-template-columns: 22px 1fr; font-size: 15px; }
+.gaps li::before { content: "✕"; color: var(--gap); font-weight: 700; }
+.gaps b { display: block; } .gaps span { color: var(--muted); }
+
+.road { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; position: relative; }
+.st { border-radius: 14px; border: 2px solid; padding: 18px 20px; display: grid; gap: 10px; align-content: start; background: var(--surface); }
+.st .top { display: flex; align-items: baseline; justify-content: space-between; }
+.st .n { font-family: 'Space Grotesk', sans-serif; font-size: 30px; font-weight: 700; line-height: 1; }
+.st .tok { font-size: 12.5px; font-weight: 600; padding: 2px 10px; border-radius: 999px; }
+.st ul { margin: 0; padding-left: 18px; font-size: 14.5px; color: var(--muted); display: grid; gap: 3px; }
+.st .acc { font-size: 13.5px; border-top: 1px dashed var(--line); padding-top: 8px; }
+.st .acc b { color: var(--fg); }
+.st1 { border-color: var(--s1); background: var(--s1-bg); } .st1 .n { color: var(--s1); } .st1 .tok { background: #fff; color: var(--s1); }
+.st2 { border-color: var(--s2); background: var(--s2-bg); } .st2 .n { color: var(--s2); } .st2 .tok { background: #fff; color: var(--s2); }
+.st3 { border-color: var(--s3); background: var(--s3-bg); } .st3 .n { color: var(--s3); } .st3 .tok { background: #fff; color: var(--s3); }
+.st4 { border-color: var(--s4); background: var(--s4-bg); } .st4 .n { color: var(--s4); } .st4 .tok { background: #fff; color: var(--s4); }
+.fix { font-size: 12.5px; font-weight: 600; color: var(--gap); }
+
+.rules { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.rule { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px 20px; display: grid; gap: 6px; }
+.rule p { font-size: 14.5px; color: var(--muted); }
+.bottom { background: var(--fg); color: #fff; border-radius: 16px; padding: 22px 26px; display: grid; grid-template-columns: 1fr auto; gap: 24px; align-items: center; }
+.bottom .k { font-size: 13px; color: #b9bdd4; font-weight: 600; letter-spacing: .03em; }
+.bottom p { font-family: 'Space Grotesk', sans-serif; font-size: 21px; line-height: 1.4; }
+.bottom .tot { text-align: right; }
+.bottom .tot b { font-family: 'Space Grotesk', sans-serif; font-size: 30px; display: block; }
+</style>
+
+<div id="page">
+  <header style="display:grid;gap:8px">
+    <h1>Yol haritası: regresyon ve gerçek veride model karşılaştırması</h1>
+    <p class="sub">Kaynak: bodyPerformance.csv (13.393 satır, 4 sınıf) ile “Makine Öğrenmesi ile Fiziksel Performans Sınıflandırması” raporunun karşılaştırması · 14 Ekim 2026. Raporun sayıları scikit-learn ile birebir doğrulandı; ancak StatAdvisor bu analizi kendisi yapamadı. Aşağıda: görülen eksikler ve bunları kapatan dört aşama.</p>
+  </header>
+
+  <section class="panel gap">
+    <h2>bodyPerformance analizinde görülen eksikler <span class="badge">8 eksik</span></h2>
+    <ul class="gaps">
+      <li><div><b>E1 · Model karşılaştırma yalnızca sentetik veride</b><span>Yüklenen veriyle model eğitilemiyor; “Tahmin” amacı seçilince sabit bir örneğe gidiyor.</span></div></li>
+      <li><div><b>E2 · Yalnızca ikili sınıf</b><span>A / B / C / D gibi çok sınıflı hedef desteklenmiyor.</span></div></li>
+      <li><div><b>E3 · Rapordaki modeller katalogda yok</b><span>Karar ağacı, k-NN ve SVM eksik; yalnızca lojistik, rastgele orman, gradyan artırma var.</span></div></li>
+      <li><div><b>E4 · Tek bölünme, çapraz doğrulama yok</b><span>%69,91 tek bir rastgele bölünmeye dayanıyor; ortalama ± SS verilemiyor.</span></div></li>
+      <li><div><b>E5 · Aşırı uyum otomatik yakalanmıyor</b><span>Karar ağacı eğitimde %100, testte %66; bu fark kırmızı bayrak olmalı.</span></div></li>
+      <li><div><b>E6 · Çok sınıflı ölçütler yok</b><span>Karışıklık matrisi, sınıf bazında kesinlik/duyarlılık/F1, makro F1, bire-karşı-hepsi ROC.</span></div></li>
+      <li><div><b>E7 · Ön işleme hattı yok</b><span>Kategorik kodlama ve standartlaştırma her katmanda yalnızca eğitim verisine uydurulmalı (veri sızıntısı).</span></div></li>
+      <li><div><b>E8 · Yorum denetimi yok</b><span>Sınıflar dengeliyken “dengesizlik” yorumu; korelasyonun yönü ve en güçlü ilişki yanlış verilmiş.</span></div></li>
+    </ul>
+  </section>
+
+  <section style="display:grid;gap:14px">
+    <h2>Aşamalar <span style="font-family:Inter;font-size:15px;font-weight:400;color:var(--muted)">her aşama ayrı oturum · testler geçince commit</span></h2>
+    <div class="road">
+      <div class="st st1">
+        <div class="top"><span class="n">1</span><span class="tok">≈ 1–1,5 M token</span></div>
+        <h3>Doğrusal regresyon (gerçek veri)</h3>
+        <ul>
+          <li>EKK; katsayılar, SH, t, p, %95 GA, standart β</li>
+          <li>R², düzeltilmiş R², model F testi</li>
+          <li>Kategorik yordayıcılar için kukla kodlama</li>
+          <li>VIF ile çoklu doğrusallık</li>
+          <li>Kalıntı tanıları: normallik, Breusch-Pagan, Cook uzaklığı</li>
+          <li>APA metni, Python kodu, DOCX/PDF</li>
+        </ul>
+        <p class="acc"><b>Kabul:</b> statsmodels OLS ile tüm değerler 1e-6 içinde.</p>
+      </div>
+      <div class="st st2">
+        <div class="top"><span class="n">2</span><span class="tok">≈ 1–1,5 M token</span></div>
+        <h3>Lojistik regresyon</h3>
+        <ul>
+          <li>İkili hedef; olasılık oranı (OR) ve %95 GA</li>
+          <li>McFadden / Nagelkerke pseudo-R²</li>
+          <li>Hosmer-Lemeshow, sınıflandırma tablosu, ROC-AUC</li>
+          <li>Tam ayrışma uyarısı</li>
+          <li>Olay / değişken oranı (EPV &lt; 10) uyarısı</li>
+          <li>“Test seçimi” ile “model seçimi” ayrı akışlar</li>
+        </ul>
+        <p class="acc"><b>Kabul:</b> statsmodels Logit ile katsayı ve p değerleri eşleşir.</p>
+      </div>
+      <div class="st st3">
+        <div class="top"><span class="n">3</span><span class="tok">≈ 1,5–2 M token</span></div>
+        <h3>Gerçek veride model karşılaştırma</h3>
+        <ul>
+          <li>Yüklenen veriden hedef ve özellik seçimi <span class="fix">E1</span></li>
+          <li>Çok sınıflı hedef (multinom lojistik) <span class="fix">E2</span></li>
+          <li>Karar ağacı, k-NN, SVM eklenir <span class="fix">E3</span></li>
+          <li>Tabakalı k-katlı çapraz doğrulama <span class="fix">E4</span></li>
+          <li>Kodlama + ölçekleme her katmanın içinde <span class="fix">E7</span></li>
+        </ul>
+        <p class="acc"><b>Kabul:</b> aynı katman indeksleriyle scikit-learn doğruluğundan en çok ±1 puan sapma.</p>
+      </div>
+      <div class="st st4">
+        <div class="top"><span class="n">4</span><span class="tok">≈ 0,5–1 M token</span></div>
+        <h3>Yorum, uyarı ve rapor</h3>
+        <ul>
+          <li>Eğitim–test farkı ≥ 10 puan → aşırı uyum bayrağı <span class="fix">E5</span></li>
+          <li>Karışıklık matrisi, sınıf bazında rapor, makro F1, bire-karşı-hepsi ROC <span class="fix">E6</span></li>
+          <li>Sınıf dengesi ölçülür; dengeli veride “dengesizlik” yorumu üretilmez <span class="fix">E8</span></li>
+          <li>Korelasyonun yönü ve sıralaması metne otomatik yazılır <span class="fix">E8</span></li>
+          <li>scikit-learn kodu üretimi ve çalıştırılarak doğrulama</li>
+        </ul>
+        <p class="acc"><b>Kabul:</b> bodyPerformance raporu StatAdvisor'da baştan sona yeniden üretilir.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="rules">
+    <div class="rule"><h3>Tek hesap motoru</h3><p>Tüm hesaplar TypeScript'te; Python yalnızca doğrulamada. Her yeni yöntem statsmodels / scikit-learn karşılaştırma testiyle gelir.</p></div>
+    <div class="rule"><h3>Birebir sayı beklenmez</h3><p>JS ve scikit-learn'ün rastgele bölünmeleri farklıdır. Karşılaştırma, aynı katman indeksleri dışarıdan verilerek yapılır.</p></div>
+    <div class="rule"><h3>Sıra bilinçli</h3><p>Regresyon tez öğrencilerinin en sık analizi ve en büyük işlevsel eksik; model karşılaştırma onun altyapısını (kodlama, ölçekleme, tanılar) kullanır.</p></div>
+  </section>
+
+  <div class="bottom">
+    <div><span class="k">ÖNERİ</span><p>1. aşama ile yeni bir oturumda başlayın: “regresyon aşamasına başlayalım”. Her aşama sonunda testler, commit ve kısa bir değerlendirme.</p></div>
+    <div class="tot"><span class="k">TOPLAM TAHMİN</span><b>≈ 4–6 M token</b><span class="k">4 oturum</span></div>
+  </div>
+</div>
+</html>
