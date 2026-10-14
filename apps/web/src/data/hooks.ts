@@ -13,6 +13,7 @@ import {
   type ColumnType,
   type DatasetDetail,
   type DatasetInfo,
+  type LevelsResponse,
   type QualityResponse,
   type SampleInfo,
   type SavedAnalysisListItem,
@@ -89,6 +90,7 @@ export interface CleanBody {
 
 export interface ProfileEntry {
   type?: ColumnType | null;
+  typeConfirmed?: boolean | null;
   validRange?: { min: number; max: number } | null;
   validCategories?: string[] | null;
 }
@@ -231,6 +233,16 @@ export function useQuality(datasetId: string | null, p: QualityParams) {
     enabled: Boolean(datasetId),
     retry: shouldRetry,
     placeholderData: keepPreviousData,
+  });
+}
+
+/** Bir sütunun gözlenen değerleri ve sayıları (geçerli kategori seçimi için). */
+export function useLevels(datasetId: string | null, column: string | null) {
+  return useQuery({
+    queryKey: ['levels', datasetId, column] as const,
+    queryFn: () => api.get<LevelsResponse>(`/api/datasets/${datasetId}/levels${qs({ column: column ?? undefined })}`),
+    enabled: Boolean(datasetId && column),
+    retry: shouldRetry,
   });
 }
 

@@ -9,6 +9,8 @@ import type { ColumnType, ParsedColumn, ParsedCsv } from './csv.ts';
 
 export interface ColumnProfile {
   type?: ColumnType;
+  /** Kullanıcı sütun türünü kaydederek onayladı (dosyadan çıkarılan tür kesin sayılmaz). */
+  typeConfirmed?: boolean;
   validRange?: { min: number; max: number };
   validCategories?: string[];
 }
@@ -21,6 +23,7 @@ export const ProfileBody = z.object({
     name,
     z.object({
       type: z.enum(['continuous', 'ordinal', 'categorical']).nullish(),
+      typeConfirmed: z.boolean().nullish(),
       validRange: z
         .object({ min: z.number().finite(), max: z.number().finite() })
         .refine((r) => r.min <= r.max, { message: 'En küçük değer en büyük değerden büyük olamaz.' })
@@ -53,6 +56,7 @@ export function buildProfile(body: z.infer<typeof ProfileBody>, csv: ParsedCsv):
     const effective: ColumnType = type ?? c.type;
     const entry: ColumnProfile = {};
     if (type && type !== c.type) entry.type = type;
+    if (p.typeConfirmed) entry.typeConfirmed = true;
     if (p.validRange) {
       if (!c.numeric || effective === 'categorical') throw new AnalysisError(`“${colName}” için sayısal aralık tanımlanamaz; kategorik sütunlarda geçerli kategorileri listeleyin.`);
       entry.validRange = { min: p.validRange.min, max: p.validRange.max };
@@ -133,6 +137,7 @@ export function describeColumns(columnsJson: string, row: { profile_json: string
       inferredType: c.type,
       type: p.type ?? (scale ? ('continuous' as const) : c.type),
       typeOverridden: p.type !== undefined,
+      typeConfirmed: p.typeConfirmed === true,
       score: Boolean(scale),
       profile: { validRange: p.validRange ?? null, validCategories: p.validCategories ?? null },
       scaleRange: scale && !p.validRange ? scaleRange(scale) : null,

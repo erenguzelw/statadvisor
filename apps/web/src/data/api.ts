@@ -73,6 +73,8 @@ export interface ColumnInfo {
   /** Dosyadan çıkarılan tür; `type` kullanıcının düzeltmesini de içerir. */
   inferredType?: ColumnType;
   typeOverridden?: boolean;
+  /** Kullanıcı sütun türünü kaydederek onayladı; onaylanmadıysa tür yalnızca dosyadan çıkarılmıştır. */
+  typeConfirmed?: boolean;
   /** Ölçek toplam/ortalama puanı (tek bir madde değil). */
   score?: boolean;
   /** Kullanıcının doğruladığı geçerlilik kuralları. */
@@ -167,4 +169,11 @@ export interface SavedAnalysisListItem {
 }
 
 export type CodeResponse = GeneratedCode;
+export interface LevelsResponse {
+  column: string;
+  total: number;
+  truncated: boolean;
+  levels: { value: string; count: number }[];
+}
+
 export type QualityResponse = DatasetQuality;
