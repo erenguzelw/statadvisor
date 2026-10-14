@@ -63,7 +63,9 @@ export function prepareData(target: (number | string | null)[], features: MlFeat
  * katmanda sınıf oranları (en çok bir gözlem farkla) korunur. Dönen dizi her gözlemin katman numarasıdır (0…k−1).
  */
 export function stratifiedKFold(y: Int32Array, k: number, seed: number): Int32Array {
-  const K = Math.max(...y) + 1;
+  // Math.max(...y) çok uzun dizilerde (≈ 125 bin+) yığın taşmasına yol açar; döngüyle bulunur
+  let K = 0;
+  for (let i = 0; i < y.length; i++) if (y[i]! + 1 > K) K = y[i]! + 1;
   const counts = new Array<number>(K).fill(0);
   y.forEach((c) => counts[c]!++);
   const minClass = Math.min(...counts);

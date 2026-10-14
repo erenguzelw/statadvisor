@@ -104,6 +104,23 @@ describe('veri kalitesi: güvenli varsayılanlar ve türe göre kontrol', () => 
     expect((await quality(ds.id)).columns.find((c: { name: string }) => c.name === 'kod').tukeyApplied).toBe(true);
   });
 
+  it('eksiklik tanılaması önbelleğe alınır ama sütun türü değişince yeniden hesaplanır', async () => {
+    // y, kod = 2 olan satırlarda sık eksik: eksiklik kod ile ilişkili
+    const lines = ['kod,x,y'];
+    for (let i = 0; i < 200; i++) {
+      const kod = 1 + (i % 2);
+      lines.push(`${kod},${(i * 7) % 13},${kod === 2 && i % 4 !== 1 ? '' : (i * 3) % 11}`);
+    }
+    const ds = await upload(lines.join('\n') + '\n');
+    const testOf = (q: { missingness: { columns: { column: string; associations: { other: string; test: string }[] }[] } }) =>
+      q.missingness.columns.find((c) => c.column === 'y')!.associations.find((a) => a.other === 'kod')?.test;
+    const a = await quality(ds.id);
+    expect(testOf(a)).toBe('Mann–Whitney U'); // kod başlangıçta sıralı sayılır
+    expect(testOf(await quality(ds.id, { value: 'x' }))).toBe('Mann–Whitney U'); // aynı profil: önbellekten, aynı sonuç
+    expect((await put(ds.id, { kod: { type: 'categorical', typeConfirmed: true } })).statusCode).toBe(200);
+    expect(testOf(await quality(ds.id))).toBe('ki-kare'); // tür değişti: yeniden hesaplandı
+  });
+
   it('profil veri setine özgüdür: başka veri setine ve yeni veriye taşınmaz', async () => {
     const a = await upload(survey({ nine: true }), 'a.csv');
     const b = await upload(survey(), 'b.csv');

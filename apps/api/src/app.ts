@@ -9,6 +9,8 @@ import {
   ALL_MODELS,
   analyze,
   analyzeQuality,
+  missingnessOf,
+  type MissingnessReport,
   AnalysisError,
   buildRegressionReport,
   buildReport,
@@ -230,6 +232,7 @@ export function buildApp(opts: AppOptions): FastifyInstance {
   const removeFile = (hash: string) => (memory ? void memFiles.delete(hash) : rmSync(join(filesDir, `${hash}.csv`), { force: true }));
 
   const cache = new Map<string, ParsedCsv>();
+  const missingnessCache = new Map<string, MissingnessReport>();
   /** Önbelleğe ekler; en fazla 6 veri seti tutulur (yükleme yolu dahil). */
   const remember = (id: string, csv: ParsedCsv) => {
     cache.delete(id);
@@ -572,7 +575,16 @@ export function buildApp(opts: AppOptions): FastifyInstance {
     const known = new Set(csv.columns.map((c) => c.name));
     const rules = parseRules(q);
     for (const n of [q.value, q.group, ...rules.map((r) => r.column)]) if (n && !known.has(n)) throw new ApiError(422, 'unknown_column', `“${n}” adlı sütun bulunamadı.`);
-    return analyzeQuality(effectiveColumns(row, csv), { valueColumn: q.value, groupColumn: q.group, rules });
+    const cols = effectiveColumns(row, csv);
+    // Eksiklik tanılaması kurallara bağlı değildir ve büyük veride pahalıdır: veri seti + profil başına bir kez hesaplanır.
+    const key = `${row.id}\u0000${row.profile_json ?? ''}\u0000${row.operations_json ?? ''}`;
+    let missingness = missingnessCache.get(key);
+    if (!missingness) {
+      missingness = missingnessOf(cols);
+      missingnessCache.set(key, missingness);
+      if (missingnessCache.size > 12) missingnessCache.delete(missingnessCache.keys().next().value!);
+    }
+    return analyzeQuality(cols, { valueColumn: q.value, groupColumn: q.group, rules, missingness });
   });
 
   /* ---------- Analizler ---------- */
