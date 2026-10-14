@@ -368,7 +368,9 @@ export function analyze(req: AnalysisRequest): AnalysisResult {
     input.kind === 'groups' ? input.groups.flat().length : input.kind === 'paired' ? input.conditions[0]!.length : input.kind === 'xy' ? input.x.length : input.table.flat().reduce((s, v) => s + v, 0);
   const minGroupN =
     input.kind === 'groups' ? Math.min(...input.groups.map((g) => g.length)) : input.kind === 'paired' ? input.conditions[0]!.length : nTotal;
-  const assumptionInput: AssumptionInput = { normalP, varianceP, alpha, n: nTotal, minGroupN, normality };
+  const shapes = assumptions.flatMap((t) => (t.shape ? [Math.abs(t.shape.skewness), Math.abs(t.shape.kurtosis)] : []));
+  const maxShape = shapes.length ? Math.max(...shapes) : undefined;
+  const assumptionInput: AssumptionInput = { normalP, varianceP, alpha, n: nTotal, minGroupN, normality, maxShape };
   const rec = recommendTest(answers, assumptionInput);
 
   let outcome: TestOutcome;
@@ -397,6 +399,9 @@ export function analyze(req: AnalysisRequest): AnalysisResult {
       finalTest: outcome.test,
       rerouteReason: rec.rerouteReason,
       warnings: rec.warnings,
+      alternatives: rec.alternatives,
+      checks: rec.checks,
+      borderline: rec.borderline,
     },
     assumptions,
     assumptionInput,

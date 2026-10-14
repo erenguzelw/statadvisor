@@ -80,6 +80,25 @@ export interface AssumptionInput {
   minGroupN: number;
   /** Normallik ölçütü (varsayılan Shapiro-Wilk). */
   normality?: 'shapiro' | 'skewkurt-1.5' | 'skewkurt-2';
+  /** Çarpıklık-basıklık ölçütünde en büyük |çarpıklık| ya da |basıklık| (sınırda uyarısı için). */
+  maxShape?: number;
+  /** false ise normallik/varyans veriden ölçülmemiştir (varsayılan değerler); koşul rozetleri "bilinmiyor" olur. */
+  measured?: boolean;
+}
+
+/** Seçilen teste yakın, belirli koşullarda düşünülebilecek bir yöntem. */
+export interface Alternative {
+  test: string;
+  when: string;
+}
+
+/** Bir koşulun nasıl bilindiği: veriden ölçüldü, kullanıcı beyan etti ya da bilinmiyor. */
+export type CheckStatus = 'verified' | 'declared' | 'unknown';
+
+export interface ConditionCheck {
+  label: string;
+  status: CheckStatus;
+  detail: string;
 }
 
 export interface Recommendation {
@@ -94,6 +113,12 @@ export interface Recommendation {
   supportedByExample: boolean;
   /** Karar ağacında izlenen koşullar. */
   conditions: string[];
+  /** Seçilen teste alternatifler ve hangi koşulda düşünülebilecekleri. */
+  alternatives: Alternative[];
+  /** Kararı etkileyen koşulların kaynağı (doğrulandı / beyan / bilinmiyor). */
+  checks: ConditionCheck[];
+  /** Normallik kararı eşiğe çok yakın: iki yolun da raporlanması önerilir. */
+  borderline: boolean;
 }
 
 const goalLabel: Record<Goal, string> = { compare: 'Amaç: Karşılaştırma', relate: 'Amaç: İlişki', predict: 'Amaç: Tahmin' };
@@ -116,7 +141,7 @@ export function recommendTest(answers: WizardAnswers, a: AssumptionInput): Recom
   if (answers.goal === 'predict') {
     planned = final = 'Sınıflandırma / regresyon modeli karşılaştırması';
     warnings.push('Tahminde varsayım testleri yerine çapraz doğrulama ve dengesiz veriye uygun ölçütler (F1, PR-AUC) kullanılır; Model Karşılaştırma sayfasına bakın.');
-    return { plannedTest: planned, finalTest: final, warnings, supportedByExample: false, conditions };
+    return { plannedTest: planned, finalTest: final, warnings, supportedByExample: false, conditions, alternatives: [], checks: [], borderline: false };
   }
 
   if (answers.goal === 'relate') {
@@ -131,8 +156,21 @@ export function recommendTest(answers: WizardAnswers, a: AssumptionInput): Recom
       final = normal ? 'Pearson korelasyonu' : 'Spearman sıra korelasyonu';
       if (!normal) reroute = 'Normallik varsayımı sağlanmadı';
     }
-    warnings.push(...general(a, normal, equalVar, false, answers.target === 'continuous'));
-    return { plannedTest: planned, finalTest: final, rerouteReason: reroute, warnings, supportedByExample: false, conditions };
+    const continuous = answers.target === 'continuous';
+    const border = continuous && isBorderline(a, alpha);
+    if (border) warnings.unshift(borderlineWarning(normal ? 'Spearman sıra korelasyonu' : 'Pearson korelasyonu'));
+    warnings.push(...general(a, normal, equalVar, false, continuous));
+    return {
+      plannedTest: planned,
+      finalTest: final,
+      rerouteReason: reroute,
+      warnings,
+      supportedByExample: false,
+      conditions,
+      alternatives: alternativesFor(final),
+      checks: checksFor(answers, a, normal, equalVar, false),
+      borderline: border,
+    };
   }
 
   // Karşılaştırma
@@ -174,10 +212,112 @@ export function recommendTest(answers: WizardAnswers, a: AssumptionInput): Recom
         : 'Yayılımlar farklı olduğundan sonuç medyan karşılaştırması olarak yorumlanamaz; yalnızca stokastik üstünlük olarak okunmalıdır.',
     );
   }
-  warnings.push(...general(a, normal, equalVar, true, answers.target === 'continuous'));
+  const continuous = answers.target === 'continuous';
+  const border = continuous && isBorderline(a, alpha);
+  if (border) {
+    // Normallik kararı tersine dönseydi seçilecek test
+    const other = paired
+      ? two ? (normal ? 'Wilcoxon işaretli sıra testi' : 'Eşleştirilmiş t-testi') : normal ? 'Friedman testi' : 'Tekrarlı ölçümler ANOVA'
+      : two ? (normal ? 'Mann-Whitney U testi' : 'Welch t-testi') : normal ? 'Kruskal-Wallis H testi' : 'Welch ANOVA';
+    warnings.unshift(borderlineWarning(other));
+  }
+  warnings.push(...general(a, normal, equalVar, true, continuous));
 
-  const supported = answers.groups === '3+' && !paired && answers.target === 'continuous';
-  return { plannedTest: planned, finalTest: final, rerouteReason: reroute, warnings, supportedByExample: supported, conditions };
+  const supported = answers.groups === '3+' && !paired && continuous;
+  return {
+    plannedTest: planned,
+    finalTest: final,
+    rerouteReason: reroute,
+    warnings,
+    supportedByExample: supported,
+    conditions,
+    alternatives: alternativesFor(final),
+    checks: checksFor(answers, a, normal, equalVar, !paired),
+    borderline: border,
+  };
+}
+
+/** Shapiro-Wilk p değeri α/2 ile 2α arasında ya da çarpıklık/basıklık sınırın ±%20'sinde ise normallik kararı kırılgandır. */
+export function isBorderline(a: AssumptionInput, alpha: number): boolean {
+  if (a.measured === false) return false;
+  const method = a.normality ?? 'shapiro';
+  if (method === 'shapiro') return a.normalP >= alpha / 2 && a.normalP < alpha * 2;
+  if (a.maxShape === undefined) return false;
+  const limit = method === 'skewkurt-2' ? 2 : 1.5;
+  return Math.abs(a.maxShape - limit) <= limit * 0.2;
+}
+
+function borderlineWarning(other: string): string {
+  return `Normallik kararı sınırda: küçük bir veri değişikliği seçimi tersine çevirebilir. Sonucun sağlamlığını göstermek için ${other} sonucunu da raporlamanız önerilir.`;
+}
+
+const ALTERNATIVES: Record<string, Alternative[]> = {
+  'Welch t-testi': [
+    { test: 'Bağımsız örneklem t-testi (Student)', when: 'Varyansların eşit olduğuna dair güçlü önsel bilgi varsa; aksi halde Welch kayıpsızdır.' },
+    { test: 'Mann-Whitney U testi', when: 'Dağılım belirgin çarpık ya da uç değerli ise; sonuç stokastik üstünlük olarak okunur.' },
+  ],
+  'Welch ANOVA': [
+    { test: 'Tek Yönlü ANOVA', when: 'Varyansların eşit olduğuna dair güçlü önsel bilgi varsa.' },
+    { test: 'Kruskal-Wallis H testi', when: 'Dağılım belirgin çarpık ya da uç değerli ise.' },
+  ],
+  'Mann-Whitney U testi': [
+    { test: 'Welch t-testi', when: 'Gruplar büyükse (her biri ≳ 30) ortalama farkı merkezi limit teoremiyle sağlam biçimde sınanabilir.' },
+    { test: 'Permütasyon / bootstrap testi', when: 'Ortalama farkını varsayımsız sınamak istiyorsanız.' },
+  ],
+  'Kruskal-Wallis H testi': [
+    { test: 'Welch ANOVA', when: 'Gruplar büyükse (her biri ≳ 30) ortalamalar sağlam biçimde karşılaştırılabilir.' },
+    { test: 'Permütasyon ANOVA', when: 'Ortalamaları varsayımsız karşılaştırmak istiyorsanız.' },
+  ],
+  'Eşleştirilmiş t-testi': [{ test: 'Wilcoxon işaretli sıra testi', when: 'Farklar belirgin çarpık ya da uç değerli ise.' }],
+  'Wilcoxon işaretli sıra testi': [
+    { test: 'Eşleştirilmiş t-testi', when: 'Denek sayısı büyükse (≳ 30) ortalama fark sağlam biçimde sınanabilir.' },
+    { test: 'İşaret testi', when: 'Farkların dağılımı simetrik değilse.' },
+  ],
+  'Tekrarlı ölçümler ANOVA': [
+    { test: 'Friedman testi', when: 'Kalıntılar belirgin çarpık ya da uç değerli ise.' },
+    { test: 'Doğrusal karma model', when: 'Eksik ölçümler varsa ya da küresellik varsayımı bozuksa.' },
+  ],
+  'Friedman testi': [{ test: 'Tekrarlı ölçümler ANOVA', when: 'Kalıntılar yaklaşık normalse; daha güçlüdür.' }],
+  'Pearson korelasyonu': [{ test: 'Spearman sıra korelasyonu', when: 'İlişki monoton ama doğrusal değilse ya da uç değer varsa.' }],
+  'Spearman sıra korelasyonu': [
+    { test: 'Pearson korelasyonu', when: 'Saçılım grafiği doğrusal ve uç değersizse.' },
+    { test: 'Kendall tau', when: 'Örneklem küçükse ya da çok sayıda bağ (eşit değer) varsa.' },
+  ],
+  'Ki-kare homojenlik testi': [{ test: 'Fisher kesin testi', when: 'Beklenen hücre sayılarından biri 5’ten küçükse.' }],
+  'Ki-kare bağımsızlık testi': [{ test: 'Fisher kesin testi', when: 'Beklenen hücre sayılarından biri 5’ten küçükse.' }],
+  'Fisher kesin testi': [{ test: 'Ki-kare testi', when: 'Tüm beklenen hücre sayıları 5 ve üzerindeyse.' }],
+};
+
+export function alternativesFor(test: string): Alternative[] {
+  return ALTERNATIVES[test] ?? [];
+}
+
+function checksFor(answers: WizardAnswers, a: AssumptionInput, normal: boolean, equalVar: boolean, usesVariance: boolean): ConditionCheck[] {
+  const measured = a.measured !== false;
+  const out: ConditionCheck[] = [];
+  if (answers.goal === 'compare') {
+    out.push(
+      answers.design === 'unknown'
+        ? { label: 'Bağımsızlık', status: 'unknown', detail: 'Doğrulanmadı; öneri bağımsızlık varsayar.' }
+        : { label: answers.design === 'paired' ? 'Eşleşmiş tasarım' : 'Bağımsızlık', status: 'declared', detail: 'Kullanıcı beyanı; veriden sınanamaz.' },
+    );
+  }
+  out.push({ label: 'Ölçek türü', status: 'declared', detail: 'Hedef değişkenin türü kullanıcı tarafından seçildi.' });
+  if (answers.target === 'continuous') {
+    out.push(
+      measured
+        ? { label: 'Normallik', status: 'verified', detail: normal ? 'Veriden ölçüldü: sapma saptanmadı.' : 'Veriden ölçüldü: varsayım reddedildi.' }
+        : { label: 'Normallik', status: 'unknown', detail: 'Veri yüklenmedi; ölçülemedi.' },
+    );
+    if (usesVariance) {
+      out.push(
+        measured
+          ? { label: 'Varyans eşitliği', status: 'verified', detail: equalVar ? 'Veriden ölçüldü: fark saptanmadı.' : 'Veriden ölçüldü: varyanslar farklı.' }
+          : { label: 'Varyans eşitliği', status: 'unknown', detail: 'Veri yüklenmedi; ölçülemedi.' },
+      );
+    }
+  }
+  return out;
 }
 
 function general(a: AssumptionInput, normal: boolean, equalVar: boolean, usesVariance: boolean, checksNormality: boolean): string[] {

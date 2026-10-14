@@ -67,6 +67,7 @@ export function buildReport(d: ReportData): string {
     : '<p class="muted">Bu test türü için ayrı bir varsayım testi uygulanmadı.</p>';
   const chart = d.distribution ? `<figure><figcaption class="muted">Kalıntıların histogramı ve kuramsal normal eğri (n = ${d.distribution.n}, çarpıklık = ${d.distribution.skewness})</figcaption>${histogramSvg(d.distribution, 'Kalıntıların histogramı ve kuramsal normal eğri')}</figure>` : '';
   const warnings = d.decision.warnings.map((w) => `<p class="warn">${esc(w)}</p>`).join('');
+  const alts = d.decision.alternatives?.length ? `<p>Alternatif yöntemler:</p><ul>${d.decision.alternatives.map((a) => `<li><strong>${esc(a.test)}</strong>: ${esc(a.when)}</li>`).join('')}</ul>` : '';
   const notes = d.notes.length ? `<ul>${d.notes.map((n) => `<li>${esc(n)}</li>`).join('')}</ul>` : '';
   const audit = d.audit ? `<section data-section="audit"><h2>Denetim izi</h2>${table(['Öğe', 'Değer'], d.audit)}</section>` : '';
 
@@ -74,7 +75,7 @@ export function buildReport(d: ReportData): string {
 <p class="muted">${esc(d.datasetName)} · ${esc(d.date)} · StatAdvisor AI</p>
 <section data-section="desc"><h2>Tanımlayıcı istatistikler</h2>${desc}${notes}</section>
 <section data-section="assump"><h2>Varsayım testleri ve karar notları</h2>${assump}${chart}
-<p>Önerilen test: <strong>${esc(d.decision.finalTest)}</strong>${d.decision.rerouteReason ? ` (${esc(d.decision.rerouteReason)})` : ''}.</p>${warnings}</section>
+<p>Önerilen test: <strong>${esc(d.decision.finalTest)}</strong>${d.decision.rerouteReason ? ` (${esc(d.decision.rerouteReason)})` : ''}.</p>${warnings}${alts}</section>
 <section data-section="result"><h2>Test sonucu</h2><p>${esc(d.resultLine)}</p></section>
 <section data-section="apa"><h2>APA 7 stilinde özet</h2><p>${esc(d.apaSummary)}</p></section>
 <section data-section="refs"><h2>Kaynakça</h2>${d.references.length ? `<ul>${d.references.map((r) => `<li>${esc(r)}</li>`).join('')}</ul>` : '<p class="muted">Kaynak yok.</p>'}</section>
