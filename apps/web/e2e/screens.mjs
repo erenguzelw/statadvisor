@@ -8,7 +8,7 @@ import { chromium } from '@playwright/test';
 const out = process.argv[2] ?? 'screens';
 const width = Number(process.argv[3] ?? 1440);
 const base = 'http://127.0.0.1:4173';
-const routes = ['veri', 'karar-sihirbazi', 'model-karsilastirma', 'veri/kalite', 'kod-rapor'];
+const routes = ['veri', 'karar-sihirbazi', 'regresyon', 'model-karsilastirma', 'veri/kalite', 'kod-rapor'];
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width, height: 900 } });
 page.on('console', (m) => m.type() === 'error' && console.log('console error:', m.text()));
