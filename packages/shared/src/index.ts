@@ -16,6 +16,7 @@ export * from './missingness.ts';
 export * from './ml-prep.ts';
 export * from './ml-models.ts';
 export * from './ml-cv.ts';
+export * from './ml-code.ts';
 export * from './quality.ts';
 export * from './regression.ts';
 export * from './regression-report.ts';

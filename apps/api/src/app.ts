@@ -6,6 +6,7 @@ import fastifyStatic from '@fastify/static';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import {
+  ALL_MODELS,
   analyze,
   analyzeQuality,
   AnalysisError,
@@ -26,6 +27,12 @@ import {
   screenResponses,
   type ScaleDef,
   fitLinearRegression,
+  generateModelCompareCode,
+  prepareData,
+  runCrossValidation,
+  stratifiedKFold,
+  type CvResult,
+  type ModelCompareSpec,
   fitLogisticRegression,
   generateLogisticCode,
   hosmerLemeshowRows,
@@ -916,6 +923,117 @@ export function buildApp(opts: AppOptions): FastifyInstance {
     reply.header('Content-Type', 'application/pdf');
     reply.header('Content-Disposition', 'attachment; filename="lojistik-regresyon-raporu.pdf"');
     return renderPdf(html);
+  });
+
+  /* ---------- Gerçek veride model karşılaştırma (arka plan işi) ---------- */
+  const ModelRunBody = z.object({
+    target: colName,
+    numeric: z.array(colName).max(200).default([]),
+    categorical: z.array(colName).max(100).default([]),
+    models: z.array(z.enum(ALL_MODELS as [string, ...string[]])).min(1).max(ALL_MODELS.length).default(['baseline', 'logistic', 'tree', 'knn', 'rf', 'gb']),
+    folds: z.number().int().min(2).max(10).default(5),
+    seed: z.number().int().min(0).max(2_147_483_647).default(42),
+  });
+
+  interface ModelJob {
+    id: string;
+    datasetId: string;
+    status: 'running' | 'done' | 'error';
+    progress: { done: number; total: number; model: string; fold: number };
+    startedAt: number;
+    finishedAt?: number;
+    spec: ModelCompareSpec;
+    result?: CvResult;
+    error?: string;
+  }
+  const modelJobs = new Map<string, ModelJob>();
+  const MAX_FEATURE_LEVELS = 30;
+
+  function startModelRun(id: string, rawBody: unknown): ModelJob {
+    const body = ModelRunBody.parse(rawBody ?? {});
+    const { row, csv } = parsed(id);
+    const col = (name: string) => {
+      const c = csv.columns.find((x) => x.name === name);
+      if (!c) throw new ApiError(422, 'unknown_column', `“${name}” adlı sütun bulunamadı.`);
+      return c;
+    };
+    const target = col(body.target);
+    const all = [...body.numeric, ...body.categorical];
+    if (all.length === 0) throw new ApiError(422, 'no_features', 'En az bir özellik seçin.');
+    if (new Set(all).size !== all.length) throw new ApiError(422, 'duplicate_feature', 'Bir değişken birden fazla kez seçilmiş.');
+    if (all.includes(target.name)) throw new ApiError(422, 'target_in_features', 'Hedef değişken aynı zamanda özellik olamaz.');
+    for (const n of body.numeric) if (!col(n).numeric) throw new ApiError(422, 'bad_feature', `“${n}” sayısal değil; kategorik özellik olarak ekleyin.`);
+    for (const n of all) if (col(n).likelyId) throw new ApiError(422, 'id_feature', `“${n}” kimlik sütunu gibi görünüyor; özellik olamaz (modelin ezberlemesine yol açar).`);
+    for (const n of body.categorical) {
+      if (col(n).unique > MAX_FEATURE_LEVELS) throw new ApiError(422, 'too_many_levels', `“${n}” kategorik özellik olarak ${col(n).unique} düzey içeriyor (en fazla ${MAX_FEATURE_LEVELS}).`);
+    }
+    if (target.likelyId) throw new ApiError(422, 'id_target', `“${target.name}” kimlik sütunu gibi görünüyor; hedef olamaz.`);
+    if (target.numeric && target.unique > 20) throw new ApiError(422, 'continuous_target', `Hedef “${target.name}” ${target.unique} farklı sayısal değer içeriyor; bu sürekli bir ölçüm. Sınıflandırma için en fazla 20 sınıf desteklenir; sürekli hedef için Doğrusal Regresyon sayfasını kullanın.`);
+    if ([...modelJobs.values()].some((j) => j.status === 'running')) throw new ApiError(409, 'busy', 'Zaten çalışan bir model karşılaştırması var; bitmesini bekleyin.');
+
+    const data = prepareData(target.values, [
+      ...body.numeric.map((n) => ({ name: n, kind: 'numeric' as const, values: col(n).values })),
+      ...body.categorical.map((n) => ({ name: n, kind: 'categorical' as const, values: col(n).values })),
+    ]);
+    stratifiedKFold(data.y, body.folds, body.seed); // yetersiz sınıf büyüklüğünü iş başlamadan açık hatayla bildirir
+    const spec: ModelCompareSpec = {
+      target: target.name,
+      numeric: body.numeric,
+      categorical: body.categorical,
+      numericCategorical: body.categorical.filter((n) => col(n).numeric),
+      targetNumeric: target.numeric,
+      folds: body.folds,
+      seed: body.seed,
+      models: body.models as ModelCompareSpec['models'],
+    };
+    const job: ModelJob = { id: randomUUID(), datasetId: row.id, status: 'running', progress: { done: 0, total: 0, model: '', fold: 0 }, startedAt: Date.now(), spec };
+    modelJobs.set(job.id, job);
+    // en çok 20 iş bellekte tutulur
+    while (modelJobs.size > 20) modelJobs.delete(modelJobs.keys().next().value!);
+    void runCrossValidation(data, { folds: body.folds, seed: body.seed, models: spec.models }, {
+      progress: (pr) => {
+        job.progress = pr;
+      },
+      yield: () => new Promise<void>((resolve) => setImmediate(resolve)),
+    })
+      .then((result) => {
+        job.result = result;
+        job.status = 'done';
+      })
+      .catch((e: unknown) => {
+        job.status = 'error';
+        job.error = e instanceof Error ? e.message : 'Model karşılaştırması başarısız oldu.';
+      })
+      .finally(() => {
+        job.finishedAt = Date.now();
+      });
+    return job;
+  }
+
+  const jobJson = (j: ModelJob) => {
+    // katman numaraları büyük olabilir; arayüze gönderilmez (kod betiği bunları yeniden üretir)
+    const result = j.result ? { ...j.result, foldOf: undefined } : undefined;
+    return { id: j.id, datasetId: j.datasetId, status: j.status, progress: j.progress, elapsedSeconds: ((j.finishedAt ?? Date.now()) - j.startedAt) / 1000, spec: j.spec, result, error: j.error };
+  };
+
+  app.post('/api/datasets/:id/model-runs', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    return reply.status(202).send(jobJson(startModelRun(id, req.body)));
+  });
+
+  const getModelJob = (id: string) => {
+    const j = modelJobs.get(id);
+    if (!j) throw new ApiError(404, 'not_found', 'Bu model karşılaştırması bulunamadı (sunucu yeniden başlatılmış ya da çok eski olabilir).');
+    return j;
+  };
+
+  app.get('/api/model-runs/:id', async (req) => jobJson(getModelJob((req.params as { id: string }).id)));
+
+  app.get('/api/model-runs/:id/code', async (req) => {
+    const j = getModelJob((req.params as { id: string }).id);
+    if (!j.result) throw new ApiError(409, 'not_ready', 'Model karşılaştırması henüz bitmedi.');
+    const { row, csv } = parsed(j.datasetId);
+    return generateModelCompareCode(fileInfo(row, csv), j.spec, j.result);
   });
 
   /** Analizin Python karşılığı; betik, beklenen çıktıyla birebir aynı satırları yazdırır. */
