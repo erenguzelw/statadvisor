@@ -17,10 +17,20 @@ export interface Classifier {
   predict(X: Matrix): Int32Array;
   /** Sınıf olasılıkları (n × K, satır öncelikli); SVM gibi olasılık üretmeyen modellerde yoktur. */
   proba?(X: Matrix): Float64Array;
+  /**
+   * Sınıf sıralama skorları (n × K): ROC eğrisi/AUC için. Olasılık veren modellerde olasılıkların kendisidir;
+   * SVM'de scikit-learn'ün `decision_function` (ovr) çıktısıdır (olasılık değildir, yalnızca sıralama bilgisi taşır).
+   */
+  scores?(X: Matrix): Float64Array;
+}
+
+/** ROC/AUC için skorlar: önce `scores`, yoksa `proba`; ikisi de yoksa undefined. */
+export function rankScores(model: Classifier, X: Matrix): Float64Array | undefined {
+  return model.scores ? model.scores(X) : model.proba ? model.proba(X) : undefined;
 }
 export type Fit = (X: Matrix, y: Int32Array, K: number) => Classifier;
 
-const argmaxRows = (P: Float64Array, n: number, K: number): Int32Array => {
+export const argmaxRows = (P: Float64Array, n: number, K: number): Int32Array => {
   const out = new Int32Array(n);
   for (let i = 0; i < n; i++) {
     let best = 0;
@@ -655,33 +665,68 @@ export function fitSvm(X: Matrix, y: Int32Array, K: number, opts: SvmOptions = {
       pairs.push({ a, b, model: trainBinarySvm(X, rows, sign, gamma, C, opts.cacheBytes ?? 200 * 1024 * 1024) });
     }
   }
-  const predict = (T: Matrix): Int32Array => {
-    const out = new Int32Array(T.n);
-    const votes = new Int32Array(K);
+  let memoFor: Matrix | undefined;
+  let memoDec: Float64Array | undefined;
+  /** Her test satırı için her çiftin karar değeri (n × çift sayısı); işaret > 0 ise çiftin ilk sınıfı. */
+  const decisions = (T: Matrix): Float64Array => {
+    if (memoFor === T && memoDec) return memoDec;
+    const out = new Float64Array(T.n * pairs.length);
     const { p, data } = X;
     for (let i = 0; i < T.n; i++) {
-      votes.fill(0);
       const off = i * p;
-      for (const { a, b, model } of pairs) {
+      pairs.forEach(({ model }, q) => {
         let s = -model.rho;
-        for (let q = 0; q < model.sv.length; q++) {
-          const so = model.sv[q]! * p;
+        for (let t = 0; t < model.sv.length; t++) {
+          const so = model.sv[t]! * p;
           let d = 0;
           for (let j = 0; j < p; j++) {
             const diff = T.data[off + j]! - data[so + j]!;
             d += diff * diff;
           }
-          s += model.coef[q]! * Math.exp(-gamma * d);
+          s += model.coef[t]! * Math.exp(-gamma * d);
         }
-        votes[s > 0 ? a : b]!++;
-      }
+        out[i * pairs.length + q] = s;
+      });
+    }
+    memoFor = T;
+    memoDec = out;
+    return out;
+  };
+  const predict = (T: Matrix): Int32Array => {
+    const dec = decisions(T);
+    const out = new Int32Array(T.n);
+    const votes = new Int32Array(K);
+    for (let i = 0; i < T.n; i++) {
+      votes.fill(0);
+      pairs.forEach(({ a, b }, q) => {
+        votes[dec[i * pairs.length + q]! > 0 ? a : b]!++;
+      });
       let best = 0;
       for (let c = 1; c < K; c++) if (votes[c]! > votes[best]!) best = c;
       out[i] = best;
     }
     return out;
   };
-  return { predict };
+  /** scikit-learn `decision_function_shape="ovr"`: oylar + dönüştürülmüş güven toplamları. */
+  const scores = (T: Matrix): Float64Array => {
+    const dec = decisions(T);
+    const out = new Float64Array(T.n * K);
+    const conf = new Float64Array(K);
+    const votes = new Float64Array(K);
+    for (let i = 0; i < T.n; i++) {
+      conf.fill(0);
+      votes.fill(0);
+      pairs.forEach(({ a, b }, q) => {
+        const d = dec[i * pairs.length + q]!;
+        conf[a]! += d;
+        conf[b]! -= d;
+        votes[d < 0 ? b : a]!++;
+      });
+      for (let c = 0; c < K; c++) out[i * K + c] = votes[c]! + conf[c]! / (3 * (Math.abs(conf[c]!) + 1));
+    }
+    return out;
+  };
+  return { predict, scores };
 }
 
 /* ------------------------------------------------------------------ */

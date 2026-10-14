@@ -114,6 +114,36 @@ describe('model karşılaştırma işi', () => {
     await finish(a.json().id);
   }, 120_000);
 
+  it('yorum, ilişki, AUC ve rapor üretir', async () => {
+    const job = await finish((await start({ ...body, models: ['baseline', 'logistic', 'tree'] })).json().id);
+    expect(job.status, job.error).toBe('done');
+    const ip = job.interpretation;
+    expect(ip.balance.label).toBe('dengeli');
+    expect(ip.notes.some((n: { title: string }) => n.title === 'Sınıflar dengeli')).toBe(true);
+    expect(ip.notes.some((n: { title: string }) => n.title.startsWith('Aşırı uyum'))).toBe(true);
+    expect(ip.best.id).toBeTruthy();
+    expect(ip.correlations.length).toBeGreaterThan(0);
+    const lr = job.result.models.find((m: { id: string }) => m.id === 'logistic');
+    expect(lr.auc.mean).toBeGreaterThan(0.5);
+    expect(lr.aucPerClass).toHaveLength(3);
+    expect(lr.roc).toHaveLength(3);
+    expect(job.result.associations.pairs.length).toBeGreaterThan(0);
+
+    const html = await app.inject({ url: `/api/model-runs/${job.id}/report?format=html` });
+    expect(html.statusCode).toBe(200);
+    for (const t of ['Model karşılaştırma raporu', 'Karışıklık matrisi', 'Yorum ve uyarılar', 'Denetim izi', 'Değişkenler arası ilişkiler']) expect(html.body).toContain(t);
+    const docx = await app.inject({ url: `/api/model-runs/${job.id}/report?format=docx` });
+    expect(docx.statusCode).toBe(200);
+    expect(docx.rawPayload.subarray(0, 2).toString()).toBe('PK');
+  }, 120_000);
+
+  it('bitmemiş işin raporu 409 döndürür', async () => {
+    const a = await start(body);
+    const r = await app.inject({ url: `/api/model-runs/${a.json().id}/report` });
+    expect(r.statusCode).toBe(409);
+    await finish(a.json().id);
+  }, 120_000);
+
   it('bilinmeyen iş 404 döndürür', async () => {
     expect((await app.inject({ url: '/api/model-runs/yok' })).statusCode).toBe(404);
   });
@@ -129,8 +159,8 @@ describe('model karşılaştırma işi', () => {
     writeFileSync(join(work, code.filename), code.code);
     const out = execFileSync(PY, [code.filename], { cwd: work, encoding: 'utf8', env: { ...process.env, PYTHONIOENCODING: 'utf-8' }, timeout: 300_000 });
     const parse = (line: string) => {
-      const m = /^(\w+): dogruluk = ([\d.]+) \(SS ([\d.]+)\) makro F1 = ([\d.]+)/.exec(line)!;
-      return { id: m[1]!, acc: Number(m[2]), f1: Number(m[4]) };
+      const m = /^(\w+): dogruluk = ([\d.]+) \(SS ([\d.]+)\) makro F1 = ([\d.]+) \(SS [\d.]+\) AUC = ([\d.]+)/.exec(line)!;
+      return { id: m[1]!, acc: Number(m[2]), f1: Number(m[4]), auc: Number(m[5]) };
     };
     const got = out.trim().split(/\r?\n/).map(parse);
     const exp = (code.expectedOutput as string[]).map(parse);
@@ -140,6 +170,7 @@ describe('model karşılaştırma işi', () => {
       const tol = exact.has(g.id) ? 0.0006 : 0.03;
       expect(Math.abs(g.acc - exp[i]!.acc), `${g.id} doğruluk`).toBeLessThanOrEqual(tol);
       expect(Math.abs(g.f1 - exp[i]!.f1), `${g.id} makro F1`).toBeLessThanOrEqual(exact.has(g.id) ? 0.0006 : 0.04);
+      expect(Math.abs(g.auc - exp[i]!.auc), `${g.id} AUC`).toBeLessThanOrEqual(exact.has(g.id) ? 0.0006 : 0.03);
     });
   }
 

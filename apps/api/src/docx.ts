@@ -1,5 +1,5 @@
 import { AlignmentType, Document, HeadingLevel, ImageRun, Packer, Paragraph, Table, TableCell, TableRow, TextRun, WidthType } from 'docx';
-import { crosstabRows, LINEAR_COEFFICIENT_NOTE, type RegressionReportData, descriptiveTables, formatP, reportFigures, type ReportData, type ReportFigure } from '@statadvisor/shared';
+import { crosstabRows, LINEAR_COEFFICIENT_NOTE, type ReportDoc, type RegressionReportData, descriptiveTables, formatP, reportFigures, type ReportData, type ReportFigure } from '@statadvisor/shared';
 import { svgToPng } from './raster.ts';
 
 const para = (text: string, opts: { bold?: boolean; italics?: boolean; size?: number; spacingAfter?: number } = {}) =>
@@ -111,6 +111,38 @@ export async function buildRegressionDocx(d: RegressionReportData): Promise<Buff
   ];
   if (d.audit) children.push(heading('Denetim izi'), table(['Öğe', 'Değer'], d.audit));
   children.push(para('Bu rapor bir karar destek aracı tarafından üretilmiştir; yöntem seçiminin ve yorumun sorumluluğu araştırmacıya aittir.', { italics: true, size: 18 }));
+  const doc = new Document({ creator: 'StatAdvisor AI', title: d.title, styles: { default: { document: { run: { font: 'Calibri', size: 22 } } } }, sections: [{ children }] });
+  return Buffer.from(await Packer.toBuffer(doc));
+}
+
+/** Blok tabanlı genel rapor belgesinden Word dosyası üretir. */
+export async function buildDocxFromDoc(d: ReportDoc): Promise<Buffer> {
+  const children: (Paragraph | Table)[] = [new Paragraph({ heading: HeadingLevel.TITLE, children: [new TextRun({ text: d.title })] }), para(d.subtitle, { italics: true, size: 20 })];
+  for (const b of d.blocks) {
+    switch (b.type) {
+      case 'heading':
+        children.push(heading(b.text));
+        break;
+      case 'p':
+        children.push(para(b.text, { italics: b.muted, size: b.muted ? 20 : undefined }));
+        break;
+      case 'list':
+        for (const i of b.items) children.push(para(`• ${i}`, { size: 20 }));
+        break;
+      case 'note':
+        children.push(para(`• ${b.title}. ${b.text}`, { size: 20 }));
+        break;
+      case 'table':
+        if (b.caption) children.push(para(b.caption, { italics: true, size: 20, spacingAfter: 60 }));
+        children.push(table(b.header, b.rows), para('', { spacingAfter: 60 }));
+        break;
+      case 'kv':
+        if (b.caption) children.push(para(b.caption, { italics: true, size: 20, spacingAfter: 60 }));
+        children.push(table(['Öğe', 'Değer'], b.rows), para('', { spacingAfter: 60 }));
+        break;
+    }
+  }
+  if (d.footer) children.push(para(d.footer, { italics: true, size: 18 }));
   const doc = new Document({ creator: 'StatAdvisor AI', title: d.title, styles: { default: { document: { run: { font: 'Calibri', size: 22 } } } }, sections: [{ children }] });
   return Buffer.from(await Packer.toBuffer(doc));
 }

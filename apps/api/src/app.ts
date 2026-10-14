@@ -27,7 +27,10 @@ import {
   screenResponses,
   type ScaleDef,
   fitLinearRegression,
+  buildModelCompareDoc,
   generateModelCompareCode,
+  interpretComparison,
+  renderReportHtml,
   prepareData,
   runCrossValidation,
   stratifiedKFold,
@@ -66,7 +69,7 @@ import { CsvError, parseCsv, type ParsedColumn, type ParsedCsv } from './csv.ts'
 import { isOle, isZip, xlsxToCsv } from './xlsx.ts';
 import { openDb } from './db.ts';
 import { buildProfile, describeColumns, effectiveColumns, ProfileBody } from './profile.ts';
-import { buildDocx, buildRegressionDocx } from './docx.ts';
+import { buildDocx, buildDocxFromDoc, buildRegressionDocx } from './docx.ts';
 import { PdfUnavailableError, pdfAvailable, renderPdf } from './pdf.ts';
 
 export interface AppOptions {
@@ -1013,7 +1016,7 @@ export function buildApp(opts: AppOptions): FastifyInstance {
   const jobJson = (j: ModelJob) => {
     // katman numaraları büyük olabilir; arayüze gönderilmez (kod betiği bunları yeniden üretir)
     const result = j.result ? { ...j.result, foldOf: undefined } : undefined;
-    return { id: j.id, datasetId: j.datasetId, status: j.status, progress: j.progress, elapsedSeconds: ((j.finishedAt ?? Date.now()) - j.startedAt) / 1000, spec: j.spec, result, error: j.error };
+    return { id: j.id, datasetId: j.datasetId, status: j.status, progress: j.progress, elapsedSeconds: ((j.finishedAt ?? Date.now()) - j.startedAt) / 1000, spec: j.spec, result, interpretation: j.result ? interpretComparison(j.result) : undefined, error: j.error };
   };
 
   app.post('/api/datasets/:id/model-runs', async (req, reply) => {
@@ -1034,6 +1037,40 @@ export function buildApp(opts: AppOptions): FastifyInstance {
     if (!j.result) throw new ApiError(409, 'not_ready', 'Model karşılaştırması henüz bitmedi.');
     const { row, csv } = parsed(j.datasetId);
     return generateModelCompareCode(fileInfo(row, csv), j.spec, j.result);
+  });
+
+  /** Model karşılaştırma raporu: html | pdf | docx (iş bittikten sonra). */
+  app.get('/api/model-runs/:id/report', async (req, reply) => {
+    const { format } = z.object({ format: z.enum(['html', 'pdf', 'docx']).default('html') }).parse(req.query);
+    const j = getModelJob((req.params as { id: string }).id);
+    if (!j.result) throw new ApiError(409, 'not_ready', 'Model karşılaştırması henüz bitmedi.');
+    const { row } = parsed(j.datasetId);
+    const eng = engineInfo();
+    const foldSizes = j.result.models.find((m) => !m.skipped)?.folds.map((f) => `${f.nTrain}/${f.nTest}`).join(', ') ?? '–';
+    const audit: [string, string][] = [
+      ['Veri seti', `${row.name} (SHA-256 ${row.sha256.slice(0, 16)}…, ${row.rows} satır)`],
+      ['Çapraz doğrulama', `tabakalı ${j.spec.folds} katlı, tohum ${j.spec.seed}; katman başına eğitim/test: ${foldSizes}`],
+      ['Modeller', j.result.models.map((m) => m.label + (m.skipped ? ' (atlandı)' : '')).join(', ')],
+      ['Ön işleme', 'Katman içinde uydurulan: medyan/mod doldurma, standartlaştırma (sayısal), tek-sıcak kodlama (kategorik)'],
+      ['Motor sürümü', `${eng.engineName} ${eng.engine}`],
+      ['Referans doğrulama', `scikit-learn ile aynı katmanlarda karşılaştırıldı (referans paketi: ${eng.referenceSuite.cases} vaka)`],
+      ['Çalışma ortamı', `Node ${eng.node}`],
+    ];
+    const doc = buildModelCompareDoc(j.result, j.spec, { datasetName: row.name, date: new Date(j.finishedAt ?? Date.now()).toLocaleDateString('tr-TR'), audit });
+    const html = renderReportHtml(doc);
+    if (format === 'html') {
+      reply.header('Content-Type', 'text/html; charset=utf-8');
+      reply.header('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; img-src data:");
+      return html;
+    }
+    if (format === 'docx') {
+      reply.header('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+      reply.header('Content-Disposition', 'attachment; filename="model-karsilastirma-raporu.docx"');
+      return buildDocxFromDoc(doc);
+    }
+    reply.header('Content-Type', 'application/pdf');
+    reply.header('Content-Disposition', 'attachment; filename="model-karsilastirma-raporu.pdf"');
+    return renderPdf(html);
   });
 
   /** Analizin Python karşılığı; betik, beklenen çıktıyla birebir aynı satırları yazdırır. */

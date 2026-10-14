@@ -36,7 +36,7 @@ const IMPORTS: Record<ModelId, string> = {
 };
 
 export function modelCompareExpectedOutput(r: CvResult): string[] {
-  return r.models.filter((m) => !m.skipped).map((m) => `${m.id}: dogruluk = ${fmt(m.accuracy.mean, 4)} (SS ${fmt(m.accuracy.sd, 4)}) makro F1 = ${fmt(m.macroF1.mean, 4)} (SS ${fmt(m.macroF1.sd, 4)})`);
+  return r.models.filter((m) => !m.skipped).map((m) => `${m.id}: dogruluk = ${fmt(m.accuracy.mean, 4)} (SS ${fmt(m.accuracy.sd, 4)}) makro F1 = ${fmt(m.macroF1.mean, 4)} (SS ${fmt(m.macroF1.sd, 4)}) AUC = ${fmt(m.auc?.mean ?? NaN, 4)}`);
 }
 
 export function generateModelCompareCode(file: DatasetFile, spec: ModelCompareSpec, r: CvResult): GeneratedCode {
@@ -51,7 +51,7 @@ export function generateModelCompareCode(file: DatasetFile, spec: ModelCompareSp
     'from sklearn.compose import ColumnTransformer',
     'from sklearn.impute import SimpleImputer',
     ...[...new Set(ran.map((id) => IMPORTS[id]))],
-    'from sklearn.metrics import accuracy_score, f1_score',
+    'from sklearn.metrics import accuracy_score, f1_score, roc_auc_score',
     'from sklearn.pipeline import Pipeline',
     'from sklearn.preprocessing import OneHotEncoder, StandardScaler',
     '',
@@ -131,7 +131,7 @@ export function generateModelCompareCode(file: DatasetFile, spec: ModelCompareSp
     '}',
     '',
     'for ad, model in MODELLER.items():',
-    '    dogruluk, makro_f1 = [], []',
+    '    dogruluk, makro_f1, auc = [], [], []',
     '    for k in range(KATMAN_SAYISI):',
     '        egitim, test = np.where(KATMAN != k)[0], np.where(KATMAN == k)[0]',
     '        boru = clone(Pipeline([("on", on_isleme), ("model", model)]))',
@@ -139,7 +139,14 @@ export function generateModelCompareCode(file: DatasetFile, spec: ModelCompareSp
     '        tahmin = boru.predict(X.iloc[test])',
     '        dogruluk.append(accuracy_score(etiketler.iloc[test], tahmin))',
     '        makro_f1.append(f1_score(etiketler.iloc[test], tahmin, average="macro", zero_division=0))',
-    '    print(f"{ad}: dogruluk = {np.mean(dogruluk):.4f} (SS {np.std(dogruluk, ddof=1):.4f}) makro F1 = {np.mean(makro_f1):.4f} (SS {np.std(makro_f1, ddof=1):.4f})")',
+    '        # bire-karşı-hepsi makro AUC: olasılık varsa olasılıkla, yoksa (SVM) karar fonksiyonuyla',
+    '        skor = boru.predict_proba(X.iloc[test]) if hasattr(boru, "predict_proba") else boru.decision_function(X.iloc[test])',
+    '        gercek = etiketler.iloc[test].to_numpy()',
+    '        if skor.ndim == 1:',
+    '            auc.append(roc_auc_score(gercek == boru.classes_[1], skor))',
+    '        else:',
+    '            auc.append(np.mean([roc_auc_score(gercek == c, skor[:, i]) for i, c in enumerate(boru.classes_)]))',
+    '    print(f"{ad}: dogruluk = {np.mean(dogruluk):.4f} (SS {np.std(dogruluk, ddof=1):.4f}) makro F1 = {np.mean(makro_f1):.4f} (SS {np.std(makro_f1, ddof=1):.4f}) AUC = {np.mean(auc):.4f}")',
   );
   const code = lines.join('\n') + '\n';
   return { filename: 'model_karsilastirma.py', code, expectedOutput: modelCompareExpectedOutput(r), requirements: requirementsOf(code) };

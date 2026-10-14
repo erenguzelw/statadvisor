@@ -74,6 +74,25 @@ describe('model karşılaştırma ↔ scikit-learn (aynı katmanlar)', () => {
     }, 600_000);
   }
 
+  // Bire-karşı-hepsi makro AUC (katman başına): olasılık veren modellerde olasılıkla, SVM'de decision_function ile
+  const aucTol: Record<ModelId, number> = { baseline: 1e-9, logistic: 1e-6, knn: 1e-6, svm: 1e-6, tree: 0.04, rf: 0.02, gb: 0.01 };
+  for (const id of Object.keys(aucTol) as ModelId[]) {
+    it(`${id}: bire-karşı-hepsi makro AUC scikit-learn ile uyumlu`, async () => {
+      let worstMean = 0;
+      for (let i = 0; i < cases.length; i++) {
+        const r = await run(i);
+        const m = r.models.find((x) => x.id === id)!;
+        const exp = cases[i]!.expected[`${id}_auc`]!;
+        expect(m.folds.length).toBe(exp.length);
+        const got = m.folds.map((f) => f.auc!);
+        expect(got.every((v) => Number.isFinite(v))).toBe(true);
+        worstMean = Math.max(worstMean, Math.abs(mean(got) - mean(exp)));
+      }
+      console.log(`${id}: AUC en büyük |Δ ortalama| = ${worstMean.toExponential(2)}`);
+      expect(worstMean).toBeLessThanOrEqual(aucTol[id]);
+    }, 600_000);
+  }
+
   it('lojistik regresyon olasılıkları scikit-learn ile 1e-5 içinde eşleşir (ilk katman)', () => {
     let worst = 0;
     for (const c of cases) {

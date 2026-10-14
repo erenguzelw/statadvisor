@@ -15,7 +15,7 @@ from sklearn.dummy import DummyClassifier
 from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
 from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import accuracy_score, f1_score
+from sklearn.metrics import accuracy_score, f1_score, roc_auc_score
 from sklearn.model_selection import StratifiedKFold
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.pipeline import Pipeline
@@ -100,7 +100,7 @@ def add_all(add, f):
         expected: dict = {}
         lr_proba = None
         for name, model in make_models().items():
-            accs, f1s = [], []
+            accs, f1s, aucs = [], [], []
             for fold in range(k_folds):
                 tr, te = np.where(fold_of != fold)[0], np.where(fold_of == fold)[0]
                 pipe = Pipeline([("pre", pre), ("m", model)])
@@ -108,10 +108,23 @@ def add_all(add, f):
                 pred = pipe.predict(Xk.iloc[te])
                 accs.append(accuracy_score(yk[te], pred))
                 f1s.append(f1_score(yk[te], pred, average="macro", zero_division=0))
+                # bire-karşı-hepsi makro AUC: olasılık varsa olasılıkla, yoksa (SVM) karar fonksiyonuyla
+                if hasattr(pipe, "predict_proba") and name != "svm":
+                    sc = pipe.predict_proba(Xk.iloc[te])
+                else:
+                    sc = pipe.decision_function(Xk.iloc[te])
+                if len(classes) == 2 and sc.ndim == 2:
+                    sc = sc[:, 1]
+                if len(classes) == 2:
+                    aucs.append(roc_auc_score(yk[te], sc))
+                else:
+                    # sınıf başına ikili (bire-karşı-hepsi) AUC'lerin ağırlıksız ortalaması
+                    aucs.append(np.mean([roc_auc_score(yk[te] == c, sc[:, i]) for i, c in enumerate(classes)]))
                 if name == "logistic" and fold == 0:
                     lr_proba = pipe.predict_proba(Xk.iloc[te])
             expected[f"{name}_acc"] = [f(v) for v in accs]
             expected[f"{name}_f1"] = [f(v) for v in f1s]
+            expected[f"{name}_auc"] = [f(v) for v in aucs]
         for name, model in alt_models().items():
             accs = []
             for fold in range(k_folds):
