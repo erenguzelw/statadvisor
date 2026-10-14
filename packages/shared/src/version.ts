@@ -5,5 +5,5 @@ export const ENGINE = {
   /** Karar kural kümesinin sürümü; kurallar değiştiğinde artırılır. */
   ruleSet: 'decision-v1',
   /** Referans doğrulama paketi (tools/reference/generate.py) ile aynı olmalıdır; reference.test.ts doğrular. */
-  referenceSuite: { scipy: '1.18.1', cases: 1094 },
+  referenceSuite: { scipy: '1.18.1', cases: 1134 },
 } as const;
