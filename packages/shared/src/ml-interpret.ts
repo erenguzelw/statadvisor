@@ -103,12 +103,22 @@ export function interpretComparison(r: CvResult): MlInterpretation {
   }
 
   // 2) Aşırı uyum
-  const flagged = real.filter((m) => m.gap >= OVERFIT_FLAG).sort((a, b) => b.gap - a.gap);
+  // Rastgele orman tam büyütülmüş ağaçlar ve önyükleme kullandığı için eğitim doğruluğu doğası gereği ~%100'dür; fark tek başına
+  // aşırı uyum kanıtı değildir (test doğruluğu ve katman SS belirleyicidir). Bu yüzden bayraktan ayrı bir bilgi notu verilir.
+  const flagged = real.filter((m) => m.gap >= OVERFIT_FLAG && m.id !== 'rf').sort((a, b) => b.gap - a.gap);
+  const forest = real.find((m) => m.id === 'rf' && m.gap >= OVERFIT_FLAG);
   if (flagged.length) {
     notes.push({
       level: 'warning',
       title: 'Aşırı uyum (eğitim–test farkı ≥ 10 puan)',
       text: `${flagged.map((m) => `${m.label}: eğitim ${pct(m.trainAccuracy)} → test ${pct(m.accuracy.mean)} (fark ${pts(m.gap)})`).join('; ')}. Eğitim verisinde çok yüksek, görülmemiş veride çok daha düşük doğruluk, modelin örüntüyü değil eğitim gözlemlerini ezberlediğini gösterir. Eşik (10 puan) bir başparmak kuralıdır. Çare: derinlik/yaprak sınırı gibi düzenleme, topluluk yöntemleri ya da daha basit model.`,
+    });
+  }
+  if (forest) {
+    notes.push({
+      level: 'info',
+      title: 'Rastgele orman: eğitim doğruluğu yanıltıcı',
+      text: `${forest.label} eğitim doğruluğu ${pct(forest.trainAccuracy)}, test doğruluğu ${pct(forest.accuracy.mean)} (fark ${pts(forest.gap)}). Tam büyütülmüş ağaçlardan oluşan orman, eğitim gözlemlerini neredeyse her zaman ezbere bilir; bu fark tek başına kötü genelleme demek değildir. Genellemeyi test (çapraz doğrulama) doğruluğu ve katmanlar arası değişim (SS ${pts(forest.accuracy.sd)}) gösterir.`,
     });
   }
   const hinted = real.filter((m) => m.gap >= OVERFIT_HINT && m.gap < OVERFIT_FLAG);
@@ -147,12 +157,15 @@ export function interpretComparison(r: CvResult): MlInterpretation {
     }
     // 4) Hangi sınıflar karışıyor
     const conf = mostConfused(best, r.classes);
+    let wrong = 0;
+    let adjacent = 0;
+    for (let a = 0; a < K; a++) for (let b = 0; b < K; b++) if (a !== b) { wrong += best.confusion[a]![b]!; if (Math.abs(a - b) === 1) adjacent += best.confusion[a]![b]!; }
     const weakest = [...best.perClass].sort((a, b) => a.recall - b.recall)[0]!;
     const strongest = [...best.perClass].sort((a, b) => b.recall - a.recall)[0]!;
     notes.push({
       level: 'info',
       title: 'Sınıf bazında okuma',
-      text: `${best.label} için en çok karışan sınıf çifti “${conf.a}” ve “${conf.b}” (${conf.n} gözlem birbirine yanlış atandı). Duyarlılık en yüksek “${strongest.cls}” (${pct(strongest.recall)}), en düşük “${weakest.cls}” (${pct(weakest.recall)}).${K > 2 ? ' Sıralı sınıflarda (ör. A–D) yanlışların komşu sınıflarda toplanması beklenir.' : ''}`,
+      text: `${best.label} için en çok karışan sınıf çifti “${conf.a}” ve “${conf.b}” (${conf.n} gözlem birbirine yanlış atandı). Duyarlılık en yüksek “${strongest.cls}” (${pct(strongest.recall)}), en düşük “${weakest.cls}” (${pct(weakest.recall)}).${K > 2 && wrong > 0 ? ` Yanlışların ${pct(adjacent / wrong, 0)}'i sıra olarak komşu sınıfa gidiyor (${r.classes.join(' < ')} sıralaması varsayılırsa; sınıflar sıralıysa yüksek oran beklenir).` : ''}`,
     });
   }
 
