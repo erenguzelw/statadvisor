@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="tr">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>StatAdvisor Teknoloji Yığını</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap&subset=latin-ext">
+<style>
+:root {
+  --bg: #f7f8fc; --surface: #ffffff; --line: #d9dcea; --fg: #141a2e; --muted: #535a75;
+  --shared: #4338ca; --shared-bg: #eceafe;
+  --api: #0369a1; --api-bg: #e0f2fe;
+  --web: #047857; --web-bg: #dcf5ea;
+  --qa: #b45309; --qa-bg: #fff4e0;
+  --vid: #a21caf; --vid-bg: #fae8ff;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.5 Inter, system-ui, sans-serif; }
+#page { width: 1600px; padding: 48px 56px 56px; display: grid; gap: 26px; }
+h1, h2 { font-family: 'Space Grotesk', system-ui, sans-serif; margin: 0; line-height: 1.15; }
+h1 { font-size: 40px; letter-spacing: -0.02em; }
+h2 { font-size: 21px; display: flex; align-items: center; gap: 10px; }
+p { margin: 0; }
+.sub { color: var(--muted); font-size: 18px; max-width: 1150px; }
+.sub b { color: var(--fg); }
+
+.arch { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 18px; position: relative; }
+.box { border-radius: 16px; border: 2px solid; padding: 18px 20px; display: grid; gap: 6px; }
+.box .path { font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 500; }
+.box b { font-family: 'Space Grotesk', system-ui, sans-serif; font-size: 20px; }
+.box span { color: var(--muted); font-size: 15px; }
+.box.shared { border-color: var(--shared); background: var(--shared-bg); } .box.shared .path { color: var(--shared); }
+.box.api { border-color: var(--api); background: var(--api-bg); } .box.api .path { color: var(--api); }
+.box.web { border-color: var(--web); background: var(--web-bg); } .box.web .path { color: var(--web); }
+
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; align-items: start; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 22px 24px; display: grid; gap: 12px; align-content: start; }
+.dot { width: 14px; height: 14px; border-radius: 4px; display: inline-block; }
+.rows { display: grid; gap: 0; }
+.row { display: grid; grid-template-columns: 210px 1fr; gap: 16px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.row:last-child { border-bottom: 0; }
+.row .t { font-weight: 600; font-size: 15px; }
+.row .t small { display: block; font-weight: 400; color: var(--muted); font-size: 12.5px; font-family: 'JetBrains Mono', monospace; }
+.row .g { color: var(--muted); font-size: 15px; }
+.common { background: var(--fg); color: #fff; border-radius: 16px; padding: 22px 26px; display: grid; grid-template-columns: auto 1fr 1fr 1fr; gap: 28px; align-items: center; }
+.common .k { font-family: 'Space Grotesk', system-ui, sans-serif; font-size: 22px; font-weight: 700; }
+.common div span { display: block; color: #b9bdd4; font-size: 14px; }
+.common div b { font-size: 18px; }
+</style>
+
+<div id="page">
+  <header style="display:grid;gap:10px">
+    <h1>StatAdvisor teknoloji yığını</h1>
+    <p class="sub">Tek depoda üç parça (npm workspaces). İstatistik hesapları hem sunucuda hem tarayıcıda <b>aynı koddan</b> çalışır; <span style="font-family:'JetBrains Mono',monospace">npm start</span> tek komutla her şeyi başlatır.</p>
+  </header>
+
+  <div class="arch">
+    <div class="box shared"><div class="path">packages/shared</div><b>İstatistik ve kural motoru</b><span>Testler, karar ağacı, ölçek puanı, tarama, Python kodu ve rapor üretimi</span></div>
+    <div class="box api"><div class="path">apps/api</div><b>Yerel sunucu</b><span>Dosya okuma, veri saklama, analiz, DOCX/PDF rapor; yalnızca 127.0.0.1</span></div>
+    <div class="box web"><div class="path">apps/web</div><b>Arayüz</b><span>Karar sihirbazı, veri kalitesi, model karşılaştırma, kod ve rapor merkezi</span></div>
+  </div>
+
+  <div class="grid">
+    <section class="panel">
+      <h2><i class="dot" style="background:var(--shared)"></i>Dil ve istatistik motoru</h2>
+      <div class="rows">
+        <div class="row"><div class="t">TypeScript (strict)</div><div class="g">Yanlış alan adı ya da sayı yerine metin gibi sessiz hataları kod çalışmadan yakalar.</div></div>
+        <div class="row"><div class="t">Node.js 26</div><div class="g">TypeScript'i derleme adımı olmadan çalıştırır; yerleşik SQLite modülü var.</div></div>
+        <div class="row"><div class="t">Elle yazılmış hesaplar<small>bağımlılık yok</small></div><div class="g">Shapiro-Wilk, Welch, Kruskal-Wallis, Mahalanobis… Denetlenebilir, tarayıcıda da çalışır, dışarıdan bir şey çekmez.</div></div>
+        <div class="row"><div class="t">Python scipy / statsmodels<small>yalnızca geliştirmede</small></div><div class="g">Elle yazılan her hesap bunlarla birebir karşılaştırılarak doğrulanır. Kullanıcının bilgisayarında gerekmez.</div></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2><i class="dot" style="background:var(--api)"></i>Sunucu</h2>
+      <div class="rows">
+        <div class="row"><div class="t">Fastify</div><div class="g">Hızlı ve hafif; yalnızca 127.0.0.1'i dinler, dışarıdan erişilemez.</div></div>
+        <div class="row"><div class="t">SQLite<small>node:sqlite</small></div><div class="g">Tek dosyalık veritabanı; kurulum ya da ayrı sunucu gerekmez, yedeklemesi kolay.</div></div>
+        <div class="row"><div class="t">zod</div><div class="g">Gelen istekleri doğrular; hatalı istek hesaba ulaşmadan reddedilir.</div></div>
+        <div class="row"><div class="t">csv-parse</div><div class="g">Tırnaklı alanları ve satır içi virgülleri doğru okur.</div></div>
+        <div class="row"><div class="t">docx</div><div class="g">Gerçek Word dosyası olarak rapor üretir.</div></div>
+        <div class="row"><div class="t">playwright-core</div><div class="g">PDF raporu Chromium ile üretir; HTML raporla birebir aynı görünür.</div></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2><i class="dot" style="background:var(--web)"></i>Arayüz</h2>
+      <div class="rows">
+        <div class="row"><div class="t">React 18 + Vite</div><div class="g">Yaygın ve iyi belgelenmiş; geliştirme sunucusu çok hızlı.</div></div>
+        <div class="row"><div class="t">Tailwind CSS v4</div><div class="g">Tasarım değerleri tek dosyada; ekranlar arasında tutarlılık.</div></div>
+        <div class="row"><div class="t">TanStack Query</div><div class="g">Veri çekme, önbellek, yükleniyor/hata durumları; sihirbazdaki anlık güncelleme.</div></div>
+        <div class="row"><div class="t">React Router</div><div class="g">Sayfalar arası geçiş.</div></div>
+        <div class="row"><div class="t">d3-scale / d3-shape</div><div class="g">Histogram, kutu grafiği, ROC eğrisi; hazır kütüphanelerde kutu grafiği yoktu.</div></div>
+        <div class="row"><div class="t">@fontsource + lucide-react</div><div class="g">Yazı tipleri ve ikonlar pakete gömülü; internet olmadan çalışır.</div></div>
+        <div class="row"><div class="t">prism-react-renderer</div><div class="g">Üretilen Python kodunu renklendirir.</div></div>
+      </div>
+    </section>
+
+    <div style="display:grid;gap:22px">
+      <section class="panel">
+        <h2><i class="dot" style="background:var(--qa)"></i>Test ve kalite</h2>
+        <div class="rows">
+          <div class="row"><div class="t">Vitest + Testing Library</div><div class="g">Birim ve bileşen testleri.</div></div>
+          <div class="row"><div class="t">Playwright + axe-core</div><div class="g">Uçtan uca testler ve erişilebilirlik denetimi.</div></div>
+          <div class="row"><div class="t">ESLint</div><div class="g">Kod tutarlılığı.</div></div>
+        </div>
+      </section>
+      <section class="panel">
+        <h2><i class="dot" style="background:var(--vid)"></i>Tanıtım videosu</h2>
+        <div class="rows">
+          <div class="row"><div class="t">Remotion</div><div class="g">Videoyu React koduyla üretir; arayüzle aynı renk ve yazı tipleri, metinler kolayca değişir.</div></div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <div class="common">
+    <div class="k">Ortak ilke</div>
+    <div><span>Gizlilik</span><b>Yerelde çalışır, veri dışarı çıkmaz</b></div>
+    <div><span>Bağımsızlık</span><b>İnternet bağlantısı gerekmez</b></div>
+    <div><span>Güven</span><b>Her hesap Python ile doğrulanır</b></div>
+  </div>
+</div>
+<script>document.fonts.ready.then(() => { document.body.dataset.ready = '1'; });</script>
+</html>
