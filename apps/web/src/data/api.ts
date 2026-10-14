@@ -1,4 +1,4 @@
-import type { CvResult, ModelCompareSpec, ModelId, AnalysisResult, AnalysisSpec, CleanRule, DatasetQuality, GeneratedCode, LogisticResult, LogisticSpec, RegressionNarrative, RegressionResult, RegressionSpec } from '@statadvisor/shared';
+import type { CvResult, MlInterpretation, ModelCompareSpec, ModelId, AnalysisResult, AnalysisSpec, CleanRule, DatasetQuality, GeneratedCode, LogisticResult, LogisticSpec, RegressionNarrative, RegressionResult, RegressionSpec } from '@statadvisor/shared';
 
 /** Sunucuya gönderilen analiz isteği. */
 export type AnalysisBody = AnalysisSpec & { datasetId: string };
@@ -236,6 +236,7 @@ export interface ModelRunJob {
   elapsedSeconds: number;
   spec: ModelCompareSpec;
   result?: Omit<CvResult, 'foldOf'>;
+  interpretation?: MlInterpretation;
   error?: string;
 }
 

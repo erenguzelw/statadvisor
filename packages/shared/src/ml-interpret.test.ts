@@ -70,6 +70,16 @@ describe('interpretComparison', () => {
     expect(it.significance).toBeTruthy();
   }, 120_000);
 
+  it('rastgele ormanın ~%100 eğitim doğruluğunu aşırı uyum bayrağı yapmaz, ayrı bilgi notu verir', async () => {
+    const r = await runCrossValidation(make(400, [1, 1, 1, 1]), { folds: 5, seed: 1, models: ['baseline', 'logistic', 'rf'] });
+    const it = interpretComparison(r);
+    const rf = r.models.find((m) => m.id === 'rf')!;
+    expect(rf.gap).toBeGreaterThanOrEqual(0.1);
+    const flag = it.notes.find((n) => n.title.startsWith('Aşırı uyum'));
+    expect(flag?.text ?? '').not.toContain('Rastgele Orman');
+    expect(it.notes.find((n) => n.title === 'Rastgele orman: eğitim doğruluğu yanıltıcı')!.level).toBe('info');
+  }, 120_000);
+
   it('dengesiz veride doğruluğun yanıltıcı olduğunu söyler', async () => {
     const r = await runCrossValidation(make(500, [9, 1]), { folds: 5, seed: 1, models: ['baseline', 'logistic'] });
     const it = interpretComparison(r);

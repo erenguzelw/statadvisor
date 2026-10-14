@@ -1,13 +1,15 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Activity, BarChart3, Database, FileCode2, Info, ListChecks, OctagonAlert, Play, Scale, ShieldCheck, Table2 } from 'lucide-react';
+import { Activity, BarChart3, Database, Download, Eye, FileCode2, Flag, Info, ListChecks, OctagonAlert, Play, Scale, ShieldCheck, Table2 } from 'lucide-react';
 import { ALL_MODELS, MODEL_INFO, type ModelCv, type ModelId } from '@statadvisor/shared';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { Button, Callout, CheckboxGroup, CodeBlock, DataTable, MetricTile, Panel, ProgressBar, SectionHeader, Select, StatusLine, Tag, type Column } from '@/components/ui';
+import { Button, Callout, CheckboxGroup, CodeBlock, DataTable, LinkButton, MetricTile, Panel, ProgressBar, SectionHeader, Select, StatusLine, Tag, type Column } from '@/components/ui';
 import { useActiveDataset } from '@/context/AppContext';
 import type { ColumnInfo, DatasetInfo, ModelRunBody, ModelRunJob } from '@/data/api';
-import { useModelRun, useModelRunCode, useStartModelRun } from '@/data/hooks';
+import { useCapabilities, useModelRun, useModelRunCode, useStartModelRun } from '@/data/hooks';
 import { columnTypeLabel } from '@/lib/variables';
+import { NoteList } from '../regression/shared';
+import { AssociationPanel, ClassDetail } from './MlInsights';
 
 const nf = new Intl.NumberFormat('tr-TR');
 const pct = (x: number, d = 1) => (Number.isFinite(x) ? `%${(x * 100).toFixed(d)}` : '–');
@@ -73,6 +75,8 @@ function AccuracyBars({ models, baseline }: { models: ModelCv[]; baseline: numbe
 
 function Results({ job }: { job: ModelRunJob }) {
   const r = job.result!;
+  const interp = job.interpretation!;
+  const caps = useCapabilities();
   const code = useModelRunCode(job.id, true);
   const ran = r.models.filter((m) => !m.skipped);
   const skipped = r.models.filter((m) => m.skipped);
@@ -82,6 +86,7 @@ function Results({ job }: { job: ModelRunJob }) {
     { key: 'model', header: 'Model', cell: (m) => <span className="font-medium text-fg">{m.label}{m.id === best?.id && <Tag tone="secondary" className="ml-2">en yüksek doğruluk</Tag>}</span> },
     { key: 'acc', header: 'Test doğruluğu', align: 'right', numeric: true, cell: (m) => `${pct(m.accuracy.mean)} ± ${(m.accuracy.sd * 100).toFixed(1)}` },
     { key: 'f1', header: 'Makro F1', align: 'right', numeric: true, cell: (m) => `${m.macroF1.mean.toFixed(3)} ± ${m.macroF1.sd.toFixed(3)}` },
+    { key: 'auc', header: 'AUC', align: 'right', numeric: true, cell: (m) => (m.auc ? `${m.auc.mean.toFixed(3)} ± ${m.auc.sd.toFixed(3)}` : '–') },
     { key: 'train', header: 'Eğitim doğruluğu', align: 'right', numeric: true, cell: (m) => pct(m.trainAccuracy) },
     { key: 'gap', header: 'Eğitim − test', align: 'right', numeric: true, cellClassName: (m) => (m.gap >= 0.1 ? 'font-semibold text-tertiary' : undefined), cell: (m) => `${(m.gap * 100).toFixed(1)} puan` },
     { key: 'time', header: 'Süre', align: 'right', numeric: true, cell: (m) => `${m.seconds.toFixed(1)} s` },
@@ -124,9 +129,17 @@ function Results({ job }: { job: ModelRunJob }) {
       </Panel>
 
       <Panel>
+        <SectionHeader icon={Flag} title="Yorum ve uyarılar" level={3} description="Her cümle sayılardan üretilir. Eşikler (sınıf dengesi, eğitim–test farkı ≥ 10 puan) başparmak kurallarıdır." />
+        <NoteList notes={interp.notes} />
+      </Panel>
+
+      <Panel>
         <SectionHeader icon={BarChart3} title="Doğruluk karşılaştırması" level={3} description="Çubuk: ortalama test doğruluğu; çizgi: ± 1 standart sapma; kesikli çizgi: taban doğruluğu." />
         <AccuracyBars models={r.models} baseline={r.baselineAccuracy} />
       </Panel>
+
+      <ClassDetail result={r} defaultId={interp.best?.id} />
+      <AssociationPanel result={r} interp={interp} />
 
       <Panel>
         <SectionHeader icon={ShieldCheck} title="Yöntem" level={3} />
@@ -148,7 +161,12 @@ function Results({ job }: { job: ModelRunJob }) {
       </Panel>
 
       <Panel>
-        <SectionHeader icon={FileCode2} title="Python (scikit-learn) kodu" level={3} description="Betik, katman atamasını aynı tohumlu karıştırmayla yeniden üretir ve aynı karşılaştırmayı yapar. Veri dosyasını betikle aynı klasöre koyun." />
+        <SectionHeader icon={FileCode2} title="Rapor ve Python (scikit-learn) kodu" level={3} description="Rapor; sonuçları, yorumları, sınıf bazında tabloları, ilişkileri, yöntemi ve denetim izini içerir. Betik, katman atamasını aynı tohumlu karıştırmayla yeniden üretir ve aynı karşılaştırmayı yapar; veri dosyasını betikle aynı klasöre koyun." />
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <LinkButton variant="tonal" icon={Eye} href={`/api/model-runs/${job.id}/report?format=html`} target="_blank" rel="noopener noreferrer">Raporu aç (HTML)</LinkButton>
+          <LinkButton variant="primary" icon={Download} href={`/api/model-runs/${job.id}/report?format=docx`} download="model-karsilastirma-raporu.docx">Word (.docx)</LinkButton>
+          {caps.data?.pdf !== false && <LinkButton variant="secondary" icon={Download} href={`/api/model-runs/${job.id}/report?format=pdf`} download="model-karsilastirma-raporu.pdf">PDF</LinkButton>}
+        </div>
         {code.isLoading && <p className="text-body text-fg-muted">Kod hazırlanıyor…</p>}
         {code.isError && <StatusLine status="danger">{code.error.message}</StatusLine>}
         {code.data && <CodeBlock code={code.data.code} filename={code.data.filename} runtime={`Python · ${code.data.requirements.join(', ')}`} lineNumbers maxHeight="28rem" />}
