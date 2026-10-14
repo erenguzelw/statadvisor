@@ -89,26 +89,61 @@ export function crosstabRows(t: { rowNames: string[]; colNames: string[]; table:
   };
 }
 
+/** Rapordaki bir grafik: HTML ve DOCX aynı SVG'yi kullanır. */
+export interface ReportFigure {
+  id: 'box' | 'scatter' | 'crosstab' | 'histogram';
+  /** Grafiğin yer aldığı bölüm. */
+  section: 'desc' | 'assump';
+  caption: string;
+  title: string;
+  svg: string;
+}
+
+/** Rapora giren tüm grafikler (veri türüne göre bazıları yoktur). */
+export function reportFigures(d: ReportData): ReportFigure[] {
+  const out: ReportFigure[] = [];
+  const add = (f: ReportFigure) => {
+    if (f.svg) out.push(f);
+  };
+  if (d.boxes?.length) {
+    const title = 'Gruplara göre kutu grafiği';
+    add({ id: 'box', section: 'desc', title, caption: 'Grup başına kutu grafiği (kutu: Q1–Q3, kalın çizgi: medyan, bıyık: Tukey sınırları içindeki uç gözlemler, halka: sınır dışı gözlem)', svg: boxPlotSvg(d.boxes, title) });
+  }
+  if (d.scatter) {
+    const s = d.scatter;
+    const title = `${s.xName} ile ${s.yName} saçılım grafiği`;
+    const shown = s.points.length < s.n ? `${s.n} gözlemden ${s.points.length} nokta gösteriliyor; ` : '';
+    add({ id: 'scatter', section: 'desc', title, caption: `Saçılım grafiği (${shown}turuncu çizgi: tüm gözlemlerden hesaplanan en küçük kareler doğrusu, y = ${s.intercept.toFixed(2)} ${s.slope < 0 ? '−' : '+'} ${Math.abs(s.slope).toFixed(2)}x)`, svg: scatterSvg(s, title) });
+  }
+  if (d.table) {
+    const title = 'Çapraz tablonun satır yüzdeleri';
+    add({ id: 'crosstab', section: 'desc', title, caption: 'Satır içi dağılım (her satır %100)', svg: crosstabSvg(d.table, title) });
+  }
+  if (d.distribution) {
+    const title = 'Kalıntıların histogramı ve kuramsal normal eğri';
+    add({ id: 'histogram', section: 'assump', title, caption: `Kalıntıların histogramı ve kuramsal normal eğri (n = ${d.distribution.n}, çarpıklık = ${d.distribution.skewness})`, svg: histogramSvg(d.distribution, title) });
+  }
+  return out;
+}
+
 /** Tek dosyalık rapor üretir. Her değer HTML'e kaçırılarak yazılır. */
 export function buildReport(d: ReportData): string {
   const desc = descriptiveTables(d.descriptives)
     .map((t) => `<p class="muted">${esc(t.title)}</p>${table(t.header, t.rows)}`)
     .join('');
-  const boxFigure = d.boxes?.length
-    ? `<figure><figcaption class="muted">Grup başına kutu grafiği (kutu: Q1–Q3, kalın çizgi: medyan, bıyık: Tukey sınırları içindeki uç gözlemler, halka: sınır dışı gözlem)</figcaption>${boxPlotSvg(d.boxes, 'Gruplara göre kutu grafiği')}</figure>`
-    : '';
-  const scatterFigure = d.scatter
-    ? `<figure><figcaption class="muted">Saçılım grafiği (${d.scatter.points.length < d.scatter.n ? `${d.scatter.n} gözlemden ${d.scatter.points.length} nokta gösteriliyor; ` : ''}turuncu çizgi: tüm gözlemlerden hesaplanan en küçük kareler doğrusu, y = ${d.scatter.intercept.toFixed(2)} ${d.scatter.slope < 0 ? '−' : '+'} ${Math.abs(d.scatter.slope).toFixed(2)}x)</figcaption>${scatterSvg(d.scatter, `${d.scatter.xName} ile ${d.scatter.yName} saçılım grafiği`)}</figure>`
-    : '';
+  const figures = reportFigures(d);
+  const figure = (id: ReportFigure['id']) => {
+    const f = figures.find((x) => x.id === id);
+    return f ? `<figure><figcaption class="muted">${esc(f.caption)}</figcaption>${f.svg}</figure>` : '';
+  };
   let crosstab = '';
   if (d.table) {
     const ct = crosstabRows(d.table);
-    crosstab = `<p class="muted">Çapraz tablo (gözlenen sayı ve satır yüzdesi)</p>${table(ct.header, ct.rows)}<figure><figcaption class="muted">Satır içi dağılım (her satır %100)</figcaption>${crosstabSvg(d.table, 'Çapraz tablonun satır yüzdeleri')}</figure>`;
+    crosstab = `<p class="muted">Çapraz tablo (gözlenen sayı ve satır yüzdesi)</p>${table(ct.header, ct.rows)}`;
   }
   const assump = d.assumptions.length
     ? table(['Test', 'Uygulandığı veri', 'İstatistik', 'p', 'Sonuç'], d.assumptions.map((x) => [x.name, x.subject, x.statistic, x.shape ? `sınır ±${x.shape.limit}` : formatP(x.p, true), x.passed ? 'Sağlandı' : 'İhlal edildi']))
     : '<p class="muted">Bu test türü için ayrı bir varsayım testi uygulanmadı.</p>';
-  const chart = d.distribution ? `<figure><figcaption class="muted">Kalıntıların histogramı ve kuramsal normal eğri (n = ${d.distribution.n}, çarpıklık = ${d.distribution.skewness})</figcaption>${histogramSvg(d.distribution, 'Kalıntıların histogramı ve kuramsal normal eğri')}</figure>` : '';
   const warnings = d.decision.warnings.map((w) => `<p class="warn">${esc(w)}</p>`).join('');
   const alts = d.decision.alternatives?.length ? `<p>Alternatif yöntemler:</p><ul>${d.decision.alternatives.map((a) => `<li><strong>${esc(a.test)}</strong>: ${esc(a.when)}</li>`).join('')}</ul>` : '';
   const notes = d.notes.length ? `<ul>${d.notes.map((n) => `<li>${esc(n)}</li>`).join('')}</ul>` : '';
@@ -116,8 +151,8 @@ export function buildReport(d: ReportData): string {
 
   const body = `<h1>${esc(d.title)}</h1>
 <p class="muted">${esc(d.datasetName)} · ${esc(d.date)} · StatAdvisor AI</p>
-<section data-section="desc"><h2>Tanımlayıcı istatistikler</h2>${desc}${boxFigure}${scatterFigure}${crosstab}${notes}</section>
-<section data-section="assump"><h2>Varsayım testleri ve karar notları</h2>${assump}${chart}
+<section data-section="desc"><h2>Tanımlayıcı istatistikler</h2>${desc}${figure('box')}${figure('scatter')}${crosstab}${figure('crosstab')}${notes}</section>
+<section data-section="assump"><h2>Varsayım testleri ve karar notları</h2>${assump}${figure('histogram')}
 <p>Önerilen test: <strong>${esc(d.decision.finalTest)}</strong>${d.decision.rerouteReason ? ` (${esc(d.decision.rerouteReason)})` : ''}.</p>${warnings}${alts}</section>
 <section data-section="result"><h2>Test sonucu</h2><p>${esc(d.resultLine)}</p></section>
 <section data-section="apa"><h2>APA 7 stilinde özet</h2><p>${esc(d.apaSummary)}</p></section>

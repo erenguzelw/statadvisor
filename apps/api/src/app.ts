@@ -354,6 +354,16 @@ export function buildApp(opts: AppOptions): FastifyInstance {
     return { ...datasetJson(row), delimiter: csv.delimiter, preview: csv.preview };
   });
 
+  /** Tüm veri setlerini, dosyalarını ve (zincirleme silmeyle) bunlara bağlı kayıtlı analizleri siler. */
+  app.delete('/api/datasets', async () => {
+    const rows = db.prepare('SELECT sha256 FROM datasets').all() as { sha256: string }[];
+    const analyses = (db.prepare('SELECT COUNT(*) AS n FROM analyses').get() as { n: number }).n;
+    db.prepare('DELETE FROM datasets').run();
+    for (const r of rows) removeFile(r.sha256);
+    cache.clear();
+    return { deletedDatasets: rows.length, deletedAnalyses: analyses };
+  });
+
   app.delete('/api/datasets/:id', async (req, reply) => {
     const { id } = req.params as { id: string };
     const row = db.prepare('SELECT * FROM datasets WHERE id = ?').get(id) as DatasetRow | undefined;

@@ -73,6 +73,24 @@ test('veri kalitesi, Veri Setleri menüsünün alt sekmesidir; eski adres yönle
   await expect(page).toHaveURL(/\/veri\/kalite$/);
 });
 
+test('tümünü sil: onay ister, vazgeçilebilir, onaylanınca tüm veri setlerini siler', async ({ page, request }) => {
+  await page.goto('/veri');
+  await expect(page.getByRole('button', { name: 'Tümünü sil' })).toHaveCount(0);
+  await loadSample(request, 'klinik');
+  await loadSample(request, 'anket');
+  await page.goto('/veri');
+  await page.getByRole('button', { name: 'Tümünü sil' }).click();
+  await page.getByRole('button', { name: 'Vazgeç' }).click();
+  await expect(page.getByRole('button', { name: 'Tümünü sil' })).toBeVisible();
+  await expect(page.getByText('Henüz veri seti yok')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Tümünü sil' }).click();
+  await expect(page.getByText(/bağlı kayıtlı analizler silinsin mi/)).toBeVisible();
+  await page.getByRole('button', { name: 'Evet, tümünü sil' }).click();
+  await expect(page.getByText('Henüz veri seti yok')).toBeVisible();
+  await expect(page.getByText('Tüm veri setleri ve bağlı analizler silindi.')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Tümünü sil' })).toHaveCount(0);
+});
+
 test('veri yokken analiz sayfaları yönlendirir; yüklenince çalışır', async ({ page }) => {
   await page.goto('/karar-sihirbazi');
   await expect(page.getByText('Önce bir veri seti seçin')).toBeVisible();

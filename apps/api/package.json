@@ -13,6 +13,7 @@
   "dependencies": {
     "@fastify/multipart": "^10.1.3",
     "@fastify/static": "^10.1.6",
+    "@resvg/resvg-js": "^2.6.2",
     "@statadvisor/shared": "*",
     "csv-parse": "^7.0.3",
     "docx": "^9.10.0",

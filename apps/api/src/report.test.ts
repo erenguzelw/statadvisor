@@ -77,6 +77,24 @@ describe('rapor biçimleri', () => {
     expect((await app.inject({ url: `/api/analyses/${g.id}/report` })).body).not.toContain('Saçılım grafiği');
   });
 
+  it('DOCX: grafikler gerçek PNG olarak gömülür (kutu + histogram, saçılım, çapraz tablo)', async () => {
+    const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    const images = async (id: string) => {
+      const zip = await JSZip.loadAsync((await app.inject({ url: `/api/analyses/${id}/report?format=docx` })).rawPayload);
+      const names = Object.keys(zip.files).filter((n) => n.startsWith('word/media/') && !zip.files[n]!.dir);
+      const heads = await Promise.all(names.map(async (n) => (await zip.file(n)!.async('nodebuffer')).subarray(0, 8)));
+      return { names, heads, xml: await zip.file('word/document.xml')!.async('string') };
+    };
+    const group = await images((await analysis()).id);
+    expect(group.names).toHaveLength(2);
+    for (const h of group.heads) expect(h.equals(PNG)).toBe(true);
+    expect(group.xml).toContain('Gruplara göre kutu grafiği');
+    expect(group.xml).toContain('Kalıntıların histogramı');
+    const rel = await images((await analysis({ goal: 'relate', group: undefined, value: undefined, x: 'yas', y: 'kan_basinci' })).id);
+    expect(rel.names).toHaveLength(1);
+    expect(rel.xml).toContain('yas ile kan_basinci saçılım grafiği');
+  });
+
   it('DOCX: özet istatistik tabloları', async () => {
     const a = await analysis();
     const zip = await JSZip.loadAsync((await app.inject({ url: `/api/analyses/${a.id}/report?format=docx` })).rawPayload);

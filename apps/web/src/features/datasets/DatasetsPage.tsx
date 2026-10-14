@@ -6,7 +6,7 @@ import { QueryView } from '@/components/layout/PageStatus';
 import { Button, DataTable, Panel, SectionHeader, StatusChip, StatusLine, Tag, type Column } from '@/components/ui';
 import { useActiveDataset, useApp } from '@/context/AppContext';
 import type { ColumnInfo, DatasetInfo } from '@/data/api';
-import { useDataset, useDatasets, useDeleteDataset, useLoadSample, useSamples, useUploadDataset } from '@/data/hooks';
+import { useDataset, useDatasets, useDeleteAllDatasets, useDeleteDataset, useLoadSample, useSamples, useUploadDataset } from '@/data/hooks';
 import { cn } from '@/lib/cn';
 import { columnTypeLabel } from '@/lib/variables';
 import { ScaleBuilder } from './ScaleBuilder';
@@ -78,6 +78,8 @@ export function DatasetsPage() {
   const upload = useUploadDataset();
   const loadSample = useLoadSample();
   const remove = useDeleteDataset();
+  const removeAll = useDeleteAllDatasets();
+  const [confirmAll, setConfirmAll] = useState(false);
   const detail = useDataset(active?.id ?? null);
   const [confirm, setConfirm] = useState<string | null>(null);
   const [status, setStatus] = useState<string>('');
@@ -89,7 +91,7 @@ export function DatasetsPage() {
       (d.duplicate ? `“${d.name}” zaten yüklüydü; etkin veri seti yapıldı.` : `“${d.name}” yüklendi (${nf.format(d.rows)} satır, ${d.columns.length} sütun).`) + excel,
     );
   };
-  const error = upload.error ?? loadSample.error ?? remove.error;
+  const error = upload.error ?? loadSample.error ?? remove.error ?? removeAll.error;
 
   const dsColumns: Column<DatasetInfo>[] = [
     {
@@ -155,11 +157,41 @@ export function DatasetsPage() {
         title="Veri Setleri"
         description="Excel ya da CSV dosyanızı yükleyin ya da örnek bir veri setiyle başlayın. Veriler bu bilgisayarda kalır; hiçbir yere gönderilmez."
         actions={
-          active && (
-            <Button variant="primary" onClick={() => navigate('/karar-sihirbazi')}>
-              Analize başla
-            </Button>
-          )
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {(list.data?.length ?? 0) > 0 &&
+              (confirmAll ? (
+                <span className="inline-flex flex-wrap items-center gap-2" role="group" aria-label="Tümünü silme onayı">
+                  <span className="text-caption text-fg-muted">Tüm veri setleri ve bağlı kayıtlı analizler silinsin mi?</span>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() =>
+                      removeAll.mutate(undefined, {
+                        onSuccess: () => {
+                          setDatasetId(null);
+                          setStatus('Tüm veri setleri ve bağlı analizler silindi.');
+                          setConfirmAll(false);
+                        },
+                      })
+                    }
+                  >
+                    Evet, tümünü sil
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setConfirmAll(false)}>
+                    Vazgeç
+                  </Button>
+                </span>
+              ) : (
+                <Button variant="ghost" icon={Trash2} onClick={() => setConfirmAll(true)}>
+                  Tümünü sil
+                </Button>
+              ))}
+            {active && (
+              <Button variant="primary" onClick={() => navigate('/karar-sihirbazi')}>
+                Analize başla
+              </Button>
+            )}
+          </div>
         }
       />
 
