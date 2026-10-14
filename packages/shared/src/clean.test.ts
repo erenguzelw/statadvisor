@@ -1,9 +1,10 @@
 import { AnalysisError } from './analysis.ts';
-import { cleanColumns, columnsToCsv, KNN_MAX_ROWS } from './clean.ts';
-import type { QualityColumn } from './quality.ts';
+import { cleanColumns, columnsToCsv, KNN_MAX_ROWS, modeOf } from './clean.ts';
+import type { CleanRule, QualityColumn } from './quality.ts';
 import { sampleDataset, SAMPLE_KINDS } from './sample-data.ts';
 
-const col = (name: string, values: (number | string | null)[], numeric = true): QualityColumn => ({ name, numeric, values });
+const col = (name: string, values: (number | string | null)[], numeric = true, extra: Partial<QualityColumn> = {}): QualityColumn => ({ name, numeric, values, ...extra });
+const rule = (column: string, issue: CleanRule['issue'], action: CleanRule['action']): CleanRule => ({ column, issue, action });
 
 describe('cleanColumns', () => {
   const x = Array.from({ length: 60 }, (_, i) => i + 1);
@@ -13,32 +14,85 @@ describe('cleanColumns', () => {
   const withOutlier: (number | null)[] = x.map((v) => 100 + (v % 7));
   withOutlier[5] = 9999;
 
-  it('Tukey sınırı dışındaki satırları çıkarır ve nedenini günlüğe yazar', () => {
-    const r = cleanColumns([col('x', x), col('d', withOutlier)], { outlierColumns: ['d'], impute: 'none' });
+  it('kural verilmezse hiçbir şey silinmez ve doldurulmaz', () => {
+    const r = cleanColumns([col('x', x), col('y', y)], { rules: [], impute: 'none' });
+    expect(r.removedRows).toBe(0);
+    expect(r.imputedCells).toBe(0);
+    expect(r.columns[1]!.values.filter((v) => v === null)).toHaveLength(2);
+  });
+
+  it('satır silme kuralı: Tukey dışındaki satırı çıkarır ve nedenini günlüğe yazar', () => {
+    const r = cleanColumns([col('x', x), col('d', withOutlier)], { rules: [rule('d', 'extreme', 'removeRow')], impute: 'none' });
     expect(r.removedRows).toBe(1);
     expect(r.columns[0]!.values).toHaveLength(59);
     expect(r.columns[0]!.values).not.toContain(6);
     expect(r.log.join(' ')).toContain('Tukey');
+    expect(r.log.join(' ')).toContain('incelenecek uç değer');
   });
 
-  it('medyan/mod ile doldurur; sütun türüne göre ayrım yapar', () => {
-    const r = cleanColumns([col('y', y), col('g', ['a', 'a', 'b', null, ...Array(56).fill('a')], false)], { outlierColumns: [], impute: 'median' });
+  it('eksik işaretle kuralı: satır korunur, yalnızca hücre eksik olur', () => {
+    const r = cleanColumns([col('x', x), col('d', withOutlier)], { rules: [rule('d', 'extreme', 'setMissing')], impute: 'none' });
+    expect(r.removedRows).toBe(0);
+    expect(r.columns[1]!.values).toHaveLength(60);
+    expect(r.columns[1]!.values[5]).toBeNull();
+    expect(r.setMissingCells).toBe(1);
+  });
+
+  it('geçersiz hücreler yalnızca doğrulanmış aralığa göre işlenir; 1–5 ölçeğinde 9 temizlenir, geçerli 5 korunur', () => {
+    const likert = Array.from({ length: 40 }, (_, i) => (i % 5) + 1);
+    likert[7] = 9;
+    const item = col('m', likert, true, { kind: 'ordinal', validRange: { min: 1, max: 5 } });
+    const r = cleanColumns([item], { rules: [rule('m', 'invalid', 'setMissing')], impute: 'none' });
+    expect(r.columns[0]!.values[7]).toBeNull();
+    expect(r.columns[0]!.values.filter((v) => v === 5)).toHaveLength(8);
+    expect(r.removedRows).toBe(0);
+  });
+
+  it('birden fazla sütunda işaretli satır bir kez silinir', () => {
+    const a = Array.from({ length: 40 }, (_, i) => 10 + (i % 5));
+    const b = Array.from({ length: 40 }, (_, i) => 20 + (i % 4));
+    a[3] = 900;
+    b[3] = 900;
+    const r = cleanColumns([col('a', a), col('b', b)], { rules: [rule('a', 'extreme', 'removeRow'), rule('b', 'extreme', 'removeRow')], impute: 'none' });
+    expect(r.removedRows).toBe(1);
+    expect(r.columns[0]!.values).toHaveLength(39);
+  });
+
+  it('doldurma yalnızca istenirse yapılır; medyan sürekli, mod sıralı ve kategorik sütunlarda kullanılır', () => {
+    const ord = col('o', [1, 2, 2, null, 2, 5, 2, 3, 2, 2], true, { kind: 'ordinal' });
+    const cat = col('g', ['a', 'a', 'b', null, 'a', 'a', 'b', 'a', 'a', 'a'], false);
+    const cont = col('y', [1.5, 2.5, 3.5, null, 10, 11, 12, 13, 14, 15]);
+    const r = cleanColumns([cont, ord, cat], { rules: [], impute: 'median' });
     expect(r.imputedCells).toBe(3);
+    expect(r.columns[1]!.values[3]).toBe(2); // mod, ortalama (≈2.67) ya da medyan değil
+    expect(r.columns[2]!.values[3]).toBe('a');
+    expect(r.columns[0]!.values[3]).toBe(11); // medyan
     expect(r.columns[0]!.values.every((v) => v !== null)).toBe(true);
-    expect(r.columns[1]!.values[3]).toBe('a');
+    expect(cleanColumns([cont, ord, cat], { rules: [], impute: 'none' }).imputedCells).toBe(0);
   });
 
-  it('KNN, ilişkili değişkenden eksik değeri yaklaşık geri kazanır', () => {
-    const r = cleanColumns([col('x', x), col('y', y)], { outlierColumns: [], impute: 'knn', k: 4 });
+  it('KNN yalnızca sürekli sütunlara uygulanır ve ilişkili değişkenden eksik değeri geri kazanır', () => {
+    const r = cleanColumns([col('x', x), col('y', y)], { rules: [], impute: 'knn', k: 4 });
     expect(r.columns[1]!.values[10]).toBeCloseTo(22, 8);
     expect(r.columns[1]!.values[20]).toBeCloseTo(42, 8);
+    const ord = col('o', [1, 2, 2, null, 2, 5, 2, 3, 2, 2, ...Array(50).fill(2)], true, { kind: 'ordinal' });
+    const knn = cleanColumns([col('x', x), ord], { rules: [], impute: 'knn' });
+    expect(knn.columns[1]!.values[3]).toBe(2); // geçerli bir kategori; ara değer değil
   });
 
-  it('hatalı istekleri anlaşılır biçimde reddeder', () => {
-    expect(() => cleanColumns([col('x', x)], { outlierColumns: ['yok'], impute: 'none' })).toThrow(AnalysisError);
-    expect(() => cleanColumns([col('g', ['a', 'b'], false)], { outlierColumns: ['g'], impute: 'none' })).toThrow(/sayısal değil/);
+  it('hatalı istekleri anlaşılır biçimde reddeder; KNN desteklenmiyorsa sessizce başka yönteme geçmez', () => {
+    expect(() => cleanColumns([col('x', x)], { rules: [rule('yok', 'extreme', 'removeRow')], impute: 'none' })).toThrow(AnalysisError);
+    expect(() => cleanColumns([col('g', ['a', 'b'], false)], { rules: [rule('g', 'extreme', 'removeRow')], impute: 'none' })).toThrow(/Tukey sınırı yalnızca sürekli/);
     const big = Array.from({ length: KNN_MAX_ROWS + 1 }, (_, i) => (i === 3 ? null : i));
-    expect(() => cleanColumns([col('b', big), col('c', big.map((v) => (v === null ? 1 : v)))], { outlierColumns: [], impute: 'knn' })).toThrow(/KNN/);
+    expect(() => cleanColumns([col('b', big), col('c', big.map((v) => (v === null ? 1 : v)))], { rules: [], impute: 'knn' })).toThrow(/KNN/);
+  });
+});
+
+describe('modeOf', () => {
+  it('eşitlikte küçük değeri seçer; sayıları sayısal sıralar', () => {
+    expect(modeOf([10, 9, 9, 10])).toBe(9);
+    expect(modeOf(['b', 'a', 'a', 'b'])).toBe('a');
+    expect(modeOf([])).toBeNull();
   });
 });
 

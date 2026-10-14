@@ -162,6 +162,13 @@ export function parseCsv(buffer: Buffer, limits: CsvLimits): ParsedCsv {
     const sortedInts = numeric && allInt ? (filled as number[]) : [];
     const sequential = sortedInts.length > 1 && sortedInts.every((v, i) => i === 0 || v === sortedInts[i - 1]! + 1);
     const idName = /(^|[_\s-])(id|kimlik|no|index|sıra|sira)$/i.test(name);
+    const isId = numeric && allInt && uniqueSet.size === filled.length && (idName || sequential);
+    // Tamsayı kodlu sütunlar sürekli ölçüm olmayabilir (kategori numarası, madde kodu). Tür çıkarımı kesin değildir;
+    // kullanıcıdan doğrulaması istenir ve Veri Kalitesi sayfasından türü düzeltilebilir.
+    if (numeric && allInt && !isId && !prefixCoded) {
+      if (type === 'ordinal') warnings.push('Tamsayı kodlu ve az sayıda değer içeriyor; sıralı sayıldı. Kategori numarası (ör. 1 = Kadın, 2 = Erkek) ise türü kategorik yapın.');
+      else if (uniqueSet.size <= 20) warnings.push('Tamsayı kodlu ve sınırlı sayıda farklı değer içeriyor; sürekli ölçüm değil sayısal kod olabilir. Türü doğrulayın.');
+    }
     return {
       name,
       type,

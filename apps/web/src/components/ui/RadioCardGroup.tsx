@@ -9,6 +9,7 @@ export interface RadioCardOption<T extends string> {
   icon?: LucideIcon;
   /** Sağ üstte küçük not, ör. "Hızlı". */
   hint?: ReactNode;
+  disabled?: boolean;
 }
 
 export interface RadioCardGroupProps<T extends string> {
@@ -41,7 +42,7 @@ export function RadioCardGroup<T extends string>({
           layout === 'row' ? 'grid-cols-[repeat(auto-fit,minmax(7rem,1fr))]' : 'grid-cols-1',
         )}
       >
-        {options.map(({ value: v, title, description, icon: Icon, hint }) => {
+        {options.map(({ value: v, title, description, icon: Icon, hint, disabled }) => {
           const checked = v === value;
           return (
             <label
@@ -50,6 +51,7 @@ export function RadioCardGroup<T extends string>({
                 'relative flex cursor-pointer gap-3 rounded-card border p-3 transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-primary',
                 layout === 'row' && Icon ? 'flex-col items-center text-center' : 'items-start',
                 checked ? 'border-secondary bg-secondary/10' : 'border-line/50 bg-surface-lowest hover:border-line-strong',
+                disabled && 'cursor-not-allowed opacity-50 hover:border-line/50',
               )}
             >
               <input
@@ -57,6 +59,7 @@ export function RadioCardGroup<T extends string>({
                 name={name}
                 value={v}
                 checked={checked}
+                disabled={disabled}
                 onChange={() => onChange(v)}
                 className={cn(Icon ? 'sr-only' : 'mt-1 accent-[var(--color-primary-strong)]')}
               />

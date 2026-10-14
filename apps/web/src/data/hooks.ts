@@ -2,6 +2,7 @@
  * Veri katmanı. Sayfalar sunucuya yalnızca bu kancalarla erişir.
  */
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { CleanRule } from '@statadvisor/shared';
 import { getModelReport } from './mocks/models';
 import {
   api,
@@ -9,6 +10,7 @@ import {
   type AnalysisBody,
   type AnalysisResponse,
   type CodeResponse,
+  type ColumnType,
   type DatasetDetail,
   type DatasetInfo,
   type QualityResponse,
@@ -77,8 +79,27 @@ export function useDeleteAllDatasets() {
 }
 
 export interface CleanBody {
-  outlierColumns: string[];
+  rules: CleanRule[];
   impute: 'none' | 'median' | 'knn';
+  /** Grup başına satır kaybını denetlemek için seçili grup sütunu. */
+  groupColumn?: string;
+  /** %10 üzeri satır kaybında gerekçe ve açık onay. */
+  acknowledgement?: { reason: string };
+}
+
+export interface ProfileEntry {
+  type?: ColumnType | null;
+  validRange?: { min: number; max: number } | null;
+  validCategories?: string[] | null;
+}
+
+/** Sütun türü düzeltmesi ve doğrulanmış geçerli değerler; tüm profil birlikte gönderilir. */
+export function useUpdateProfile(datasetId: string | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (columns: Record<string, ProfileEntry>) => api.put<DatasetInfo>(`/api/datasets/${datasetId}/profile`, { columns }),
+    onSuccess: () => qc.invalidateQueries(),
+  });
 }
 
 export function useCleanDataset(datasetId: string | null) {
@@ -195,7 +216,7 @@ export function useAnalysisCode(id: string | null) {
 export interface QualityParams {
   value?: string;
   group?: string;
-  clean?: string[];
+  rules: CleanRule[];
 }
 
 function qs(params: Record<string, string | undefined>) {
@@ -206,17 +227,17 @@ function qs(params: Record<string, string | undefined>) {
 export function useQuality(datasetId: string | null, p: QualityParams) {
   return useQuery({
     queryKey: keys.quality(datasetId, p),
-    queryFn: () => api.get<QualityResponse>(`/api/datasets/${datasetId}/quality${qs({ value: p.value, group: p.group, clean: p.clean?.join(',') })}`),
+    queryFn: () => api.get<QualityResponse>(`/api/datasets/${datasetId}/quality${qs({ value: p.value, group: p.group, rulesJson: JSON.stringify(p.rules) })}`),
     enabled: Boolean(datasetId),
     retry: shouldRetry,
     placeholderData: keepPreviousData,
   });
 }
 
-export function useCleaningCode(datasetId: string | null, p: { clean: string[]; impute: string }) {
+export function useCleaningCode(datasetId: string | null, p: { rules: CleanRule[]; impute: string }) {
   return useQuery({
     queryKey: keys.cleaningCode(datasetId, p),
-    queryFn: () => api.get<CodeResponse>(`/api/datasets/${datasetId}/cleaning-code${qs({ clean: p.clean.join(','), impute: p.impute })}`),
+    queryFn: () => api.get<CodeResponse>(`/api/datasets/${datasetId}/cleaning-code${qs({ rulesJson: JSON.stringify(p.rules), impute: p.impute })}`),
     enabled: Boolean(datasetId),
     retry: shouldRetry,
     placeholderData: keepPreviousData,

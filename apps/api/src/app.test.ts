@@ -184,6 +184,33 @@ describe('analizler', () => {
     expect(r.json().result.outcome.kind).toBe('table');
   });
 
+  it('virgüllü sütun adlarını kalite ve temizleme kodunda bölmeden kullanır', async () => {
+    const name = 'Eşyaya zarar vermek, birine dayak atmaya kıyasla çok da kötü değildir.';
+    const source = `grup,"${name}"\n` + A.map((v, i) => `${i % 2 ? 'A' : 'B'},${v}`).join('\n');
+    const id = (await upload(source)).json().id;
+    const query = new URLSearchParams({ value: name, group: 'grup', cleanJson: JSON.stringify([name]) });
+    const quality = await app.inject({ url: `/api/datasets/${id}/quality?${query}` });
+    expect(quality.statusCode).toBe(200);
+    expect(quality.json().plan.rules.map((r: { column: string }) => r.column)).toEqual([name]);
+    expect(quality.json().focus.valueColumn).toBe(name);
+    const code = await app.inject({ url: `/api/datasets/${id}/cleaning-code?${query}` });
+    expect(code.statusCode).toBe(200);
+    expect(code.json().code).toContain(name);
+    query.set('cleanJson', '[]');
+    const empty = await app.inject({ url: `/api/datasets/${id}/quality?${query}` });
+    expect(empty.statusCode).toBe(200);
+    expect(empty.json().plan.rules).toEqual([]);
+    expect(empty.json().plan.removedRows).toBe(0);
+    for (const endpoint of ['quality', 'cleaning-code']) {
+      for (const invalid of ['{', '{}', '[1]']) {
+        query.set('cleanJson', invalid);
+        expect((await app.inject({ url: `/api/datasets/${id}/${endpoint}?${query}` })).statusCode).toBe(400);
+      }
+      query.set('cleanJson', JSON.stringify(['yok']));
+      expect((await app.inject({ url: `/api/datasets/${id}/${endpoint}?${query}` })).statusCode).toBe(422);
+    }
+  });
+
   it('veri kalitesini gerçek sütunlardan hesaplar', async () => {
     const id = (await upload(csv())).json().id;
     const r = await app.inject({ url: `/api/datasets/${id}/quality?value=biyobelirtec&group=grup` });

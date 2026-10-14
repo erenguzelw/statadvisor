@@ -1,4 +1,4 @@
-import type { AnalysisResult, AnalysisSpec, DatasetQuality, GeneratedCode } from '@statadvisor/shared';
+import type { AnalysisResult, AnalysisSpec, CleanRule, DatasetQuality, GeneratedCode } from '@statadvisor/shared';
 
 /** Sunucuya gönderilen analiz isteği. */
 export type AnalysisBody = AnalysisSpec & { datasetId: string };
@@ -48,6 +48,7 @@ const json = (method: string, body?: unknown): RequestInit => ({
 export const api = {
   get: <T>(path: string) => request<T>(path),
   post: <T>(path: string, body?: unknown) => request<T>(path, json('POST', body ?? {})),
+  put: <T>(path: string, body?: unknown) => request<T>(path, json('PUT', body ?? {})),
   del: (path: string) => request<void>(path, { method: 'DELETE' }),
   upload: (file: File) => {
     const form = new FormData();
@@ -69,15 +70,42 @@ export interface ColumnInfo {
   prefixCoded?: boolean;
   rankLabels?: string[] | null;
   warnings: string[];
+  /** Dosyadan çıkarılan tür; `type` kullanıcının düzeltmesini de içerir. */
+  inferredType?: ColumnType;
+  typeOverridden?: boolean;
+  /** Ölçek toplam/ortalama puanı (tek bir madde değil). */
+  score?: boolean;
+  /** Kullanıcının doğruladığı geçerlilik kuralları. */
+  profile?: { validRange: { min: number; max: number } | null; validCategories: string[] | null };
+  /** Ölçek tanımından gelen beklenen aralık (kullanıcının ölçeği tanımlarken girdiği min/maks). */
+  scaleRange?: { min: number; max: number } | null;
+}
+
+export interface OperationLoss {
+  level: 'none' | 'review' | 'confirm';
+  worstRate: number;
+  worstScope: string;
+  reviewThreshold: number;
+  confirmThreshold: number;
+  groups: { group: string; n: number; removed: number; rate: number }[] | null;
 }
 
 export interface DatasetOperations {
+  kind?: string;
+  rules?: CleanRule[];
   outlierColumns?: string[];
   impute?: 'none' | 'median' | 'knn';
+  groupColumn?: string | null;
   removedRows?: number;
+  removedRate?: number;
+  setMissingCells?: number;
   imputedCells?: number;
   scales?: unknown;
   screening?: unknown;
+  loss?: OperationLoss;
+  acknowledgement?: { reason: string } | null;
+  /** Bu sürümden önceki işlemler (en eskiden en yeniye). */
+  history?: { dataset: string; createdAt: string; operations: Omit<DatasetOperations, 'history'> }[];
   log: string[];
 }
 

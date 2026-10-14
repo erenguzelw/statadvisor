@@ -40,7 +40,7 @@ for (const { path, title } of routes) {
     await page.goto(path);
     await expect(page.getByRole('heading', { level: 1, name: title })).toBeVisible();
     if (path === '/karar-sihirbazi') await expect(page.getByText('Otomatik varsayım kontrolü')).toBeVisible();
-    if (path === '/veri/kalite') await expect(page.getByText('Temiz hücre oranı')).toBeVisible();
+    if (path === '/veri/kalite') await expect(page.getByText('Toplam gözlem')).toBeVisible();
     await settle(page);
 
     const { violations } = await new AxeBuilder({ page }).analyze();
@@ -288,23 +288,79 @@ test('kod ve rapor: kaydedilmiş analiz yokken yönlendirir', async ({ page, req
   await expect(page.getByText('Henüz kaydedilmiş analiz yok')).toBeVisible();
 });
 
-test('veri kalitesi: aykırı ve eksik değerler gösterilir; temizlenmiş sürüm etkin olur ve analizde kullanılır', async ({ page, request }) => {
+test('veri kalitesi: varsayılan olarak hiçbir şey seçili değildir; uç değer yalnızca açık eylemle silinir; temizlenmiş sürüm etkin olur ve analizde kullanılır', async ({ page, request }) => {
   await loadSample(request, 'klinik');
   await page.goto('/veri/kalite');
-  await expect(page.getByText(/Dallanan yol uyarısı/)).toBeVisible();
-  await expect(page.getByText('Eksik değerler', { exact: true })).toBeVisible();
+  const create = page.getByRole('button', { name: 'Temizlenmiş sürümü oluştur' });
+  // Güvenli varsayılan: tarama sonuçları görünür ama silme/doldurma seçili değildir.
+  await expect(page.getByText('Toplam gözlem')).toBeVisible();
+  await expect(page.getByText(/Henüz bir eylem seçilmedi: hiçbir satır silinmez/)).toBeVisible();
+  await expect(create).toBeDisabled();
+  await expect(page.getByText(/Dallanan yol uyarısı/)).toHaveCount(0);
+  await expect(page.getByText('Eksik değer', { exact: true })).toBeVisible();
+  await expect(page.getByRole('radio', { name: /Doldurma/ }).first()).toBeChecked();
+
+  // Sürekli ölçümde uç değer açık bir eylemle silinir; önizleme sonucu gösterir.
+  await page.getByLabel('kan_basinci sütunu uç değer eylemi').selectOption('removeRow');
+  await expect(page.getByText(/Silinecek benzersiz satır:/)).toBeVisible();
+  await expect(create).toBeEnabled();
   await page.getByRole('radio', { name: 'Sonrası (önizleme)' }).check();
-  await expect(page.getByText(/satır çıkarılır/)).toBeVisible();
+  await expect(page.getByText(/Dallanan yol uyarısı/)).toBeVisible();
   await expect(page.getByText(/Temizleme kodu \(Python\)/)).toBeVisible();
 
-  await page.getByRole('button', { name: 'Temizlenmiş sürümü oluştur' }).click();
+  await create.click();
   await expect(page.getByText('Temizlenmiş sürüm oluşturuldu ve etkin veri seti yapıldı')).toBeVisible();
   await expect(page.getByRole('banner').getByLabel('Veri seti')).toContainText('temizlenmiş');
+  await expect(page.getByRole('heading', { name: 'Sürüm geçmişi' })).toBeVisible();
 
   await page.getByRole('button', { name: 'Hipotez testine geç' }).click();
   await expect(page).toHaveURL(/karar-sihirbazi/);
   await expect(page.getByRole('main').getByText('klinik_ornek (temizlenmiş).csv').first()).toBeVisible();
   await expect(page.getByText('Shapiro-Wilk testi')).toBeVisible();
+});
+
+test('veri kalitesi: sıralı anket maddesi Tukey ile silinmez; kullanıcı 1–5 aralığını doğrulayınca 9 geçersiz hücre olur', async ({ page, request }) => {
+  const lines = ['id,m1,grup'];
+  for (let i = 0; i < 60; i++) lines.push(`${i + 1},${i === 5 ? 9 : i % 20 === 0 ? 1 : i % 21 === 0 ? 5 : 3 + (i % 2)},${i % 2 ? 'a' : 'b'}`);
+  const up = await request.post('/api/datasets', { multipart: { file: { name: 'likert.csv', mimeType: 'text/csv', buffer: Buffer.from(lines.join('\n') + '\n') } } });
+  expect(up.ok()).toBe(true);
+  await page.goto('/veri/kalite');
+  await expect(page.getByText(/Tukey uygulanmaz \(sıralı\)/)).toBeVisible();
+  // Geçerlilik doğrulanmadan geçersiz-hücre eylemi seçilemez ve hiçbir hücre geçersiz sayılmaz.
+  await expect(page.getByLabel('m1 sütunu geçersiz hücre eylemi')).toBeDisabled();
+  await expect(page.getByLabel('m1 sütunu uç değer eylemi')).toBeDisabled();
+  await expect(page.getByText('kural doğrulanmadı').first()).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Temizlenmiş sürümü oluştur' })).toBeDisabled();
+
+  await page.getByRole('button', { name: 'm1 türünü ve geçerli değerlerini düzenle' }).click();
+  await page.getByLabel('Geçerli en küçük değer').fill('1');
+  await page.getByLabel('Geçerli en büyük değer').fill('5');
+  await page.getByRole('button', { name: 'Kaydet' }).click();
+  await expect(page.getByText('doğrulanmış aralık 1–5').first()).toBeVisible();
+  const invalidAction = page.getByLabel('m1 sütunu geçersiz hücre eylemi');
+  await expect(invalidAction).toBeEnabled();
+  await invalidAction.selectOption('setMissing');
+  await expect(page.getByText(/Eksik işaretlenecek hücre:/)).toContainText('1');
+  await expect(page.getByText(/Silinecek benzersiz satır:/)).toContainText('0');
+  await page.getByRole('button', { name: 'Temizlenmiş sürümü oluştur' }).click();
+  await expect(page.getByText('Temizlenmiş sürüm oluşturuldu ve etkin veri seti yapıldı')).toBeVisible();
+  await expect(page.getByText(/60 satır\./).first()).toBeVisible(); // satır silinmedi
+});
+
+test('veri kalitesi: veri seti değişince önceki seçimler yeni veriye taşınmaz', async ({ page, request }) => {
+  await loadSample(request, 'klinik');
+  await loadSample(request, 'anket');
+  await page.goto('/veri/kalite');
+  const dataset = page.getByRole('banner').getByLabel('Veri seti');
+  const pick = async (text: string) => dataset.selectOption((await dataset.locator('option', { hasText: text }).getAttribute('value'))!);
+  await pick('klinik');
+  await page.getByLabel('kan_basinci sütunu uç değer eylemi').selectOption('removeRow');
+  await expect(page.getByText(/Silinecek benzersiz satır:/)).toBeVisible();
+  await pick('anket');
+  await expect(page.getByText(/Henüz bir eylem seçilmedi: hiçbir satır silinmez/)).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Temizlenmiş sürümü oluştur' })).toBeDisabled();
+  await pick('klinik');
+  await expect(page.getByText(/Henüz bir eylem seçilmedi: hiçbir satır silinmez/)).toBeVisible();
 });
 
 test('model karşılaştırma: ölçütler taban çizgisiyle birlikte gösterilir; bayraklar işaretlenir', async ({ page }) => {
