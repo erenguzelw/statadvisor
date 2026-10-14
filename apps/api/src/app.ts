@@ -26,6 +26,15 @@ import {
   screenResponses,
   type ScaleDef,
   fitLinearRegression,
+  fitLogisticRegression,
+  generateLogisticCode,
+  hosmerLemeshowRows,
+  classificationRows,
+  logisticReportData,
+  logitCoefficientRows,
+  logitModelRows,
+  narrateLogistic,
+  type LogisticSpec,
   generateAnalysisCode,
   generateRegressionCode,
   narrateRegression,
@@ -812,6 +821,100 @@ export function buildApp(opts: AppOptions): FastifyInstance {
     }
     reply.header('Content-Type', 'application/pdf');
     reply.header('Content-Disposition', 'attachment; filename="regresyon-raporu.pdf"');
+    return renderPdf(html);
+  });
+
+  /* ---------- İkili lojistik regresyon ---------- */
+  const LogisticBody = RegressionBody.extend({ eventLevel: z.string().max(200).optional() });
+
+  function runLogistic(id: string, rawBody: unknown) {
+    const body = LogisticBody.parse(rawBody ?? {});
+    const { row, csv } = parsed(id);
+    const col = (name: string) => {
+      const c = csv.columns.find((x) => x.name === name);
+      if (!c) throw new ApiError(422, 'unknown_column', `“${name}” adlı sütun bulunamadı.`);
+      return c;
+    };
+    const dep = col(body.dependent);
+    const all = [...body.numeric, ...body.categorical];
+    if (all.length === 0) throw new ApiError(422, 'no_predictors', 'En az bir yordayıcı seçin.');
+    if (new Set(all).size !== all.length) throw new ApiError(422, 'duplicate_predictor', 'Bir değişken hem sayısal hem kategorik yordayıcı olarak ya da birden fazla kez seçilmiş.');
+    if (all.includes(dep.name)) throw new ApiError(422, 'dependent_in_predictors', 'Bağımlı değişken aynı zamanda yordayıcı olamaz.');
+    for (const n of body.numeric) if (!col(n).numeric) throw new ApiError(422, 'bad_predictor', `“${n}” sayısal değil; kategorik yordayıcı olarak ekleyin.`);
+    for (const n of all) if (col(n).likelyId) throw new ApiError(422, 'id_predictor', `“${n}” kimlik sütunu gibi görünüyor; yordayıcı olamaz.`);
+    const result = fitLogisticRegression(
+      dep.values,
+      [
+        ...body.numeric.map((n) => ({ name: n, kind: 'numeric' as const, values: col(n).values })),
+        ...body.categorical.map((n) => ({ name: n, kind: 'categorical' as const, values: col(n).values })),
+      ],
+      { alpha: body.alpha, reference: body.reference, eventLevel: body.eventLevel },
+    );
+    const spec: LogisticSpec = {
+      dependent: dep.name,
+      numeric: body.numeric,
+      categorical: body.categorical,
+      alpha: body.alpha,
+      reference: body.reference,
+      numericCategorical: [...body.categorical, ...(dep.numeric ? [dep.name] : [])].filter((n) => col(n).numeric),
+      eventLevel: result.eventLevel,
+    };
+    return { row, csv, spec, result };
+  }
+
+  app.post('/api/datasets/:id/logistic', async (req) => {
+    const { id } = req.params as { id: string };
+    const { row, csv, spec, result } = runLogistic(id, req.body);
+    const narrative = narrateLogistic(result, spec.dependent);
+    // Tam ayrışmada statsmodels da hata verir; katsayılar anlamsız olduğu için kod üretilmez.
+    const code = result.separation === 'complete' ? null : generateLogisticCode(fileInfo(row, csv), spec, result);
+    const { probs, usedRows, ...summary } = result;
+    void probs; void usedRows;
+    return {
+      datasetId: row.id,
+      datasetName: row.name,
+      spec,
+      result: summary,
+      narrative,
+      model: logitModelRows(result),
+      coefficients: logitCoefficientRows(result),
+      classification: classificationRows(result),
+      hosmerLemeshow: hosmerLemeshowRows(result),
+      code,
+      engine: engineInfo(),
+    };
+  });
+
+  app.post('/api/datasets/:id/logistic/report', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const { format } = z.object({ format: z.enum(['html', 'pdf', 'docx']).default('html') }).parse(req.query);
+    const { row, spec, result } = runLogistic(id, req.body);
+    const eng = engineInfo();
+    const audit: [string, string][] = [
+      ['Veri seti', `${row.name} (SHA-256 ${row.sha256.slice(0, 16)}…, ${row.rows} satır)`],
+      ['Bağımlı değişken', `${spec.dependent} (olay: ${result.eventLevel}; referans: ${result.referenceLevel})`],
+      ['Yordayıcılar', [...spec.numeric, ...spec.categorical].join(', ')],
+      ['Referans düzeyler', result.categories.map((c) => `${c.name}: ${c.reference}`).join('; ') || '–'],
+      ['Güven düzeyi', `%${Math.round((1 - (spec.alpha ?? 0.05)) * 100)}`],
+      ['Sınıflandırma eşiği', String(result.classification.threshold)],
+      ['Motor sürümü', `${eng.engineName} ${eng.engine}`],
+      ['Referans doğrulama', `statsmodels Logit ile karşılaştırıldı (referans paketi: ${eng.referenceSuite.cases} vaka)`],
+      ['Çalışma ortamı', `Node ${eng.node}`],
+    ];
+    const data = logisticReportData(result, spec, row.name, new Date().toLocaleDateString('tr-TR'), audit);
+    const html = buildRegressionReport(data);
+    if (format === 'html') {
+      reply.header('Content-Type', 'text/html; charset=utf-8');
+      reply.header('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; img-src data:");
+      return html;
+    }
+    if (format === 'docx') {
+      reply.header('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+      reply.header('Content-Disposition', 'attachment; filename="lojistik-regresyon-raporu.docx"');
+      return buildRegressionDocx(data);
+    }
+    reply.header('Content-Type', 'application/pdf');
+    reply.header('Content-Disposition', 'attachment; filename="lojistik-regresyon-raporu.pdf"');
     return renderPdf(html);
   });
 

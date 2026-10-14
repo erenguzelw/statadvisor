@@ -270,6 +270,8 @@ export function generateRegressionCode(file: DatasetFile, spec: RegressionSpec, 
 }
 
 /** Rapora yazılan düz veri. */
+export const LINEAR_COEFFICIENT_NOTE = 'b: düzeltilmemiş katsayı; SH: standart hata; β: standartlaştırılmış katsayı; VIF: varyans şişirme çarpanı.';
+
 export interface RegressionReportData {
   title: string;
   datasetName: string;
@@ -278,6 +280,10 @@ export interface RegressionReportData {
   predictors: string[];
   model: [string, string][];
   coefficients: { header: string[]; rows: string[][] };
+  /** Katsayı tablosunun altındaki açıklama (verilmezse doğrusal regresyon açıklaması). */
+  coefficientNote?: string;
+  /** Katsayılardan sonra eklenen ek tablolar (ör. sınıflandırma tablosu). */
+  extraTables?: { title: string; header: string[]; rows: string[][] }[];
   narrative: RegressionNarrative;
   audit?: [string, string][];
 }
@@ -312,7 +318,7 @@ export function buildRegressionReport(d: RegressionReportData): string {
 <p class="muted">${esc(d.datasetName)} · ${esc(d.date)} · StatAdvisor AI</p>
 <p>Bağımlı değişken: <strong>${esc(d.dependent)}</strong>. Yordayıcılar: ${d.predictors.map((p) => `<strong>${esc(p)}</strong>`).join(', ')}.</p>
 <section data-section="model"><h2>Model özeti</h2>${tbl(['Ölçüt', 'Değer'], d.model)}</section>
-<section data-section="coef"><h2>Katsayılar</h2>${tbl(d.coefficients.header, d.coefficients.rows)}<p class="muted">b: düzeltilmemiş katsayı; SH: standart hata; β: standartlaştırılmış katsayı; VIF: varyans şişirme çarpanı.</p></section>
+<section data-section="coef"><h2>Katsayılar</h2>${tbl(d.coefficients.header, d.coefficients.rows)}<p class="muted">${esc(d.coefficientNote ?? LINEAR_COEFFICIENT_NOTE)}</p>${(d.extraTables ?? []).map((t) => `<p class="muted">${esc(t.title)}</p>${tbl(t.header, t.rows)}`).join('')}</section>
 <section data-section="notes"><h2>Tanılar ve uyarılar</h2>${notes || '<p class="muted">Uyarı yok.</p>'}</section>
 <section data-section="read"><h2>Nasıl okunur</h2><ul>${d.narrative.interpretation.map((t) => `<li>${esc(t)}</li>`).join('')}</ul></section>
 <section data-section="apa"><h2>APA 7 stilinde özet</h2><p>${esc(d.narrative.apaSummary)}</p></section>

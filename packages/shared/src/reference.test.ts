@@ -11,6 +11,7 @@ import {
   fisherExact,
   friedmanTest,
   fitLinearRegression,
+  fitLogisticRegression,
   fSurvival,
   kruskalWallis,
   levene,
@@ -145,6 +146,25 @@ specs.ols = {
 };
 specs.ols!.tol!.shapiroW = [1e-9, 1e-11];
 specs.ols!.tol!.shapiroP = [1e-7, 1e-10];
+
+specs.logit = {
+  run: (i) => {
+    const r = fitLogisticRegression(i.y, i.predictors);
+    const c = r.coefficients;
+    return {
+      b: c.map((x) => x.b), se: c.map((x) => x.se), z: c.map((x) => x.z), p: c.map((x) => x.p),
+      ciLow: c.map((x) => x.ciLow), ciHigh: c.map((x) => x.ciHigh), vif: c.slice(1).map((x) => x.vif!),
+      n: r.n, logLik: r.logLik, logLikNull: r.logLikNull, lrChi2: r.lrChi2, lrP: r.lrP, mcFadden: r.mcFadden,
+      coxSnell: r.coxSnell, nagelkerke: r.nagelkerke, aic: r.aic, bic: r.bic, auc: r.auc,
+      hlChi2: r.hosmerLemeshow!.chi2, hlP: r.hosmerLemeshow!.p,
+      tp: r.classification.tp, fp: r.classification.fp, tn: r.classification.tn, fn: r.classification.fn,
+      probs: r.probs,
+    };
+  },
+  tol: Object.fromEntries(
+    ['b', 'se', 'z', 'p', 'ciLow', 'ciHigh', 'vif', 'n', 'logLik', 'logLikNull', 'lrChi2', 'lrP', 'mcFadden', 'coxSnell', 'nagelkerke', 'aic', 'bic', 'auc', 'hlChi2', 'hlP', 'tp', 'fp', 'tn', 'fn', 'probs'].map((k) => [k, olsTol]),
+  ) as Record<string, [number, number]>,
+};
 
 export { specs, close, fixture };
 export type { Case };

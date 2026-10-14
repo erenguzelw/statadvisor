@@ -145,6 +145,13 @@ try:
 except ModuleNotFoundError:
     pass
 
+try:
+    import generate_logit  # noqa: E402
+
+    generate_logit.add_all(add, f)
+except ModuleNotFoundError:
+    pass
+
 meta = {
     "seed": SEED,
     "python": sys.version.split()[0],

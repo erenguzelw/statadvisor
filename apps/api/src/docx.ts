@@ -1,5 +1,5 @@
 import { AlignmentType, Document, HeadingLevel, ImageRun, Packer, Paragraph, Table, TableCell, TableRow, TextRun, WidthType } from 'docx';
-import { crosstabRows, type RegressionReportData, descriptiveTables, formatP, reportFigures, type ReportData, type ReportFigure } from '@statadvisor/shared';
+import { crosstabRows, LINEAR_COEFFICIENT_NOTE, type RegressionReportData, descriptiveTables, formatP, reportFigures, type ReportData, type ReportFigure } from '@statadvisor/shared';
 import { svgToPng } from './raster.ts';
 
 const para = (text: string, opts: { bold?: boolean; italics?: boolean; size?: number; spacingAfter?: number } = {}) =>
@@ -98,7 +98,8 @@ export async function buildRegressionDocx(d: RegressionReportData): Promise<Buff
     table(['Ölçüt', 'Değer'], d.model),
     heading('Katsayılar'),
     table(d.coefficients.header, d.coefficients.rows),
-    para('b: düzeltilmemiş katsayı; SH: standart hata; β: standartlaştırılmış katsayı; VIF: varyans şişirme çarpanı.', { italics: true, size: 18 }),
+    para(d.coefficientNote ?? LINEAR_COEFFICIENT_NOTE, { italics: true, size: 18 }),
+    ...(d.extraTables ?? []).flatMap((t) => [para(t.title, { italics: true, size: 20, spacingAfter: 60 }), table(t.header, t.rows), para('', { spacingAfter: 60 })]),
     heading('Tanılar ve uyarılar'),
     ...(d.narrative.notes.length ? d.narrative.notes.map((n) => para(`• ${n.title}. ${n.text}`, { size: 20 })) : [para('Uyarı yok.', { italics: true })]),
     heading('Nasıl okunur'),
