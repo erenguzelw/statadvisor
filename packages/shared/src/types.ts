@@ -75,6 +75,17 @@ export interface GroupDescriptive {
   se: number;
 }
 
+/** İki sayısal değişkenin saçılım özeti: en çok 500 nokta (aralıklı örnekleme) ve tüm veriden en küçük kareler doğrusu. */
+export interface ScatterSample {
+  xName: string;
+  yName: string;
+  points: [number, number][];
+  /** Grafikteki nokta sayısı değil, analizdeki toplam gözlem sayısı. */
+  n: number;
+  slope: number;
+  intercept: number;
+}
+
 export interface Interpretation {
   id: string;
   /** Kanıt olarak gösterilen sayısal çıktı, ör. "p = 0.003". */

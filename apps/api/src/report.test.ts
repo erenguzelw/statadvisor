@@ -61,6 +61,22 @@ describe('rapor biçimleri', () => {
     expect(xml).toContain('Toplam');
   });
 
+  it('HTML: korelasyon raporunda saçılım grafiği, en çok 500 nokta ve regresyon doğrusu', async () => {
+    const a = await analysis({ goal: 'relate', group: undefined, value: undefined, x: 'yas', y: 'kan_basinci' });
+    expect(a.result.scatter.n).toBe(1420);
+    expect(a.result.scatter.points.length).toBeLessThanOrEqual(500);
+    const html = (await app.inject({ url: `/api/analyses/${a.id}/report` })).body;
+    expect(html).toContain('Saçılım grafiği');
+    expect(html).toContain('yas ile kan_basinci saçılım grafiği');
+    expect(html).toMatch(/1420 gözlemden \d+ nokta gösteriliyor/);
+    expect(html).toMatch(/y = -?\d+\.\d\d [+−] \d+\.\d\dx/);
+    expect((html.match(/<circle/g) ?? []).length).toBe(a.result.scatter.points.length);
+    expect(html).not.toContain('NaN');
+    // grup karşılaştırmasında saçılım grafiği yoktur
+    const g = await analysis();
+    expect((await app.inject({ url: `/api/analyses/${g.id}/report` })).body).not.toContain('Saçılım grafiği');
+  });
+
   it('DOCX: özet istatistik tabloları', async () => {
     const a = await analysis();
     const zip = await JSZip.loadAsync((await app.inject({ url: `/api/analyses/${a.id}/report?format=docx` })).rawPayload);

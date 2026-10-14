@@ -2,7 +2,7 @@
  * Raporlar için bağımsız (kütüphanesiz) SVG grafikler. Çıktı belirleyicidir: aynı veri aynı metni üretir.
  */
 import { extent } from './extent.ts';
-import type { BoxStats, DistributionSample } from './types.ts';
+import type { BoxStats, DistributionSample, ScatterSample } from './types.ts';
 
 const W = 520;
 const H = 220;
@@ -108,4 +108,35 @@ export function crosstabSvg(t: { rowNames: string[]; colNames: string[]; table: 
     .map((c, i) => `<rect x="${labelW + i * 110}" y="${axisY + 6}" width="10" height="10" fill="${COLORS[i % COLORS.length]}" fill-opacity="0.8"/><text x="${labelW + i * 110 + 14}" y="${axisY + 15}" font-size="10" fill="#333">${esc(c.length > 12 ? `${c.slice(0, 11)}…` : c)}</text>`)
     .join('');
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${h}" width="100%" role="img" aria-label="${esc(title)}"><title>${esc(title)}</title>${rows}${legend}</svg>`;
+}
+
+/** İki sayısal değişken için saçılım grafiği ve (tüm veriden hesaplanan) en küçük kareler doğrusu. */
+export function scatterSvg(s: ScatterSample, title: string): string {
+  const pts = s.points.filter(([a, b]) => Number.isFinite(a) && Number.isFinite(b));
+  if (pts.length < 2) return '';
+  const xs = extent(pts.map((p) => p[0]));
+  const ys = extent(pts.map((p) => p[1]));
+  const xp = (xs.hi - xs.lo || 1) * 0.05;
+  const yp = (ys.hi - ys.lo || 1) * 0.05;
+  const x0 = xs.lo - xp;
+  const x1 = xs.hi + xp;
+  const y0 = ys.lo - yp;
+  const y1 = ys.hi + yp;
+  const left = 52;
+  const bottom = 40;
+  const sx = (v: number) => left + ((v - x0) / (x1 - x0)) * (W - left - pad.right);
+  const sy = (v: number) => H - bottom - ((v - y0) / (y1 - y0)) * (H - pad.top - bottom);
+  const grid = [0, 1, 2, 3, 4]
+    .map((i) => {
+      const v = y0 + ((y1 - y0) * i) / 4;
+      const u = x0 + ((x1 - x0) * i) / 4;
+      return `<line x1="${left}" x2="${W - pad.right}" y1="${n2(sy(v))}" y2="${n2(sy(v))}" stroke="#ddd" stroke-dasharray="3 4"/><text x="${left - 6}" y="${n2(sy(v) + 3)}" text-anchor="end" font-size="10" fill="#555">${tick(v)}</text><text x="${n2(sx(u))}" y="${H - bottom + 14}" text-anchor="middle" font-size="10" fill="#555">${tick(u)}</text>`;
+    })
+    .join('');
+  const dots = pts.map(([a, b]) => `<circle cx="${n2(sx(a))}" cy="${n2(sy(b))}" r="2.6" fill="#6b6fe0" fill-opacity="0.45"/>`).join('');
+  const line = Number.isFinite(s.slope)
+    ? `<line x1="${n2(sx(xs.lo))}" y1="${n2(sy(s.intercept + s.slope * xs.lo))}" x2="${n2(sx(xs.hi))}" y2="${n2(sy(s.intercept + s.slope * xs.hi))}" stroke="#d98a00" stroke-width="2"/>`
+    : '';
+  const cut = (t: string) => (t.length > 40 ? `${t.slice(0, 39)}…` : t);
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${esc(title)}"><title>${esc(title)}</title>${grid}${dots}${line}<text x="${n2((left + W - pad.right) / 2)}" y="${H - 4}" text-anchor="middle" font-size="11" fill="#222">${esc(cut(s.xName))}</text><text transform="rotate(-90)" x="${-n2((H - bottom + pad.top) / 2)}" y="12" text-anchor="middle" font-size="11" fill="#222">${esc(cut(s.yName))}</text></svg>`;
 }

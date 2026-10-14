@@ -1,7 +1,7 @@
 import type { AnalysisResult } from './analysis.ts';
-import { boxPlotSvg, crosstabSvg, histogramSvg } from './chart-svg.ts';
+import { boxPlotSvg, crosstabSvg, histogramSvg, scatterSvg } from './chart-svg.ts';
 import { formatP, pText } from './stats.ts';
-import type { AssumptionTest, BoxStats, DecisionPath, DistributionSample, GroupDescriptive } from './types.ts';
+import type { AssumptionTest, BoxStats, DecisionPath, DistributionSample, GroupDescriptive, ScatterSample } from './types.ts';
 
 /** Rapora yazılan düz veri; hem gerçek analiz sonuçlarından hem örnek özetten üretilebilir. */
 export interface ReportData {
@@ -12,6 +12,8 @@ export interface ReportData {
   descriptives: GroupDescriptive[];
   /** Grup/koşul başına kutu grafiği özeti; verilirse tanımlayıcı istatistiklerin altına grafik eklenir. */
   boxes?: BoxStats[];
+  /** İlişki analizlerinde saçılım grafiği için örnek noktalar. */
+  scatter?: ScatterSample;
   /** Kategorik analizlerde çapraz tablo; verilirse tablo ve yığılmış çubuk grafiği eklenir. */
   table?: { rowNames: string[]; colNames: string[]; table: number[][] };
   /** Sayısal hedeflerde grup içi kalıntıların dağılımı (rapora grafik olarak eklenir). */
@@ -39,6 +41,7 @@ export function reportFromResult(r: AnalysisResult, date: string, audit?: [strin
     date,
     descriptives: r.descriptives,
     boxes: r.boxes,
+    scatter: r.scatter,
     table: r.table,
     distribution: r.distribution,
     assumptions: r.assumptions,
@@ -94,6 +97,9 @@ export function buildReport(d: ReportData): string {
   const boxFigure = d.boxes?.length
     ? `<figure><figcaption class="muted">Grup başına kutu grafiği (kutu: Q1–Q3, kalın çizgi: medyan, bıyık: Tukey sınırları içindeki uç gözlemler, halka: sınır dışı gözlem)</figcaption>${boxPlotSvg(d.boxes, 'Gruplara göre kutu grafiği')}</figure>`
     : '';
+  const scatterFigure = d.scatter
+    ? `<figure><figcaption class="muted">Saçılım grafiği (${d.scatter.points.length < d.scatter.n ? `${d.scatter.n} gözlemden ${d.scatter.points.length} nokta gösteriliyor; ` : ''}turuncu çizgi: tüm gözlemlerden hesaplanan en küçük kareler doğrusu, y = ${d.scatter.intercept.toFixed(2)} ${d.scatter.slope < 0 ? '−' : '+'} ${Math.abs(d.scatter.slope).toFixed(2)}x)</figcaption>${scatterSvg(d.scatter, `${d.scatter.xName} ile ${d.scatter.yName} saçılım grafiği`)}</figure>`
+    : '';
   let crosstab = '';
   if (d.table) {
     const ct = crosstabRows(d.table);
@@ -110,7 +116,7 @@ export function buildReport(d: ReportData): string {
 
   const body = `<h1>${esc(d.title)}</h1>
 <p class="muted">${esc(d.datasetName)} · ${esc(d.date)} · StatAdvisor AI</p>
-<section data-section="desc"><h2>Tanımlayıcı istatistikler</h2>${desc}${boxFigure}${crosstab}${notes}</section>
+<section data-section="desc"><h2>Tanımlayıcı istatistikler</h2>${desc}${boxFigure}${scatterFigure}${crosstab}${notes}</section>
 <section data-section="assump"><h2>Varsayım testleri ve karar notları</h2>${assump}${chart}
 <p>Önerilen test: <strong>${esc(d.decision.finalTest)}</strong>${d.decision.rerouteReason ? ` (${esc(d.decision.rerouteReason)})` : ''}.</p>${warnings}${alts}</section>
 <section data-section="result"><h2>Test sonucu</h2><p>${esc(d.resultLine)}</p></section>
