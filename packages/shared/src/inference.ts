@@ -24,7 +24,7 @@ import {
   wilcoxonSignedRank,
   type PairResult,
 } from './tests.ts';
-import type { BoxStats, GroupDescriptive, Interpretation } from './types.ts';
+import type { BoxStats, GroupDescriptive, Interpretation, ScatterSample } from './types.ts';
 
 export type TestInput =
   | { kind: 'groups'; names: string[]; groups: number[][] }
@@ -96,6 +96,27 @@ export function describeGroups(names: string[], groups: number[][]): GroupDescri
       se: s / Math.sqrt(g.length),
     };
   });
+}
+
+/** Saçılım grafiğinde çizilen en fazla nokta sayısı. */
+const MAX_SCATTER_POINTS = 500;
+
+/** Saçılım özeti: noktalar sabit aralıkla seçilir (aynı veri → aynı grafik); doğru tüm gözlemlerden hesaplanır. */
+export function scatterSample(xName: string, yName: string, x: number[], y: number[]): ScatterSample {
+  const n = x.length;
+  const stride = Math.max(1, Math.ceil(n / MAX_SCATTER_POINTS));
+  const points: [number, number][] = [];
+  for (let i = 0; i < n; i += stride) points.push([x[i]!, y[i]!]);
+  const mx = mean(x);
+  const my = mean(y);
+  let sxy = 0;
+  let sxx = 0;
+  for (let i = 0; i < n; i++) {
+    sxy += (x[i]! - mx) * (y[i]! - my);
+    sxx += (x[i]! - mx) ** 2;
+  }
+  const slope = sxx > 0 ? sxy / sxx : NaN;
+  return { xName, yName, points, n, slope, intercept: my - slope * mx };
 }
 
 /** Rapordaki kutu grafiğinde tek tek çizilen en fazla uç gözlem sayısı (büyük veride rapor şişmesin diye). */

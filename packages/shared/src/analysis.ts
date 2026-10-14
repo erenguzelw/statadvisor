@@ -5,9 +5,9 @@
 import { groupResiduals, levene, mean, shapiroWilk } from './assumptions.ts';
 import { extent } from './extent.ts';
 import { recommendTest,type AssumptionInput, type Design, type Goal, type Target, type WizardAnswers } from './decision.ts';
-import { boxStatsFor, describeGroups, interpretOutcome, runTest, type TestInput, type TestOutcome } from './inference.ts';
+import { boxStatsFor, describeGroups, scatterSample, interpretOutcome, runTest, type TestInput, type TestOutcome } from './inference.ts';
 import { histogram, meanSd, pText, shapeStats, skewness } from './stats.ts';
-import type { AssumptionTest, BoxStats, DecisionPath, DistributionSample, GroupDescriptive, Interpretation } from './types.ts';
+import type { AssumptionTest, BoxStats, DecisionPath, ScatterSample, DistributionSample, GroupDescriptive, Interpretation } from './types.ts';
 
 /** Çözümlenebilir bir istek biçimi hatası; kullanıcıya olduğu gibi gösterilebilir. */
 export class AnalysisError extends Error {
@@ -54,6 +54,8 @@ export interface AnalysisResult {
   descriptives: GroupDescriptive[];
   /** Grup/koşul başına kutu grafiği özeti (grup karşılaştırması ve eşleşmiş koşullar için). */
   boxes?: BoxStats[];
+  /** İlişki analizlerinde (iki sayısal sütun) saçılım grafiği için örnek noktalar. */
+  scatter?: ScatterSample;
   outcome: TestOutcome;
   interpretation: Interpretation;
   apaSummary: string;
@@ -274,6 +276,7 @@ export function analyze(req: AnalysisRequest): AnalysisResult {
   let groupCount: '2' | '3+' = '2';
   let descriptives: GroupDescriptive[] = [];
   let boxes: BoxStats[] | undefined;
+  let scatter: ScatterSample | undefined;
   let variables: string[];
   const normality: NormalityMethod = req.normality ?? 'shapiro';
   const limit = normality === 'skewkurt-2' ? 2 : 1.5;
@@ -320,6 +323,7 @@ export function analyze(req: AnalysisRequest): AnalysisResult {
     input = { kind: 'xy', xName: req.x.name, yName: req.y.name, x, y };
     variables = [req.x.name, req.y.name];
     descriptives = describeGroups([req.x.name, req.y.name], [x, y]);
+    scatter = scatterSample(req.x.name, req.y.name, x, y);
   } else if (req.design === 'paired') {
     if (!req.conditions || req.conditions.length < 2) throw new AnalysisError('Eşleşmiş karşılaştırma için en az 2 sütun (koşul) seçin.');
     const { keep, dropped } = completeRows(req.conditions);
@@ -413,6 +417,7 @@ export function analyze(req: AnalysisRequest): AnalysisResult {
     distribution,
     descriptives,
     boxes,
+    scatter,
     outcome,
     interpretation: interpretOutcome(outcome),
     table: input.kind === 'table' ? { rowNames: input.rowNames, colNames: input.colNames, table: input.table } : undefined,
