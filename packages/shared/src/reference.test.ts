@@ -180,7 +180,10 @@ describe(`referans vakalar (SciPy ${fixture.meta.scipy}, scikit-learn ${fixture.
   const byTest: Record<string, Case[]> = {};
   for (const c of fixture.cases) (byTest[c.test] ??= []).push(c);
 
+  // ml_cv vakaları ayrı dosyada (ml-cv.test.ts) sınanır: modele göre farklı eşleşme beklentisi vardır
+  const SEPARATE = new Set(['ml_cv']);
   for (const [name, list] of Object.entries(byTest)) {
+    if (SEPARATE.has(name)) continue;
     const spec = specs[name];
     it(`${name}: ${list.length} vaka`, () => {
       expect(spec, `"${name}" için çalıştırıcı tanımlı değil`).toBeDefined();
