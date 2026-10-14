@@ -346,4 +346,65 @@ suite('üretilen temizleme kodu, uygulamanın temizlediği veriyi yeniden üreti
       expect(maxDiff).toBeLessThan(1e-6);
     });
   }
+
+  /** Karma kurallı veri: sıralı madde, sayısal kodlu ve metin kategorik, sürekli ölçümler; eksik değerler dağınık. */
+  function mixedCsv() {
+    const lines = ['id,grup,m1,kod,sehir,puan,olcum'];
+    for (let i = 0; i < 120; i++) {
+      const m1 = i === 6 ? 9 : i === 17 ? 0 : i % 13 === 0 ? '' : 1 + (i % 5);
+      const kod = i === 4 ? 3 : i % 17 === 0 ? '' : 1 + (i % 2);
+      const sehir = i === 8 ? 'X' : i % 19 === 0 ? '' : ['A', 'B', 'C'][i % 3];
+      const puan = i === 10 ? 999 : i === 11 ? 99 : i % 23 === 0 ? '' : (50 + (i % 9) * 1.3 + (i % 4) * 0.2 + i * 0.00731).toFixed(4);
+      const olcum = i === 20 ? 250 : i === 21 ? 300 : i % 29 === 0 ? '' : (80 + (i % 7) * 1.1 + (i % 3) * 0.3 + i * 0.00917).toFixed(4);
+      lines.push(`${i + 1},${['K', 'T'][i % 2]},${m1},${kod},${sehir},${puan},${olcum}`);
+    }
+    return lines.join('\n') + '\n';
+  }
+
+  for (const impute of ['none', 'median', 'knn'] as const) {
+    it(`karma kurallar (geçersiz hücre + uç değer; eksik işaretle + satır sil) + ${impute === 'none' ? 'doldurma yok' : impute + ' doldurma'}`, { timeout: 120_000 }, async () => {
+      const id = await uploadCsv(mixedCsv());
+      const prof = await app.inject({
+        method: 'PUT',
+        url: `/api/datasets/${id}/profile`,
+        payload: { columns: { m1: { validRange: { min: 1, max: 5 } }, kod: { type: 'categorical', validCategories: ['1', '2'] }, sehir: { validCategories: ['A', 'B', 'C'] }, puan: { validRange: { min: 0, max: 100 } } } },
+      });
+      expect(prof.statusCode, prof.body).toBe(200);
+      const rules = [
+        { column: 'm1', issue: 'invalid', action: 'setMissing' },
+        { column: 'kod', issue: 'invalid', action: 'removeRow' },
+        { column: 'sehir', issue: 'invalid', action: 'setMissing' },
+        { column: 'puan', issue: 'invalid', action: 'setMissing' },
+        { column: 'puan', issue: 'extreme', action: 'removeRow' },
+        { column: 'olcum', issue: 'extreme', action: 'setMissing' },
+      ];
+      const clean = await app.inject({ method: 'POST', url: `/api/datasets/${id}/clean`, payload: { rules, impute } });
+      expect(clean.statusCode, clean.body).toBe(201);
+      const op = clean.json().operations;
+      expect(op.removedRows).toBeGreaterThanOrEqual(2); // kod = 3 ve puan = 99 (geçerli ama uç)
+      expect(op.setMissingCells).toBeGreaterThanOrEqual(3); // m1 = 9 ve 0, sehir = X, puan = 999, olcum uçları
+      const appCsv = table((await app.inject({ url: `/api/datasets/${clean.json().id}/download` })).body);
+      const pyCsv = table(await runCleaning(id, `rulesJson=${encodeURIComponent(JSON.stringify(rules))}&impute=${impute}`));
+      expect(pyCsv[0]).toEqual(appCsv[0]);
+      expect(pyCsv.length).toBe(appCsv.length);
+      let maxDiff = 0;
+      let worst = '';
+      for (let i = 1; i < appCsv.length; i++) {
+        for (let j = 0; j < appCsv[i]!.length; j++) {
+          const a = appCsv[i]![j]!;
+          const b = pyCsv[i]![j]!;
+          const na = Number(a);
+          const nb = Number(b);
+          if (a === '' || b === '' || Number.isNaN(na) || Number.isNaN(nb)) expect(b, `satır ${i}, sütun ${appCsv[0]![j]}`).toBe(a);
+          else if (Math.abs(na - nb) > maxDiff) {
+            maxDiff = Math.abs(na - nb);
+            worst = `satır ${i}, sütun ${appCsv[0]![j]}: uygulama ${a}, python ${b}`;
+          }
+        }
+      }
+      expect(maxDiff, worst).toBeLessThan(1e-6);
+      if (impute === 'none') expect(appCsv.slice(1).some((r) => r.includes(''))).toBe(true); // doldurma yok: eksikler kaldı
+      else expect(appCsv.slice(1).flat().filter((c) => c === '').length).toBeLessThan(5);
+    });
+  }
 });

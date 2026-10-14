@@ -29,6 +29,8 @@ const MIGRATIONS: string[] = [
   // Temizleme ile türetilen veri sürümlerinin kaynağı ve uygulanan işlemler
   `ALTER TABLE datasets ADD COLUMN parent_id TEXT REFERENCES datasets(id) ON DELETE SET NULL;
    ALTER TABLE datasets ADD COLUMN operations_json TEXT;`,
+  // Sütun profili: kullanıcının düzelttiği türler ve doğruladığı geçerli değerler
+  `ALTER TABLE datasets ADD COLUMN profile_json TEXT;`,
 ];
 
 export function openDb(path: string): DatabaseSync {

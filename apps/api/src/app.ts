@@ -12,6 +12,14 @@ import {
   buildReport,
   cleanColumns,
   computeScales,
+  groupLossOf,
+  KNN_MAX_ROWS,
+  lossLevel,
+  planRules,
+  ROW_LOSS_CONFIRM,
+  ROW_LOSS_REVIEW,
+  validateRules,
+  type CleanRule,
   generateScalesCode,
   generateScreeningCode,
   screenResponses,
@@ -33,6 +41,7 @@ import {
 import { CsvError, parseCsv, type ParsedColumn, type ParsedCsv } from './csv.ts';
 import { isOle, isZip, xlsxToCsv } from './xlsx.ts';
 import { openDb } from './db.ts';
+import { buildProfile, describeColumns, effectiveColumns, ProfileBody } from './profile.ts';
 import { buildDocx } from './docx.ts';
 import { PdfUnavailableError, pdfAvailable, renderPdf } from './pdf.ts';
 
@@ -84,7 +93,44 @@ const QualityQuery = z.object({
   value: colName.optional(),
   group: colName.optional(),
   clean: z.string().max(4000).optional(),
+  cleanJson: z.string().max(80000).optional(),
+  rulesJson: z.string().max(200000).optional(),
 });
+
+/** Sütun adlarındaki virgül ve boşlukları korur; eski istemciler de desteklenir. */
+function parseCleanColumns(q: { clean?: string; cleanJson?: string }): string[] | undefined {
+  if (q.cleanJson !== undefined) {
+    let names: unknown;
+    try {
+      names = JSON.parse(q.cleanJson);
+    } catch {
+      throw new ApiError(400, 'invalid_columns', 'Temizlenecek sütun listesi geçersiz.');
+    }
+    return z.array(colName).max(200).parse(names);
+  }
+  return q.clean === undefined ? undefined : q.clean.split(',').map((s) => s.trim()).filter(Boolean);
+}
+
+const RuleSchema = z.object({ column: colName, issue: z.enum(['invalid', 'extreme']), action: z.enum(['setMissing', 'removeRow']) });
+
+/**
+ * Temizleme kuralları. rulesJson yeni biçimdir ({column, issue, action} listesi). Eski clean/cleanJson sütun listesi,
+ * her sütun için “uç değeri olan satırı sil” kuralına çevrilir. Hiçbiri verilmezse kural yoktur: hiçbir şey seçilmemiş
+ * sayılır, “hepsi” sayılmaz.
+ */
+function parseRules(q: { clean?: string; cleanJson?: string; rulesJson?: string }): CleanRule[] {
+  if (q.rulesJson !== undefined) {
+    if (q.clean !== undefined || q.cleanJson !== undefined) throw new ApiError(400, 'invalid_rules', 'rulesJson ile clean/cleanJson birlikte kullanılamaz.');
+    let raw: unknown;
+    try {
+      raw = JSON.parse(q.rulesJson);
+    } catch {
+      throw new ApiError(400, 'invalid_rules', 'Temizleme kuralları geçersiz.');
+    }
+    return z.array(RuleSchema).max(400).parse(raw);
+  }
+  return (parseCleanColumns(q) ?? []).map((column) => ({ column, issue: 'extreme' as const, action: 'removeRow' as const }));
+}
 
 /** Anahtarları sıralanmış, tekrarlanabilir JSON; girdi karması için kullanılır. */
 function canonical(value: unknown): string {
@@ -184,13 +230,22 @@ export function buildApp(opts: AppOptions): FastifyInstance {
     created_at: string;
     parent_id: string | null;
     operations_json: string | null;
+    profile_json: string | null;
   }
   const columnSummary = (c: ParsedColumn) => ({ name: c.name, type: c.type, numeric: c.numeric, unique: c.unique, missing: c.missing, examples: c.examples, likelyId: c.likelyId, prefixCoded: c.prefixCoded, rankLabels: c.rankLabels, warnings: c.warnings });
-  const datasetJson = (r: DatasetRow) => ({ id: r.id, name: r.name, size: r.size, rows: r.rows, columns: JSON.parse(r.columns_json) as unknown[], createdAt: r.created_at, parentId: r.parent_id, operations: r.operations_json ? (JSON.parse(r.operations_json) as unknown) : null });
+  const datasetJson = (r: DatasetRow) => ({ id: r.id, name: r.name, size: r.size, rows: r.rows, columns: describeColumns(r.columns_json, r), createdAt: r.created_at, parentId: r.parent_id, operations: r.operations_json ? (JSON.parse(r.operations_json) as unknown) : null });
+
+  /** Kaynak sürümün işlem kaydı ve ondan önceki geçmiş; ham veri (işlemsiz kaynak) geçmişe girmez. */
+  function historyOf(parent: DatasetRow | undefined): unknown[] {
+    if (!parent?.operations_json) return [];
+    const ops = JSON.parse(parent.operations_json) as { history?: unknown[] } & Record<string, unknown>;
+    const { history, ...own } = ops;
+    return [...(history ?? []), { dataset: parent.name, createdAt: parent.created_at, operations: own }];
+  }
 
   /* ---------- Veri setleri ---------- */
   /** Bir CSV içeriğini veri seti olarak kaydeder; aynı içerik varsa mevcut kayıt döner. */
-  function ingest(buf: Buffer, rawName: string, provenance?: { parentId: string; operations: unknown }) {
+  function ingest(buf: Buffer, rawName: string, provenance?: { parentId: string; operations: Record<string, unknown> }) {
     const csv = parseCsv(buf, limits);
     const hash = sha256(buf);
     const existing = db.prepare('SELECT * FROM datasets WHERE sha256 = ?').get(hash) as DatasetRow | undefined;
@@ -200,7 +255,10 @@ export function buildApp(opts: AppOptions): FastifyInstance {
     const id = hash.slice(0, 16);
     writeFile(hash, buf);
     const now = new Date().toISOString();
-    db.prepare('INSERT INTO datasets (id, name, sha256, size, rows, columns_json, created_at, parent_id, operations_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
+    // Türetilmiş sürüm: önceki işlemler sürüm geçmişine yazılır, sütun profili kaynaktan kopyalanır.
+    const parent = provenance ? (db.prepare('SELECT * FROM datasets WHERE id = ?').get(provenance.parentId) as DatasetRow | undefined) : undefined;
+    const operations = provenance ? { ...provenance.operations, history: historyOf(parent) } : null;
+    db.prepare('INSERT INTO datasets (id, name, sha256, size, rows, columns_json, created_at, parent_id, operations_json, profile_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
       id,
       name,
       hash,
@@ -209,7 +267,8 @@ export function buildApp(opts: AppOptions): FastifyInstance {
       JSON.stringify(csv.columns.map(columnSummary)),
       now,
       provenance?.parentId ?? null,
-      provenance ? JSON.stringify(provenance.operations) : null,
+      operations ? JSON.stringify(operations) : null,
+      parent?.profile_json ?? null,
     );
     remember(id, csv);
     return { dataset: datasetJson(db.prepare('SELECT * FROM datasets WHERE id = ?').get(id) as unknown as DatasetRow), created: true };
@@ -246,25 +305,72 @@ export function buildApp(opts: AppOptions): FastifyInstance {
     return reply.status(created ? 201 : 200).send({ ...dataset, duplicate: !created });
   });
 
-  /** Temizleme: yeni bir veri sürümü üretir; ham veri değişmez. */
+  /**
+   * Temizleme: yeni bir veri sürümü üretir; ham veri değişmez. Kurallar kullanıcı tarafından seçilir; hiçbir sütun
+   * kendiliğinden temizlenmez. Eski `outlierColumns` listesi “uç değeri olan satırı sil” kuralı olarak yorumlanır.
+   */
   const CleanBody = z.object({
-    outlierColumns: z.array(colName).max(200).default([]),
+    rules: z.array(RuleSchema).max(400).optional(),
+    outlierColumns: z.array(colName).max(200).optional(),
     impute: z.enum(['none', 'median', 'knn']).default('none'),
+    /** Kayıp oranını grup başına da denetlemek için (arayüzdeki grup sütunu). */
+    groupColumn: colName.optional(),
+    /** %10 üzeri satır kaybında gereken gerekçe ve açık onay. */
+    acknowledgement: z.object({ reason: z.string().trim().min(10).max(1000) }).optional(),
   });
   app.post('/api/datasets/:id/clean', async (req, reply) => {
     const { id } = req.params as { id: string };
     const body = CleanBody.parse(req.body ?? {});
-    if (body.outlierColumns.length === 0 && body.impute === 'none') throw new ApiError(422, 'nothing_to_do', 'Uygulanacak bir işlem seçilmedi.');
+    if (body.rules && body.outlierColumns) throw new ApiError(400, 'invalid_rules', 'rules ile outlierColumns birlikte kullanılamaz.');
+    const rules: CleanRule[] = body.rules ?? (body.outlierColumns ?? []).map((column) => ({ column, issue: 'extreme' as const, action: 'removeRow' as const }));
+    if (rules.length === 0 && body.impute === 'none') throw new ApiError(422, 'nothing_to_do', 'Uygulanacak bir işlem seçilmedi.');
     const { row, csv } = parsed(id);
-    const result = cleanColumns(
-      csv.columns.map((c) => ({ name: c.name, numeric: c.numeric, values: c.values, skip: c.likelyId })),
-      body,
-    );
+    if (body.groupColumn && !csv.columns.some((c) => c.name === body.groupColumn)) throw new ApiError(422, 'unknown_column', `“${body.groupColumn}” adlı sütun bulunamadı.`);
+    const eff = effectiveColumns(row, csv);
+    // Satır kaybı: toplam ve grup başına; eşikler ürünün koruyucu tasarım eşikleridir (bilimsel eşik değil).
+    const plan = planRules(eff, rules);
+    const total = row.rows ? (plan.removedRows / row.rows) * 100 : 0;
+    const groupCol = eff.find((c) => c.name === body.groupColumn);
+    const groupLoss = groupCol ? groupLossOf(groupCol.values, plan.remove) : undefined;
+    const loss = lossLevel(total, groupLoss);
+    if (loss.level === 'confirm' && !body.acknowledgement) {
+      throw new ApiError(422, 'confirmation_required', `Satır kaybı %${loss.worstRate.toFixed(1)} (${loss.worstScope}); %${ROW_LOSS_CONFIRM} üzerinde işlemi onaylamak için gerekçe (en az 10 karakter) ve açık onay gerekir.`);
+    }
+    if (body.impute === 'knn' && row.rows - plan.removedRows > KNN_MAX_ROWS) {
+      throw new ApiError(422, 'knn_too_large', `KNN imputasyonu en fazla ${KNN_MAX_ROWS.toLocaleString('tr-TR')} satırda desteklenir (kalacak: ${(row.rows - plan.removedRows).toLocaleString('tr-TR')}); medyan/mod ile doldurmayı seçin.`);
+    }
+    const result = cleanColumns(eff, { rules, impute: body.impute });
     if (result.columns[0]!.values.length < 3) throw new ApiError(422, 'too_few_rows', 'Temizlikten sonra analiz için yeterli satır kalmıyor.');
+    const log = [...result.log];
+    if ((row.parent_id || row.operations_json) && rules.some((r) => r.issue === 'extreme')) {
+      log.push('Bu veri, daha önce işlenmiş bir sürümdür: Tukey sınırları bu sürümün verisinden yeniden hesaplandı. Önceki turda uç değerler çıkarıldıysa dağılım daralmıştır ve yeni sınırlar ek gözlemleri işaretleyebilir.');
+    }
     const buf = Buffer.from(columnsToCsv(result.columns), 'utf8');
-    const operations = { ...body, removedRows: result.removedRows, imputedCells: result.imputedCells, log: result.log };
+    const operations = {
+      kind: 'cleaning',
+      rules,
+      impute: body.impute,
+      groupColumn: body.groupColumn ?? null,
+      removedRows: result.removedRows,
+      removedRate: total,
+      setMissingCells: result.setMissingCells,
+      imputedCells: result.imputedCells,
+      loss: { level: loss.level, worstRate: loss.worstRate, worstScope: loss.worstScope, reviewThreshold: ROW_LOSS_REVIEW, confirmThreshold: ROW_LOSS_CONFIRM, groups: groupLoss ?? null },
+      acknowledgement: body.acknowledgement ?? null,
+      log,
+    };
     const { dataset, created } = ingest(buf, `${row.name.replace(/\.csv$/i, '')} (temizlenmiş).csv`, { parentId: row.id, operations });
     return reply.status(created ? 201 : 200).send({ ...dataset, duplicate: !created });
+  });
+
+  /** Sütun profili: tür düzeltmesi ve kullanıcının doğruladığı geçerli aralık/kategoriler (tüm profil değiştirilir). */
+  app.put('/api/datasets/:id/profile', async (req) => {
+    const { id } = req.params as { id: string };
+    const body = ProfileBody.parse(req.body ?? {});
+    const { csv } = parsed(id);
+    const profile = buildProfile(body, csv);
+    db.prepare('UPDATE datasets SET profile_json = ? WHERE id = ?').run(Object.keys(profile).length ? JSON.stringify(profile) : null, id);
+    return datasetJson(db.prepare('SELECT * FROM datasets WHERE id = ?').get(id) as unknown as DatasetRow);
   });
 
   /** Ölçek puanları: araştırmacının tanımladığı alt boyutlardan yeni sütunlar ekleyen yeni bir veri sürümü üretir. */
@@ -386,18 +492,31 @@ export function buildApp(opts: AppOptions): FastifyInstance {
 
   const fileInfo = (row: DatasetRow, csv: ParsedCsv) => ({ fileName: row.name, delimiter: csv.delimiter, decimalComma: csv.decimalComma, prefixCoded: csv.columns.filter((c) => c.prefixCoded).map((c) => c.name), rankCoded: Object.fromEntries(csv.columns.filter((c) => c.rankLabels).map((c) => [c.name, c.rankLabels!])) });
 
-  /** Temizleme işleminin Python karşılığı. */
+  /** Temizleme işleminin Python karşılığı (uygulamanın yaptığı işlemle aynı kurallar). */
   app.get('/api/datasets/:id/cleaning-code', async (req) => {
     const { id } = req.params as { id: string };
-    const q = z.object({ clean: z.string().max(4000).optional(), impute: z.enum(['none', 'median', 'knn']).default('none') }).parse(req.query);
+    const q = QualityQuery.pick({ clean: true, cleanJson: true, rulesJson: true }).extend({ impute: z.enum(['none', 'median', 'knn']).default('none') }).parse(req.query);
     const { row, csv } = parsed(id);
-    const clean = q.clean ? q.clean.split(',').map((s) => s.trim()).filter(Boolean) : [];
-    for (const n of clean) if (!csv.columns.some((c) => c.name === n)) throw new ApiError(422, 'unknown_column', `“${n}” adlı sütun bulunamadı.`);
+    const rules = parseRules(q);
+    for (const r of rules) if (!csv.columns.some((c) => c.name === r.column)) throw new ApiError(422, 'unknown_column', `“${r.column}” adlı sütun bulunamadı.`);
+    const eff = effectiveColumns(row, csv);
+    validateRules(eff, rules);
+    if (q.impute === 'knn') {
+      const kept = row.rows - planRules(eff, rules).removedRows;
+      if (kept > KNN_MAX_ROWS) throw new ApiError(422, 'knn_too_large', `KNN imputasyonu en fazla ${KNN_MAX_ROWS.toLocaleString('tr-TR')} satırda desteklenir (kalacak: ${kept.toLocaleString('tr-TR')}); medyan/mod ile doldurmayı seçin.`);
+    }
+    const isContinuous = (c: (typeof eff)[number]) => c.numeric && c.kind === 'continuous';
+    const validity: Record<string, { numeric: boolean; range?: { min: number; max: number }; categories?: string[] }> = {};
+    for (const r of rules) {
+      const c = eff.find((x) => x.name === r.column)!;
+      if (c.validRange || c.validCategories?.length) validity[c.name] = { numeric: c.numeric, range: c.validRange, categories: c.validCategories };
+    }
     return generateCleaningCode(fileInfo(row, csv), {
-      numericColumns: csv.columns.filter((c) => c.numeric).map((c) => c.name),
-      categoricalColumns: csv.columns.filter((c) => !c.numeric).map((c) => c.name),
-      idColumns: csv.columns.filter((c) => c.likelyId).map((c) => c.name),
-      outlierColumns: clean,
+      numericColumns: eff.filter((c) => c.numeric).map((c) => c.name),
+      continuousColumns: eff.filter((c) => !c.skip && isContinuous(c)).map((c) => c.name),
+      modeColumns: eff.filter((c) => !c.skip && !isContinuous(c)).map((c) => c.name),
+      rules,
+      validity,
       impute: q.impute as ImputeMethod,
     });
   });
@@ -406,14 +525,11 @@ export function buildApp(opts: AppOptions): FastifyInstance {
   app.get('/api/datasets/:id/quality', async (req) => {
     const { id } = req.params as { id: string };
     const q = QualityQuery.parse(req.query);
-    const { csv } = parsed(id);
+    const { row, csv } = parsed(id);
     const known = new Set(csv.columns.map((c) => c.name));
-    const clean = q.clean ? q.clean.split(',').map((s) => s.trim()).filter(Boolean) : undefined;
-    for (const n of [q.value, q.group, ...(clean ?? [])]) if (n && !known.has(n)) throw new ApiError(422, 'unknown_column', `“${n}” adlı sütun bulunamadı.`);
-    return analyzeQuality(
-      csv.columns.map((c) => ({ name: c.name, numeric: c.numeric, values: c.values, skip: c.likelyId })),
-      { valueColumn: q.value, groupColumn: q.group, cleanColumns: clean },
-    );
+    const rules = parseRules(q);
+    for (const n of [q.value, q.group, ...rules.map((r) => r.column)]) if (n && !known.has(n)) throw new ApiError(422, 'unknown_column', `“${n}” adlı sütun bulunamadı.`);
+    return analyzeQuality(effectiveColumns(row, csv), { valueColumn: q.value, groupColumn: q.group, rules });
   });
 
   /* ---------- Analizler ---------- */
@@ -545,8 +661,17 @@ export function buildApp(opts: AppOptions): FastifyInstance {
       if (ds.parent_id || ds.operations_json) {
         const parent = ds.parent_id ? (db.prepare('SELECT name FROM datasets WHERE id = ?').get(ds.parent_id) as { name: string } | undefined) : undefined;
         audit.splice(1, 0, ['Veri sürümü', `Temizlenmiş sürüm (kaynak: ${parent?.name ?? 'silinmiş veri seti'})`]);
-        const ops = ds.operations_json ? (JSON.parse(ds.operations_json) as { log?: string[] }) : {};
-        for (const line of ops.log ?? []) audit.splice(2, 0, ['Temizlik işlemi', line]);
+        type Ops = { log?: string[]; removedRows?: number; removedRate?: number; loss?: { level: string; worstRate: number; worstScope: string }; acknowledgement?: { reason: string } | null; history?: { dataset: string; operations: Ops }[] };
+        const ops = ds.operations_json ? (JSON.parse(ds.operations_json) as Ops) : {};
+        const lines: [string, string][] = [];
+        for (const h of ops.history ?? []) lines.push(['Önceki işlem', `${h.dataset}: ${(h.operations.log ?? []).join(' ')}`]);
+        for (const line of ops.log ?? []) lines.push(['Temizlik işlemi', line]);
+        if (ops.removedRows) {
+          const level = ops.loss?.level === 'confirm' ? 'onay gerekti' : ops.loss?.level === 'review' ? 'inceleme eşiği aşıldı' : 'eşik aşılmadı';
+          lines.push(['Satır kaybı', `${ops.removedRows} satır (%${(ops.removedRate ?? 0).toFixed(1)}); ${level}. Eşikler ürünün koruyucu tasarım eşikleridir, bilimsel eşik değildir.`]);
+        }
+        if (ops.acknowledgement) lines.push(['Kullanıcı gerekçesi', ops.acknowledgement.reason]);
+        audit.splice(2, 0, ...lines);
       } else {
         audit.splice(1, 0, ['Veri sürümü', 'Ham veri (değiştirilmemiş)']);
       }

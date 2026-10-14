@@ -102,6 +102,26 @@ describe('rapor biçimleri', () => {
     for (const text of ['Konum ve yayılım', 'Ortalama ve dağılım şekli', 'Maks']) expect(xml).toContain(text);
   });
 
+  it('denetim izi: kurallar, satır kaybı, kullanıcı gerekçesi ve önceki işlemler rapora yazılır', async () => {
+    const lines = ['g,v'];
+    for (let i = 0; i < 100; i++) lines.push(`${i < 50 ? 'A' : 'B'},${i === 3 ? '' : i >= 80 && i < 92 ? 500 : (10 + (i % 5) * 0.7).toFixed(1)}`);
+    const boundary = '----r';
+    const payload = Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="r.csv"\r\nContent-Type: text/csv\r\n\r\n${lines.join('\n')}\n\r\n--${boundary}--\r\n`);
+    const raw = (await app.inject({ method: 'POST', url: '/api/datasets', payload, headers: { 'content-type': `multipart/form-data; boundary=${boundary}` } })).json();
+    const first = (await app.inject({ method: 'POST', url: `/api/datasets/${raw.id}/clean`, payload: { rules: [{ column: 'v', issue: 'extreme', action: 'removeRow' }], acknowledgement: { reason: 'Veri girişi hatası olduğu doğrulandı.' } } })).json();
+    expect(first.rows).toBe(88);
+    const second = (await app.inject({ method: 'POST', url: `/api/datasets/${first.id}/clean`, payload: { impute: 'median' } })).json();
+    expect(second.id).not.toBe(first.id);
+    const a = (await app.inject({ method: 'POST', url: '/api/analyses', payload: { datasetId: second.id, goal: 'compare', design: 'independent', target: 'continuous', value: 'v', group: 'g' } })).json();
+    const html = (await app.inject({ url: `/api/analyses/${a.id}/report` })).body;
+    for (const text of ['Önceki işlem', 'Temizlik işlemi', 'Tukey sınırları', 'medyan']) expect(html).toContain(text);
+    const firstReport = (await app.inject({ url: `/api/analyses/${(await (await app.inject({ method: 'POST', url: '/api/analyses', payload: { datasetId: first.id, goal: 'compare', design: 'independent', target: 'continuous', value: 'v', group: 'g' } })).json()).id}/report` })).body;
+    expect(firstReport).toContain('Satır kaybı');
+    expect(firstReport).toContain('%12.0');
+    expect(firstReport).toContain('Kullanıcı gerekçesi');
+    expect(firstReport).toContain('koruyucu tasarım eşikleridir');
+  });
+
   it('aynı analiz iki kez raporlanınca denetim izi dışında aynı çıktı üretilir', async () => {
     const first = await analysis();
     const second = await analysis();

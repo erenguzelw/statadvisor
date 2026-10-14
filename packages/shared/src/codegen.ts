@@ -4,6 +4,7 @@
  */
 import type { AnalysisResult, NormalityMethod } from './analysis.ts';
 import type { ImputeMethod } from './clean.ts';
+import type { CleanRule } from './quality.ts';
 import type { ScaleDef, ScaleResult } from './scales.ts';
 import type { ScreenOptions, ScreenResult } from './screening.ts';
 
@@ -390,11 +391,23 @@ export function generateAnalysisCode(file: DatasetFile, spec: AnalysisSpec, r: A
   return { filename: 'analiz.py', code, expectedOutput: expectedLines(r), requirements: requirementsOf(code) };
 }
 
-/** Veri temizleme kodu (aykırı satırları çıkarma + doldurma). Sonucu temizlenmis.csv dosyasına yazar. */
-export function generateCleaningCode(
-  file: DatasetFile,
-  opts: { numericColumns: string[]; categoricalColumns: string[]; idColumns: string[]; outlierColumns: string[]; impute: ImputeMethod; k?: number },
-): GeneratedCode {
+/** Temizleme kodunun girdisi: uygulamanın yaptığı işlemle aynı kurallar ve sütun rolleri. */
+export interface CleaningCodeOptions {
+  /** Tüm sayısal sütunlar (sayıya çevrilir; çevrilemeyen değerler eksik sayılır). */
+  numericColumns: string[];
+  /** Sürekli, kimlik olmayan sayısal sütunlar: medyan ya da KNN ile doldurulur. */
+  continuousColumns: string[];
+  /** Sıralı ve kategorik, kimlik olmayan sütunlar: mod ile doldurulur. */
+  modeColumns: string[];
+  rules: CleanRule[];
+  /** Kullanıcının doğruladığı geçerlilik kuralları (yalnızca kurallarda geçen sütunlar için gerekir). */
+  validity: Record<string, { numeric: boolean; range?: { min: number; max: number }; categories?: string[] }>;
+  impute: ImputeMethod;
+  k?: number;
+}
+
+/** Veri temizleme kodu: kullanıcının seçtiği kurallar (eksik işaretle / satır sil) ve isteğe bağlı doldurma. Sonucu temizlenmis.csv dosyasına yazar. */
+export function generateCleaningCode(file: DatasetFile, opts: CleaningCodeOptions): GeneratedCode {
   const imports = ['import numpy as np', 'import pandas as pd'];
   const L: string[] = ['# StatAdvisor AI tarafından üretildi. Veri dosyası betikle aynı klasörde olmalıdır.', ''];
   if (opts.impute === 'knn') {
@@ -403,38 +416,67 @@ export function generateCleaningCode(
   L.push(...imports, '', naBlock, '', readCsvLine(file));
   L.push('', '# Sayısal sütunlar: sayıya çevrilemeyen değerler eksik sayılır');
   L.push(`SAYISAL = ${pyList(opts.numericColumns)}`, 'for s in SAYISAL:', '    df[s] = pd.to_numeric(df[s], errors="coerce")');
-  if (opts.outlierColumns.length) {
+  if (opts.rules.length) {
+    const ranges = Object.entries(opts.validity).filter(([, v]) => v.range);
+    const cats = Object.entries(opts.validity).filter(([, v]) => v.categories?.length);
+    L.push('', '# 1. Kullanıcının seçtiği kurallar. Hepsi özgün veri üzerinde değerlendirilir; hiçbiri diğerinin sonucunu etkilemez.');
+    L.push('#    Geçerli aralık/kategoriler kullanıcı tarafından doğrulanmıştır; gözlenen min/maks değerlerden türetilmemiştir.');
+    L.push(`GECERLI_ARALIK = {${ranges.map(([n, v]) => `${py(n)}: (${v.range!.min}, ${v.range!.max})`).join(', ')}}`);
     L.push(
-      '',
-      '# 1. Tukey sınırlarıyla (1.5 x IQR) aykırı satırlar; sınırlar tüm veri üzerinden hesaplanır',
-      'dis = pd.Series(False, index=df.index)',
-      `for s in ${pyList(opts.outlierColumns)}:`,
-      '    q1, q3 = df[s].quantile([0.25, 0.75])',
-      '    iqr = q3 - q1',
-      '    dis |= (df[s] < q1 - 1.5 * iqr) | (df[s] > q3 + 1.5 * iqr)',
-      'df = df[~dis].reset_index(drop=True)  # silmeden önce klinik geçerliliği kontrol edin',
+      `GECERLI_KATEGORI = {${cats.map(([n, v]) => `${py(n)}: [${v.categories!.map((c) => (v.numeric ? String(Number(c)) : py(c))).join(', ')}]`).join(', ')}}`,
+    );
+    L.push('# (sütun, sorun, eylem): sorun = gecersiz | uc (Tukey 1.5 x IQR, incelenecek uç değer); eylem = eksik | satir');
+    L.push('KURALLAR = [');
+    for (const r of opts.rules) L.push(`    (${py(r.column)}, ${py(r.issue === 'invalid' ? 'gecersiz' : 'uc')}, ${py(r.action === 'setMissing' ? 'eksik' : 'satir')}),`);
+    L.push(
+      ']',
+      'satir_sil = pd.Series(False, index=df.index)',
+      'eksik_yap = {}',
+      'for s, sorun, eylem in KURALLAR:',
+      '    gecersiz = pd.Series(False, index=df.index)',
+      '    if s in GECERLI_ARALIK:',
+      '        alt, ust = GECERLI_ARALIK[s]',
+      '        gecersiz = df[s].notna() & ((df[s] < alt) | (df[s] > ust))',
+      '    elif s in GECERLI_KATEGORI:',
+      '        gecersiz = df[s].notna() & ~df[s].isin(GECERLI_KATEGORI[s])',
+      '    if sorun == "gecersiz":',
+      '        m = gecersiz',
+      '    else:  # Tukey sınırı geçersiz hücreler dışarıda bırakılarak hesaplanır',
+      '        v = df[s][~gecersiz].dropna()',
+      '        m = pd.Series(False, index=df.index)',
+      '        if len(v) >= 4:',
+      '            q1, q3 = v.quantile([0.25, 0.75])',
+      '            iqr = q3 - q1',
+      '            m = df[s].notna() & ~gecersiz & ((df[s] < q1 - 1.5 * iqr) | (df[s] > q3 + 1.5 * iqr))',
+      '    if eylem == "satir":',
+      '        satir_sil |= m',
+      '    else:',
+      '        eksik_yap[s] = eksik_yap[s] | m if s in eksik_yap else m',
+      'for s, m in eksik_yap.items():',
+      '    df.loc[m, s] = np.nan',
+      'df = df[~satir_sil].reset_index(drop=True)  # silmeden önce işaretlenen hücrelerin geçerliliğini kontrol edin',
     );
   }
   if (opts.impute === 'median') {
     L.push(
       '',
-      '# 2. Eksik değerler: sayısalda medyan, kategorikte mod',
-      `for s in ${pyList(opts.numericColumns.filter((c) => !opts.idColumns.includes(c)))}:`,
+      '# 2. Eksik değerler: sürekli sütunlarda medyan; sıralı ve kategorik sütunlarda mod',
+      `for s in ${pyList(opts.continuousColumns)}:`,
       '    df[s] = df[s].fillna(df[s].median())',
-      `for s in ${pyList(opts.categoricalColumns)}:`,
+      `for s in ${pyList(opts.modeColumns)}:`,
       '    if df[s].isna().any() and df[s].notna().any():',
       '        df[s] = df[s].fillna(df[s].mode().iloc[0])',
     );
   } else if (opts.impute === 'knn') {
-    const feats = opts.numericColumns.filter((c) => !opts.idColumns.includes(c));
     L.push(
       '',
-      `# 2. Eksik değerler: sayısalda KNN (k=${opts.k ?? 5}, standartlaştırılmış), kategorikte mod`,
-      `OZELLIK = ${pyList(feats)}`,
-      'olcek = StandardScaler()',
-      'z = olcek.fit_transform(df[OZELLIK])',
-      `df[OZELLIK] = olcek.inverse_transform(KNNImputer(n_neighbors=${opts.k ?? 5}).fit_transform(z))`,
-      `for s in ${pyList(opts.categoricalColumns)}:`,
+      `# 2. Eksik değerler: sürekli sütunlarda KNN (k=${opts.k ?? 5}, standartlaştırılmış); sıralı ve kategorik sütunlarda mod`,
+      `OZELLIK = ${pyList(opts.continuousColumns)}`,
+      'if OZELLIK:',
+      '    olcek = StandardScaler()',
+      '    z = olcek.fit_transform(df[OZELLIK])',
+      `    df[OZELLIK] = olcek.inverse_transform(KNNImputer(n_neighbors=${opts.k ?? 5}).fit_transform(z))`,
+      `for s in ${pyList(opts.modeColumns)}:`,
       '    if df[s].isna().any() and df[s].notna().any():',
       '        df[s] = df[s].fillna(df[s].mode().iloc[0])',
     );

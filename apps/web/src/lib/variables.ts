@@ -17,7 +17,8 @@ export interface Picks {
 export type Answers = Pick<WizardAnswers, 'goal' | 'design' | 'target'>;
 
 const usable = (c: ColumnInfo) => !c.likelyId;
-export const numericColumns = (cols: ColumnInfo[]) => cols.filter((c) => c.numeric && usable(c));
+/** Kullanıcı bir sayısal sütunu “kategorik” olarak düzelttiyse (kategori kodu) sayısal ölçüm adayı sayılmaz. */
+export const numericColumns = (cols: ColumnInfo[]) => cols.filter((c) => c.numeric && c.type !== 'categorical' && usable(c));
 /** Grup sütunu adayı: 2–12 farklı değer. */
 export const groupColumns = (cols: ColumnInfo[]) => cols.filter((c) => usable(c) && c.unique >= 2 && c.unique <= 12);
 
