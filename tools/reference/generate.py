@@ -138,6 +138,13 @@ try:
 except ModuleNotFoundError:
     pass
 
+try:
+    import generate_ols  # noqa: E402
+
+    generate_ols.add_all(add, f)
+except ModuleNotFoundError:
+    pass
+
 meta = {
     "seed": SEED,
     "python": sys.version.split()[0],

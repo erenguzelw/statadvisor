@@ -10,6 +10,7 @@ import {
   dunnTest,
   fisherExact,
   friedmanTest,
+  fitLinearRegression,
   fSurvival,
   kruskalWallis,
   levene,
@@ -122,6 +123,28 @@ const specs: Record<string, Spec> = {
     tol: { p: [1e-9, 1e-12], pAdj: [1e-9, 1e-12] },
   },
 };
+
+const olsTol: [number, number] = [1e-7, 1e-9];
+specs.ols = {
+  run: (i) => {
+    const r = fitLinearRegression(i.y, i.predictors);
+    const c = r.coefficients;
+    return {
+      b: c.map((x) => x.b), se: c.map((x) => x.se), t: c.map((x) => x.t), p: c.map((x) => x.p),
+      ciLow: c.map((x) => x.ciLow), ciHigh: c.map((x) => x.ciHigh),
+      beta: c.slice(1).map((x) => x.beta!), vif: c.slice(1).map((x) => x.vif!),
+      n: r.n, r2: r.r2, adjR2: r.adjR2, F: r.F, pF: r.pF, sigma: r.sigma, logLik: r.logLik, aic: r.aic, bic: r.bic,
+      dw: r.diagnostics.durbinWatson, bpLm: r.diagnostics.breuschPagan.lm, bpP: r.diagnostics.breuschPagan.p,
+      cooks: r.cooks, hat: r.leverage,
+      shapiroW: r.diagnostics.shapiro!.W, shapiroP: r.diagnostics.shapiro!.p,
+    };
+  },
+  tol: Object.fromEntries(
+    ['b', 'se', 't', 'p', 'ciLow', 'ciHigh', 'beta', 'vif', 'n', 'r2', 'adjR2', 'F', 'pF', 'sigma', 'logLik', 'aic', 'bic', 'dw', 'bpLm', 'bpP', 'cooks', 'hat'].map((k) => [k, olsTol]),
+  ) as Record<string, [number, number]>,
+};
+specs.ols!.tol!.shapiroW = [1e-9, 1e-11];
+specs.ols!.tol!.shapiroP = [1e-7, 1e-10];
 
 export { specs, close, fixture };
 export type { Case };
