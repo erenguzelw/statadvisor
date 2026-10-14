@@ -330,4 +330,30 @@ describe('örnek veri, temizleme ve önizleme', () => {
     const kept = (await app.inject({ url: `/api/datasets/${clean.id}` })).json();
     expect(kept.parentId).toBeNull();
   });
+
+  it('kaynak silinse bile rapor "ham veri" demez; temizlik geçmişini gösterir', async () => {
+    const raw = (await app.inject({ method: 'POST', url: '/api/samples/klinik' })).json();
+    const clean = (await app.inject({ method: 'POST', url: `/api/datasets/${raw.id}/clean`, payload: { outlierColumns: ['kan_basinci'], impute: 'median' } })).json();
+    const a = (await app.inject({ method: 'POST', url: '/api/analyses', payload: { datasetId: clean.id, goal: 'compare', design: 'independent', target: 'continuous', value: 'kan_basinci', group: 'grup' } })).json();
+    expect((await app.inject({ method: 'DELETE', url: `/api/datasets/${raw.id}` })).statusCode).toBe(204);
+    const html = (await app.inject({ url: `/api/analyses/${a.id}/report` })).body;
+    expect(html).not.toContain('Ham veri (değiştirilmemiş)');
+    expect(html).toContain('Temizlenmiş sürüm');
+    expect(html).toContain('silinmiş veri seti');
+    expect(html).toContain('Temizlik işlemi');
+  });
+
+  it('200.000 satırlık veride kutu grafiği ve dağılım özeti hata vermez', async () => {
+    const lines = ['grup,deger'];
+    for (let i = 0; i < 200_000; i++) lines.push(`${i % 2 ? 'A' : 'B'},${((i * 7919) % 10007) / 10}`);
+    const big = buildApp({ dataDir: ':memory:', maxUploadBytes: 20_000_000 });
+    try {
+      const up = await big.inject({ method: 'POST', url: '/api/datasets', ...multipart('buyuk.csv', lines.join('\n')) });
+      expect(up.statusCode).toBe(201);
+      const r = await big.inject({ method: 'POST', url: '/api/analyses?save=false', payload: { datasetId: up.json().id, goal: 'compare', design: 'independent', target: 'continuous', value: 'deger', group: 'grup' } });
+      expect(r.statusCode).toBe(200);
+    } finally {
+      await big.close();
+    }
+  }, 60_000);
 });

@@ -1,6 +1,6 @@
 import { useId } from 'react';
 import { scaleBand, scaleLinear } from 'd3-scale';
-import type { BoxStats } from '@statadvisor/shared';
+import { extent, type BoxStats } from '@statadvisor/shared';
 
 const W = 420;
 const H = 230;
@@ -18,8 +18,7 @@ export interface BoxPlotGroupProps {
 export function BoxPlotGroup({ boxes, summary, unit }: BoxPlotGroupProps) {
   const titleId = useId();
   const all = boxes.flatMap((b) => [b.whiskerLow, b.whiskerHigh, ...b.outliers]);
-  const lo = Math.min(...all);
-  const hi = Math.max(...all);
+  const { lo, hi } = extent(all);
   const span = hi - lo || 1;
   const y = scaleLinear()
     .domain([lo - span * 0.04, hi + span * 0.04])

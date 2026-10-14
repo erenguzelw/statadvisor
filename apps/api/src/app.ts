@@ -157,14 +157,19 @@ export function buildApp(opts: AppOptions): FastifyInstance {
   const removeFile = (hash: string) => (memory ? void memFiles.delete(hash) : rmSync(join(filesDir, `${hash}.csv`), { force: true }));
 
   const cache = new Map<string, ParsedCsv>();
+  /** Önbelleğe ekler; en fazla 6 veri seti tutulur (yükleme yolu dahil). */
+  const remember = (id: string, csv: ParsedCsv) => {
+    cache.delete(id);
+    cache.set(id, csv);
+    if (cache.size > 6) cache.delete(cache.keys().next().value!);
+  };
   const parsed = (id: string): { row: DatasetRow; csv: ParsedCsv } => {
     const row = db.prepare('SELECT * FROM datasets WHERE id = ?').get(id) as DatasetRow | undefined;
     if (!row) throw new ApiError(404, 'not_found', 'Veri seti bulunamadı.');
     let csv = cache.get(id);
     if (!csv) {
       csv = parseCsv(readFile(row.sha256), limits);
-      cache.set(id, csv);
-      if (cache.size > 6) cache.delete(cache.keys().next().value!);
+      remember(id, csv);
     }
     return { row, csv };
   };
@@ -206,7 +211,7 @@ export function buildApp(opts: AppOptions): FastifyInstance {
       provenance?.parentId ?? null,
       provenance ? JSON.stringify(provenance.operations) : null,
     );
-    cache.set(id, csv);
+    remember(id, csv);
     return { dataset: datasetJson(db.prepare('SELECT * FROM datasets WHERE id = ?').get(id) as unknown as DatasetRow), created: true };
   }
 
@@ -526,8 +531,9 @@ export function buildApp(opts: AppOptions): FastifyInstance {
     const ds = db.prepare('SELECT * FROM datasets WHERE id = ?').get(a.datasetId) as DatasetRow | undefined;
     if (ds) {
       audit.unshift(['Veri seti', `${ds.name} (SHA-256 ${ds.sha256.slice(0, 16)}…, ${ds.rows} satır)`]);
-      if (ds.parent_id) {
-        const parent = db.prepare('SELECT name FROM datasets WHERE id = ?').get(ds.parent_id) as { name: string } | undefined;
+      // Kaynak silinirse parent_id null olur (ON DELETE SET NULL); işlem kaydı ise kalır, bu yüzden ikisine de bakılır.
+      if (ds.parent_id || ds.operations_json) {
+        const parent = ds.parent_id ? (db.prepare('SELECT name FROM datasets WHERE id = ?').get(ds.parent_id) as { name: string } | undefined) : undefined;
         audit.splice(1, 0, ['Veri sürümü', `Temizlenmiş sürüm (kaynak: ${parent?.name ?? 'silinmiş veri seti'})`]);
         const ops = ds.operations_json ? (JSON.parse(ds.operations_json) as { log?: string[] }) : {};
         for (const line of ops.log ?? []) audit.splice(2, 0, ['Temizlik işlemi', line]);

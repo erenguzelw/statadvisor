@@ -3,7 +3,8 @@
  * çalıştırır, önerilen testi uygular ve sonucu (APA metni, kaynakça ve uyarılarla) döndürür.
  */
 import { groupResiduals, levene, mean, shapiroWilk } from './assumptions.ts';
-import { recommendTest, type AssumptionInput, type Design, type Goal, type Target, type WizardAnswers } from './decision.ts';
+import { extent } from './extent.ts';
+import { recommendTest,type AssumptionInput, type Design, type Goal, type Target, type WizardAnswers } from './decision.ts';
 import { describeGroups, interpretOutcome, runTest, type TestInput, type TestOutcome } from './inference.ts';
 import { histogram, meanSd, pText, shapeStats, skewness } from './stats.ts';
 import type { AssumptionTest, DecisionPath, DistributionSample, GroupDescriptive, Interpretation } from './types.ts';
@@ -383,8 +384,7 @@ export function analyze(req: AnalysisRequest): AnalysisResult {
   let distribution: DistributionSample | undefined;
   if (residualsForChart && residualsForChart.length >= 5) {
     const { mean: m, sd } = meanSd(residualsForChart);
-    const lo = Math.min(...residualsForChart);
-    const hi = Math.max(...residualsForChart);
+    const { lo, hi } = extent(residualsForChart);
     const bins = Math.max(5, Math.min(24, Math.round(Math.sqrt(residualsForChart.length) * 1.2)));
     const width = (hi - lo) / bins || 1;
     distribution = { bins: histogram(residualsForChart, bins, lo, width), mean: m, sd, skewness: Number(skewness(residualsForChart).toFixed(2)), n: residualsForChart.length };
