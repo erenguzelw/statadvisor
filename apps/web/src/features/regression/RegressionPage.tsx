@@ -1,18 +1,15 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Activity, Database, Download, Eye, FileCode2, Languages, ListChecks, Sigma, Table2, TriangleAlert, Info, OctagonAlert } from 'lucide-react';
-import { formatP, type RegressionNote } from '@statadvisor/shared';
+import { Activity, Database, FileCode2, Info, Languages, ListChecks, OctagonAlert, Sigma, Table2, TriangleAlert } from 'lucide-react';
+import { formatP } from '@statadvisor/shared';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { Button, Callout, CheckboxGroup, CodeBlock, CopyButton, DataTable, MetricTile, Panel, SectionHeader, Select, StatusLine, Tag, type Column } from '@/components/ui';
+import { Callout, CheckboxGroup, CodeBlock, CopyButton, DataTable, MetricTile, Panel, SectionHeader, Select, StatusLine, Tag, type Column } from '@/components/ui';
 import { useActiveDataset } from '@/context/AppContext';
 import type { ColumnInfo, DatasetInfo, RegressionBody, RegressionResponse } from '@/data/api';
-import { useCapabilities, useLevels, useRegression } from '@/data/hooks';
-import { fetchReport } from '@/lib/download';
+import { useRegression } from '@/data/hooks';
 import { useDebounced } from '@/lib/useDebounced';
 import { columnTypeLabel } from '@/lib/variables';
-
-const nf = new Intl.NumberFormat('tr-TR');
-const n2 = (x: number, d = 2) => (Number.isFinite(x) ? x.toFixed(d) : '–');
+import { n2, nf, NoteList, ReferenceSelect, ReportActions } from './shared';
 
 /** Bağımlı değişken adayı: sayısal, kimlik olmayan, kategori kodu olarak işaretlenmemiş sütunlar. */
 const dependentCandidates = (cols: ColumnInfo[]) => cols.filter((c) => c.numeric && c.type !== 'categorical' && !c.likelyId);
@@ -37,40 +34,6 @@ export function RegressionPage() {
   if (!dataset) return <EmptyDataset />;
   // Veri seti değişince seçimler sıfırlanır.
   return <Regression key={dataset.id} dataset={dataset} />;
-}
-
-/** Kategorik yordayıcı için referans düzey seçimi (düzeyler sunucudan gelir). */
-function ReferenceSelect({ datasetId, column, value, onChange }: { datasetId: string; column: string; value: string | undefined; onChange: (v: string | undefined) => void }) {
-  const q = useLevels(datasetId, column);
-  const levels = q.data?.levels ?? [];
-  // Sunucudaki varsayılan: sıralı düzey listesinde ilk düzey (kukla değişkeni olmayan düzey).
-  const sorted = [...levels].map((l) => l.value).sort(new Intl.Collator('tr', { numeric: true }).compare);
-  const def = sorted[0];
-  return (
-    <Select
-      label={`“${column}” için referans düzey`}
-      value={value ?? def}
-      onChange={(v) => onChange(v === def ? undefined : v)}
-      options={sorted.map((v) => ({ value: v, label: `${v} · ${nf.format(levels.find((l) => l.value === v)?.count ?? 0)} gözlem` }))}
-      hint="Diğer düzeylerin katsayıları bu düzeye göre okunur."
-    />
-  );
-}
-
-const noteIcon = { info: Info, warning: TriangleAlert, danger: OctagonAlert } as const;
-const noteTone = { info: 'info', warning: 'warning', danger: 'danger' } as const;
-
-function NoteList({ notes }: { notes: RegressionNote[] }) {
-  if (!notes.length) return <p className="text-body text-fg-muted">Bu veride otomatik uyarı oluşmadı. Bu, varsayımların sağlandığının kanıtı değildir; kalıntı grafiğine de bakın.</p>;
-  return (
-    <div className="flex flex-col gap-3">
-      {notes.map((n) => (
-        <Callout key={n.title} tone={noteTone[n.level]} icon={noteIcon[n.level]} title={n.title}>
-          <span className="text-body">{n.text}</span>
-        </Callout>
-      ))}
-    </div>
-  );
 }
 
 /** Kalıntı–yordanan değer grafiği: desen (huni, eğri) varsa doğrusallık/varyans varsayımı şüphelidir. */
@@ -106,21 +69,6 @@ type CoefRow = string[];
 
 function Results({ data, body, datasetId }: { data: RegressionResponse; body: RegressionBody; datasetId: string }) {
   const r = data.result;
-  const caps = useCapabilities();
-  const [busy, setBusy] = useState<string | null>(null);
-  const [err, setErr] = useState<string | null>(null);
-  const report = async (format: 'html' | 'pdf' | 'docx') => {
-    setBusy(format);
-    setErr(null);
-    try {
-      await fetchReport(`/api/datasets/${datasetId}/regression/report?format=${format}`, body, format === 'html' ? null : `regresyon-raporu.${format}`);
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : 'Rapor üretilemedi.');
-    } finally {
-      setBusy(null);
-    }
-  };
-
   const cols: Column<CoefRow>[] = data.coefficients.header.map((h, i) => ({
     key: h,
     header: h,
@@ -193,12 +141,7 @@ function Results({ data, body, datasetId }: { data: RegressionResponse; body: Re
 
       <Panel>
         <SectionHeader icon={FileCode2} title="Python kodu ve rapor" level={3} description="Betik, ekrandaki sayıları statsmodels ile yeniden üretir (otomatik testle doğrulanır). Veri dosyasını betikle aynı klasöre koyun." />
-        <div className="mb-4 flex flex-wrap items-center gap-2">
-          <Button variant="tonal" icon={Eye} disabled={busy !== null} onClick={() => report('html')}>{busy === 'html' ? 'Hazırlanıyor…' : 'Raporu aç (HTML)'}</Button>
-          <Button variant="primary" icon={Download} disabled={busy !== null} onClick={() => report('docx')}>{busy === 'docx' ? 'Hazırlanıyor…' : 'Word (.docx)'}</Button>
-          <Button variant="secondary" icon={Download} disabled={busy !== null || caps.data?.pdf === false} title={caps.data?.pdf === false ? 'PDF için Chromium gerekir: npx playwright install chromium' : undefined} onClick={() => report('pdf')}>{busy === 'pdf' ? 'Hazırlanıyor…' : 'PDF'}</Button>
-          {err && <StatusLine status="danger" className="text-caption">{err}</StatusLine>}
-        </div>
+        <ReportActions url={`/api/datasets/${datasetId}/regression/report`} body={body} fileBase="regresyon-raporu" />
         <CodeBlock code={data.code.code} filename={data.code.filename} runtime={`Python · ${data.code.requirements.join(', ')}`} lineNumbers maxHeight="28rem" />
       </Panel>
     </>

@@ -1,4 +1,4 @@
-import type { AnalysisResult, AnalysisSpec, CleanRule, DatasetQuality, GeneratedCode, RegressionNarrative, RegressionResult, RegressionSpec } from '@statadvisor/shared';
+import type { AnalysisResult, AnalysisSpec, CleanRule, DatasetQuality, GeneratedCode, LogisticResult, LogisticSpec, RegressionNarrative, RegressionResult, RegressionSpec } from '@statadvisor/shared';
 
 /** Sunucuya gönderilen analiz isteği. */
 export type AnalysisBody = AnalysisSpec & { datasetId: string };
@@ -196,6 +196,25 @@ export interface RegressionResponse {
   /** Kalıntı grafiği için (eşit aralıklı seçilmiş) noktalar. */
   plot: { fitted: number[]; residuals: number[]; step: number };
   code: GeneratedCode;
+}
+
+export interface LogisticBody extends RegressionBody {
+  /** 1 olarak kodlanan düzey (verilmezse sıralı iki düzeyin ikincisi). */
+  eventLevel?: string;
+}
+
+export interface LogisticResponse {
+  datasetId: string;
+  datasetName: string;
+  spec: LogisticSpec;
+  result: Omit<LogisticResult, 'probs' | 'usedRows'>;
+  narrative: RegressionNarrative;
+  model: [string, string][];
+  coefficients: { header: string[]; rows: string[][] };
+  classification: { header: string[]; rows: string[][] };
+  hosmerLemeshow: { header: string[]; rows: string[][] } | null;
+  /** Tam ayrışmada üretilmez. */
+  code: GeneratedCode | null;
 }
 
 export type QualityResponse = DatasetQuality;
