@@ -5,9 +5,9 @@
 import { groupResiduals, levene, mean, shapiroWilk } from './assumptions.ts';
 import { extent } from './extent.ts';
 import { recommendTest,type AssumptionInput, type Design, type Goal, type Target, type WizardAnswers } from './decision.ts';
-import { describeGroups, interpretOutcome, runTest, type TestInput, type TestOutcome } from './inference.ts';
+import { boxStatsFor, describeGroups, interpretOutcome, runTest, type TestInput, type TestOutcome } from './inference.ts';
 import { histogram, meanSd, pText, shapeStats, skewness } from './stats.ts';
-import type { AssumptionTest, DecisionPath, DistributionSample, GroupDescriptive, Interpretation } from './types.ts';
+import type { AssumptionTest, BoxStats, DecisionPath, DistributionSample, GroupDescriptive, Interpretation } from './types.ts';
 
 /** Çözümlenebilir bir istek biçimi hatası; kullanıcıya olduğu gibi gösterilebilir. */
 export class AnalysisError extends Error {
@@ -52,6 +52,8 @@ export interface AnalysisResult {
   /** Grup içi kalıntıların dağılımı (sayısal hedefler için). */
   distribution?: DistributionSample;
   descriptives: GroupDescriptive[];
+  /** Grup/koşul başına kutu grafiği özeti (grup karşılaştırması ve eşleşmiş koşullar için). */
+  boxes?: BoxStats[];
   outcome: TestOutcome;
   interpretation: Interpretation;
   apaSummary: string;
@@ -271,6 +273,7 @@ export function analyze(req: AnalysisRequest): AnalysisResult {
   let residualsForChart: number[] | undefined;
   let groupCount: '2' | '3+' = '2';
   let descriptives: GroupDescriptive[] = [];
+  let boxes: BoxStats[] | undefined;
   let variables: string[];
   const normality: NormalityMethod = req.normality ?? 'shapiro';
   const limit = normality === 'skewkurt-2' ? 2 : 1.5;
@@ -335,6 +338,7 @@ export function analyze(req: AnalysisRequest): AnalysisResult {
     input = { kind: 'paired', names: req.conditions.map((c) => c.name), conditions: conds };
     variables = req.conditions.map((c) => c.name);
     descriptives = describeGroups(variables, conds);
+    boxes = boxStatsFor(variables, conds);
   } else {
     if (!req.value || !req.group) throw new AnalysisError('Karşılaştırma için bir sonuç sütunu ve bir grup sütunu seçin.');
     const { keep, dropped } = completeRows([req.value, req.group]);
@@ -362,6 +366,7 @@ export function analyze(req: AnalysisRequest): AnalysisResult {
     input = { kind: 'groups', names: levels, groups };
     variables = [req.value.name, req.group.name];
     descriptives = describeGroups(levels, groups);
+    boxes = boxStatsFor(levels, groups);
   }
 
   const answers: WizardAnswers = { goal: req.goal, groups: groupCount, design: req.design, target: req.target };
@@ -407,6 +412,7 @@ export function analyze(req: AnalysisRequest): AnalysisResult {
     assumptionInput,
     distribution,
     descriptives,
+    boxes,
     outcome,
     interpretation: interpretOutcome(outcome),
     table: input.kind === 'table' ? { rowNames: input.rowNames, colNames: input.colNames, table: input.table } : undefined,

@@ -1,10 +1,8 @@
 import { AlignmentType, Document, HeadingLevel, Packer, Paragraph, Table, TableCell, TableRow, TextRun, WidthType } from 'docx';
-import { formatP, type ReportData } from '@statadvisor/shared';
+import { crosstabRows, descriptiveTables, formatP, type ReportData } from '@statadvisor/shared';
 
 const para = (text: string, opts: { bold?: boolean; italics?: boolean; size?: number; spacingAfter?: number } = {}) =>
   new Paragraph({ spacing: { after: opts.spacingAfter ?? 120 }, children: [new TextRun({ text, bold: opts.bold, italics: opts.italics, size: opts.size })] });
-
-const f2 = (v: number) => (Number.isFinite(v) ? v.toFixed(2) : '–');
 
 const heading = (text: string) => new Paragraph({ heading: HeadingLevel.HEADING_2, spacing: { before: 280, after: 120 }, children: [new TextRun({ text })] });
 
@@ -29,7 +27,8 @@ export async function buildDocx(d: ReportData): Promise<Buffer> {
     para(`${d.datasetName} · ${d.date} · StatAdvisor AI`, { italics: true, size: 20 }),
 
     heading('Tanımlayıcı istatistikler'),
-    table(['Grup', 'n', 'Medyan', 'Ortalama', 'SS', 'Çarpıklık', 'Basıklık'], d.descriptives.map((x) => [x.group, String(x.n), x.median.toFixed(2), x.mean.toFixed(2), f2(x.sd), f2(x.skewness), f2(x.kurtosis)])),
+    ...descriptiveTables(d.descriptives).flatMap((t) => [para(t.title, { italics: true, size: 20, spacingAfter: 60 }), table(t.header, t.rows), para('', { spacingAfter: 60 })]),
+    ...(d.table ? [para('Çapraz tablo (gözlenen sayı ve satır yüzdesi)', { italics: true, size: 20, spacingAfter: 60 }), table(crosstabRows(d.table).header, crosstabRows(d.table).rows)] : []),
     ...d.notes.map((n) => para(`• ${n}`, { size: 20 })),
 
     heading('Varsayım testleri ve karar notları'),

@@ -36,6 +36,38 @@ describe('rapor biçimleri', () => {
     expect(res.body).not.toMatch(/p = < /);
   });
 
+  it('HTML: özet istatistik tabloları ve grup kutu grafiği', async () => {
+    const a = await analysis();
+    const html = (await app.inject({ url: `/api/analyses/${a.id}/report` })).body;
+    for (const text of ['Konum ve yayılım', 'Ortalama ve dağılım şekli', 'Min', 'Q1', 'Q3', 'Maks', 'SH', 'Gruplara göre kutu grafiği']) expect(html).toContain(text);
+    expect(html).not.toContain('NaN');
+    expect(html).not.toContain('undefined');
+  });
+
+  it('HTML ve DOCX: kategorik analizde çapraz tablo ve satır yüzdeleri; grafik yalnızca HTML\'de', async () => {
+    const rows = ['grup,sonuc', ...Array.from({ length: 60 }, (_, i) => `${i % 2 ? 'a' : 'b'},${i % 3 === 0 ? 'evet' : 'hayır'}`)].join('\n');
+    const boundary = '----ct';
+    const payload = Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="k.csv"\r\nContent-Type: text/csv\r\n\r\n${rows}\r\n--${boundary}--\r\n`);
+    const up = (await app.inject({ method: 'POST', url: '/api/datasets', payload, headers: { 'content-type': `multipart/form-data; boundary=${boundary}` } })).json();
+    const a = (await app.inject({ method: 'POST', url: '/api/analyses', payload: { datasetId: up.id, goal: 'compare', design: 'independent', target: 'categorical', group: 'grup', value: 'sonuc' } })).json();
+    const html = (await app.inject({ url: `/api/analyses/${a.id}/report` })).body;
+    expect(html).toContain('Çapraz tablo');
+    expect(html).toContain('Satır içi dağılım');
+    expect(html).toContain('Toplam');
+    expect(html).toMatch(/\d+ \(%\d+\)/);
+    const zip = await JSZip.loadAsync((await app.inject({ url: `/api/analyses/${a.id}/report?format=docx` })).rawPayload);
+    const xml = await zip.file('word/document.xml')!.async('string');
+    expect(xml).toContain('Çapraz tablo');
+    expect(xml).toContain('Toplam');
+  });
+
+  it('DOCX: özet istatistik tabloları', async () => {
+    const a = await analysis();
+    const zip = await JSZip.loadAsync((await app.inject({ url: `/api/analyses/${a.id}/report?format=docx` })).rawPayload);
+    const xml = await zip.file('word/document.xml')!.async('string');
+    for (const text of ['Konum ve yayılım', 'Ortalama ve dağılım şekli', 'Maks']) expect(xml).toContain(text);
+  });
+
   it('aynı analiz iki kez raporlanınca denetim izi dışında aynı çıktı üretilir', async () => {
     const first = await analysis();
     const second = await analysis();
