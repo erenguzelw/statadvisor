@@ -5,7 +5,9 @@
  * böylece test katmanından eğitime bilgi sızmaz. Metrikler test katmanlarından, "eğitim doğruluğu" ise eğitim
  * satırlarının (en çok `trainEvalMax` gözlemlik tohumlu bir alt örneğinde) hesaplanır.
  */
+import { rocAuc, rocCurve } from './assumptions.ts';
 import { mulberry32 } from './ml.ts';
+import { describeAssociations, type Associations } from './ml-assoc.ts';
 import {
   fitDecisionTree,
   fitGradientBoostingClassifier,
@@ -14,6 +16,7 @@ import {
   fitMajority,
   fitRandomForestClassifier,
   fitSvm,
+  argmaxRows,
   type Classifier,
   type Fit,
 } from './ml-models.ts';
@@ -112,6 +115,8 @@ export interface FoldResult {
   accuracy: number;
   macroF1: number;
   trainAccuracy: number;
+  /** Bire-karşı-hepsi (OvR) makro AUC; skor üretemeyen modelde yoktur. */
+  auc?: number;
   seconds: number;
 }
 
@@ -141,7 +146,14 @@ export interface ModelCv {
   confusion: number[][];
   perClass: ClassReport[];
   seconds: number;
+  /** Kalibre sınıf olasılığı üretiyor mu (SVM üretmez; AUC için karar skorları kullanılır). */
   hasProba: boolean;
+  /** Katmanlar arası ortalama ± SS OvR makro AUC. */
+  auc?: { mean: number; sd: number };
+  /** Sınıf başına AUC (katman ortalaması). */
+  aucPerClass?: number[];
+  /** Sınıf başına ROC eğrisi (tüm test katmanlarının birleşik tahminlerinden). */
+  roc?: { cls: string; points: { fpr: number; tpr: number }[] }[];
 }
 
 export interface CvResult {
@@ -157,6 +169,8 @@ export interface CvResult {
   /** En sık sınıfın oranı (taban doğruluğu). */
   baselineAccuracy: number;
   models: ModelCv[];
+  /** Özellikler arası korelasyonlar ve hedefle ilişki. */
+  associations: Associations;
 }
 
 export interface CvHooks {
@@ -232,6 +246,8 @@ export async function runCrossValidation(data: PreparedData, opts: CvOptions = {
   let done = 0;
   const featureColumns: string[] = [];
   const trainAccs = new Map<ModelId, number[]>();
+  const aucFolds = new Map<ModelId, number[][]>(); // model → katman → sınıf AUC
+  const oofScores = new Map<ModelId, Float64Array>();
 
   for (let fold = 0; fold < k; fold++) {
     const trainRows = rowsOf((f) => f !== fold);
@@ -261,8 +277,25 @@ export async function runCrossValidation(data: PreparedData, opts: CvOptions = {
         res.id === 'rf'
           ? fitRandomForestClassifier(Xtr, ytr, K, { seed: seed + fold })
           : MODEL_INFO[res.id].fit(Xtr, ytr, K);
-      const pred = model.predict(Xte);
+      const proba = model.proba?.(Xte);
+      const sc = model.scores ? model.scores(Xte) : proba;
+      const pred = proba ? argmaxRows(proba, Xte.n, K) : model.predict(Xte);
       const predTrain = model.predict(Xev);
+      let foldAuc: number | undefined;
+      if (sc) {
+        const perClass = Array.from({ length: K }, (_, c) => {
+          const col = Array.from({ length: Xte.n }, (_, i) => sc[i * K + c]!);
+          const lab = testRows.map((r) => (data.y[r] === c ? 1 : 0));
+          return rocAuc(col, lab);
+        });
+        const store = aucFolds.get(res.id) ?? [];
+        store.push(perClass);
+        aucFolds.set(res.id, store);
+        foldAuc = perClass.reduce((a, b) => a + b, 0) / K;
+        const oof = oofScores.get(res.id) ?? new Float64Array(data.n * K);
+        testRows.forEach((r, i) => oof.set(sc.subarray(i * K, (i + 1) * K), r * K));
+        oofScores.set(res.id, oof);
+      }
       const cm = confusionOf(data.y, pred, K, testRows);
       let correct = 0;
       for (let c = 0; c < K; c++) correct += cm[c]![c]!;
@@ -271,7 +304,7 @@ export async function runCrossValidation(data: PreparedData, opts: CvOptions = {
       for (let a = 0; a < K; a++) for (let b = 0; b < K; b++) res.confusion[a]![b]! += cm[a]![b]!;
       const seconds = (Date.now() - t0) / 1000;
       res.seconds += seconds;
-      res.folds.push({ fold, nTrain: trainRows.length, nTest: testRows.length, accuracy: correct / testRows.length, macroF1: macroF1Of(cm), trainAccuracy: trainCorrect / yev.length, seconds });
+      res.folds.push({ fold, nTrain: trainRows.length, nTest: testRows.length, accuracy: correct / testRows.length, macroF1: macroF1Of(cm), trainAccuracy: trainCorrect / yev.length, ...(foldAuc !== undefined ? { auc: foldAuc } : {}), seconds });
       const arr = trainAccs.get(res.id) ?? [];
       arr.push(trainCorrect / yev.length);
       trainAccs.set(res.id, arr);
@@ -285,6 +318,20 @@ export async function runCrossValidation(data: PreparedData, opts: CvOptions = {
     res.macroF1 = meanSd(res.folds.map((f) => f.macroF1));
     res.trainAccuracy = meanSd(trainAccs.get(res.id) ?? []).mean;
     res.gap = res.trainAccuracy - res.accuracy.mean;
+    const af = aucFolds.get(res.id);
+    if (af && af.length) {
+      res.auc = meanSd(af.map((pc) => pc.reduce((a, b) => a + b, 0) / K));
+      res.aucPerClass = Array.from({ length: K }, (_, c) => meanSd(af.map((pc) => pc[c]!)).mean);
+      const oof = oofScores.get(res.id)!;
+      res.roc = data.classes.map((cls, c) => ({
+        cls,
+        points: rocCurve(
+          Array.from({ length: data.n }, (_, i) => oof[i * K + c]!),
+          Array.from(data.y, (v) => (v === c ? 1 : 0)),
+          60,
+        ),
+      }));
+    }
     res.perClass = data.classes.map((cls, c) => {
       const tp = res.confusion[c]![c]!;
       const row = res.confusion[c]!.reduce((s, v) => s + v, 0);
@@ -304,5 +351,6 @@ export async function runCrossValidation(data: PreparedData, opts: CvOptions = {
     classCounts,
     baselineAccuracy: Math.max(...classCounts) / data.n,
     models: results,
+    associations: describeAssociations(data),
   };
 }
