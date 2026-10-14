@@ -1,4 +1,4 @@
-import type { AnalysisResult, AnalysisSpec, CleanRule, DatasetQuality, GeneratedCode } from '@statadvisor/shared';
+import type { AnalysisResult, AnalysisSpec, CleanRule, DatasetQuality, GeneratedCode, RegressionNarrative, RegressionResult, RegressionSpec } from '@statadvisor/shared';
 
 /** Sunucuya gönderilen analiz isteği. */
 export type AnalysisBody = AnalysisSpec & { datasetId: string };
@@ -174,6 +174,28 @@ export interface LevelsResponse {
   total: number;
   truncated: boolean;
   levels: { value: string; count: number }[];
+}
+
+/** Regresyon isteği: seçilen sütunlar ve (isteğe bağlı) referans düzeyler. */
+export interface RegressionBody {
+  dependent: string;
+  numeric: string[];
+  categorical: string[];
+  alpha: number;
+  reference?: Record<string, string>;
+}
+
+export interface RegressionResponse {
+  datasetId: string;
+  datasetName: string;
+  spec: RegressionSpec;
+  result: Omit<RegressionResult, 'fitted' | 'residuals' | 'cooks' | 'leverage' | 'usedRows'>;
+  narrative: RegressionNarrative;
+  model: [string, string][];
+  coefficients: { header: string[]; rows: string[][] };
+  /** Kalıntı grafiği için (eşit aralıklı seçilmiş) noktalar. */
+  plot: { fitted: number[]; residuals: number[]; step: number };
+  code: GeneratedCode;
 }
 
 export type QualityResponse = DatasetQuality;

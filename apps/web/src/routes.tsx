@@ -4,6 +4,7 @@ import { AppShell } from '@/components/layout/AppShell';
 import { DataSection } from '@/components/layout/DataSection';
 import { DatasetsPage } from '@/features/datasets/DatasetsPage';
 import { DecisionWizardPage } from '@/features/decision-wizard/DecisionWizardPage';
+import { RegressionPage } from '@/features/regression/RegressionPage';
 import { ModelComparisonPage } from '@/features/model-comparison/ModelComparisonPage';
 import { DataQualityPage } from '@/features/data-quality/DataQualityPage';
 import { CodeReportPage } from '@/features/code-report/CodeReportPage';
@@ -37,6 +38,7 @@ export const router = createBrowserRouter([
         ],
       },
       { path: 'karar-sihirbazi', element: <DecisionWizardPage /> },
+      { path: 'regresyon', element: <RegressionPage /> },
       { path: 'model-karsilastirma', element: <ModelComparisonPage /> },
       { path: 'veri-kalitesi', element: <Navigate to="/veri/kalite" replace /> },
       { path: 'kod-rapor', element: <CodeReportPage /> },

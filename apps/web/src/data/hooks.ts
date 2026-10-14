@@ -15,6 +15,8 @@ import {
   type DatasetInfo,
   type LevelsResponse,
   type QualityResponse,
+  type RegressionBody,
+  type RegressionResponse,
   type SampleInfo,
   type SavedAnalysisListItem,
 } from './api';
@@ -243,6 +245,17 @@ export function useLevels(datasetId: string | null, column: string | null) {
     queryFn: () => api.get<LevelsResponse>(`/api/datasets/${datasetId}/levels${qs({ column: column ?? undefined })}`),
     enabled: Boolean(datasetId && column),
     retry: shouldRetry,
+  });
+}
+
+/** Doğrusal regresyon: gövde geçerliyse modeli kurar (sunucuda hesaplanır, kaydedilmez). */
+export function useRegression(datasetId: string | null, body: RegressionBody | null) {
+  return useQuery({
+    queryKey: ['regression', datasetId, body] as const,
+    queryFn: () => api.post<RegressionResponse>(`/api/datasets/${datasetId}/regression`, body),
+    enabled: Boolean(datasetId && body),
+    retry: shouldRetry,
+    placeholderData: keepPreviousData,
   });
 }
 

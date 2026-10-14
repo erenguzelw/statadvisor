@@ -1,4 +1,4 @@
-import { Code2, Database, GitCompareArrows, Workflow, type LucideIcon } from 'lucide-react';
+import { Code2, Database, GitCompareArrows, TrendingUp, Workflow, type LucideIcon } from 'lucide-react';
 
 export interface NavItem {
   to: string;
@@ -9,6 +9,7 @@ export interface NavItem {
 export const navItems: NavItem[] = [
   { to: '/veri', label: 'Veri Setleri', icon: Database },
   { to: '/karar-sihirbazi', label: 'Karar Sihirbazı & Varsayım', icon: Workflow },
+  { to: '/regresyon', label: 'Doğrusal Regresyon', icon: TrendingUp },
   { to: '/model-karsilastirma', label: 'Model Karşılaştırma', icon: GitCompareArrows },
   { to: '/kod-rapor', label: 'Kod & Rapor Merkezi', icon: Code2 },
 ];
