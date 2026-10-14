@@ -264,7 +264,7 @@ function apaSentence(o: TestOutcome, assumptions: AssumptionTest[]): string {
 export function analyze(req: AnalysisRequest): AnalysisResult {
   const alpha = req.alpha ?? 0.05;
   if (!(alpha > 0 && alpha < 1)) throw new AnalysisError('Anlamlılık düzeyi (α) 0 ile 1 arasında olmalıdır.');
-  if (req.goal === 'predict') throw new AnalysisError('Tahmin amaçlı çalışmalar için Model Karşılaştırma sayfasını kullanın; bu çözümleme hipotez testleri içindir.');
+  if (req.goal === 'predict') throw new AnalysisError('Tahmin ve modelleme için Doğrusal Regresyon, Lojistik Regresyon ya da Model Karşılaştırma sayfalarını kullanın; bu çözümleme hipotez testleri içindir.');
 
   const notes: string[] = [];
   const assumptions: AssumptionTest[] = [];

@@ -14,6 +14,8 @@ import {
   type DatasetDetail,
   type DatasetInfo,
   type LevelsResponse,
+  type LogisticBody,
+  type LogisticResponse,
   type QualityResponse,
   type RegressionBody,
   type RegressionResponse,
@@ -253,6 +255,17 @@ export function useRegression(datasetId: string | null, body: RegressionBody | n
   return useQuery({
     queryKey: ['regression', datasetId, body] as const,
     queryFn: () => api.post<RegressionResponse>(`/api/datasets/${datasetId}/regression`, body),
+    enabled: Boolean(datasetId && body),
+    retry: shouldRetry,
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** İkili lojistik regresyon: gövde geçerliyse modeli kurar (sunucuda hesaplanır, kaydedilmez). */
+export function useLogistic(datasetId: string | null, body: LogisticBody | null) {
+  return useQuery({
+    queryKey: ['logistic', datasetId, body] as const,
+    queryFn: () => api.post<LogisticResponse>(`/api/datasets/${datasetId}/logistic`, body),
     enabled: Boolean(datasetId && body),
     retry: shouldRetry,
     placeholderData: keepPreviousData,

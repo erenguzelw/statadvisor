@@ -66,7 +66,7 @@ export function buildBody(datasetId: string, cols: ColumnInfo[], a: Answers, p: 
 
 /** İstek tamamlanmadığında kullanıcıya gösterilecek eksik adımın açıklaması. */
 export function missingHint(a: Answers): string {
-  if (a.goal === 'predict') return 'Tahmin için Model Karşılaştırma sayfasını kullanın.';
+  if (a.goal === 'predict') return 'Tahmin ve modelleme için Doğrusal Regresyon, Lojistik Regresyon ya da Model Karşılaştırma sayfalarını kullanın.';
   if (a.goal === 'relate') return a.target === 'categorical' ? 'İki farklı kategorik sütun seçin.' : 'İki farklı sayısal sütun seçin.';
   if (a.design === 'paired' && a.target !== 'categorical') return 'Karşılaştırılacak en az iki sütun (koşul) seçin.';
   if (a.target === 'categorical') return 'Bir grup sütunu ve bir sonuç sütunu seçin (farklı sütunlar).';
