@@ -8,10 +8,12 @@ import { RocCurve } from '@/components/charts';
 import { ModelCard, ModelComparisonTable, RedFlagCard, modelColors } from '@/components/domain';
 import { useApp } from '@/context/AppContext';
 import { useModelComparison } from '@/data/hooks';
+import { SegmentedControl } from '@/components/ui';
+import { RealDataComparison } from './RealDataComparison';
 
 const pct = (x: number) => `%${(x * 100).toFixed(1)}`;
 
-export function ModelComparisonPage() {
+function SyntheticComparison() {
   const { narrate } = useApp();
   const navigate = useNavigate();
   const query = useModelComparison();
@@ -190,5 +192,27 @@ export function ModelComparisonPage() {
         );
       }}
     </QueryView>
+  );
+}
+
+/** Model Karşılaştırma: kendi verinizde çapraz doğrulama ya da sentetik örnek. */
+export function ModelComparisonPage() {
+  const [mode, setMode] = useState<'real' | 'sample'>('real');
+  return (
+    <>
+      <div className="mb-6 flex flex-wrap items-center gap-3">
+        <SegmentedControl
+          label="Model karşılaştırma kaynağı"
+          size="md"
+          value={mode}
+          onChange={setMode}
+          options={[
+            { value: 'real', label: 'Kendi verim' },
+            { value: 'sample', label: 'Örnek (sentetik)' },
+          ]}
+        />
+      </div>
+      {mode === 'real' ? <RealDataComparison /> : <SyntheticComparison />}
+    </>
   );
 }
