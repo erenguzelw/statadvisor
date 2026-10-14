@@ -1,5 +1,5 @@
 import { AlignmentType, Document, HeadingLevel, ImageRun, Packer, Paragraph, Table, TableCell, TableRow, TextRun, WidthType } from 'docx';
-import { crosstabRows, descriptiveTables, formatP, reportFigures, type ReportData, type ReportFigure } from '@statadvisor/shared';
+import { crosstabRows, type RegressionReportData, descriptiveTables, formatP, reportFigures, type ReportData, type ReportFigure } from '@statadvisor/shared';
 import { svgToPng } from './raster.ts';
 
 const para = (text: string, opts: { bold?: boolean; italics?: boolean; size?: number; spacingAfter?: number } = {}) =>
@@ -85,5 +85,31 @@ export async function buildDocx(d: ReportData): Promise<Buffer> {
     styles: { default: { document: { run: { font: 'Calibri', size: 22 } } } },
     sections: [{ children }],
   });
+  return Buffer.from(await Packer.toBuffer(doc));
+}
+
+/** Regresyon raporu: model özeti, katsayı tablosu, uyarılar, yorum, APA özeti ve kaynakça. */
+export async function buildRegressionDocx(d: RegressionReportData): Promise<Buffer> {
+  const children: (Paragraph | Table)[] = [
+    new Paragraph({ heading: HeadingLevel.TITLE, children: [new TextRun({ text: d.title })] }),
+    para(`${d.datasetName} · ${d.date} · StatAdvisor AI`, { italics: true, size: 20 }),
+    para(`Bağımlı değişken: ${d.dependent}. Yordayıcılar: ${d.predictors.join(', ')}.`),
+    heading('Model özeti'),
+    table(['Ölçüt', 'Değer'], d.model),
+    heading('Katsayılar'),
+    table(d.coefficients.header, d.coefficients.rows),
+    para('b: düzeltilmemiş katsayı; SH: standart hata; β: standartlaştırılmış katsayı; VIF: varyans şişirme çarpanı.', { italics: true, size: 18 }),
+    heading('Tanılar ve uyarılar'),
+    ...(d.narrative.notes.length ? d.narrative.notes.map((n) => para(`• ${n.title}. ${n.text}`, { size: 20 })) : [para('Uyarı yok.', { italics: true })]),
+    heading('Nasıl okunur'),
+    ...d.narrative.interpretation.map((t) => para(`• ${t}`, { size: 20 })),
+    heading('APA 7 stilinde özet'),
+    para(d.narrative.apaSummary),
+    heading('Kaynakça'),
+    ...d.narrative.references.map((r) => para(r, { size: 20 })),
+  ];
+  if (d.audit) children.push(heading('Denetim izi'), table(['Öğe', 'Değer'], d.audit));
+  children.push(para('Bu rapor bir karar destek aracı tarafından üretilmiştir; yöntem seçiminin ve yorumun sorumluluğu araştırmacıya aittir.', { italics: true, size: 18 }));
+  const doc = new Document({ creator: 'StatAdvisor AI', title: d.title, styles: { default: { document: { run: { font: 'Calibri', size: 22 } } } }, sections: [{ children }] });
   return Buffer.from(await Packer.toBuffer(doc));
 }

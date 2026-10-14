@@ -58,6 +58,13 @@ export interface RegressionDiagnostics {
   notes: string[];
 }
 
+export interface CategoryInfo {
+  name: string;
+  /** Sıralı düzey listesi (referans dahil). */
+  levels: string[];
+  reference: string;
+}
+
 export interface RegressionResult {
   n: number;
   /** Sabit terim dahil parametre sayısı. */
@@ -75,6 +82,8 @@ export interface RegressionResult {
   bic: number;
   coefficients: Coefficient[];
   diagnostics: RegressionDiagnostics;
+  /** Kategorik yordayıcıların düzeyleri ve referans düzey. */
+  categories: CategoryInfo[];
   /** Çıkarılan (eksik değerli) satır sayısı. */
   droppedRows: number;
   /** Özgün veri satır indeksleri (tam gözlemli satırlar). */
@@ -213,6 +222,7 @@ export function buildDesign(y: (number | null)[], predictors: RegressionPredicto
     if (ok) used.push(i);
   }
   const columns: DesignColumn[] = [{ term: 'Sabit', predictor: null, values: used.map(() => 1) }];
+  const categories: CategoryInfo[] = [];
   for (const p of predictors) {
     if (p.kind === 'numeric') {
       columns.push({ term: p.name, predictor: p.name, values: used.map((i) => p.values[i] as number) });
@@ -221,6 +231,7 @@ export function buildDesign(y: (number | null)[], predictors: RegressionPredicto
       if (levels.length < 2) throw new AnalysisError(`“${p.name}” sütununda (eksik değerler çıkarıldıktan sonra) yalnızca bir düzey kaldı; kukla kodlanamaz.`);
       const ref = opts.reference?.[p.name] ?? levels[0]!;
       if (!levels.includes(ref)) throw new AnalysisError(`“${p.name}” için referans düzey “${ref}” veride yok.`);
+      categories.push({ name: p.name, levels, reference: ref });
       for (const lv of levels) {
         if (lv === ref) continue;
         columns.push({ term: `${p.name}[${lv}]`, predictor: p.name, level: lv, values: used.map((i) => (String(p.values[i]) === lv ? 1 : 0)) });
@@ -228,7 +239,7 @@ export function buildDesign(y: (number | null)[], predictors: RegressionPredicto
     }
   }
   const yv = used.map((i) => y[i] as number);
-  return { used, columns, y: yv, dropped: total - used.length };
+  return { used, columns, y: yv, dropped: total - used.length, categories };
 }
 
 export function fitLinearRegression(y: (number | null)[], predictors: RegressionPredictor[], opts: RegressionOptions = {}): RegressionResult {
@@ -360,6 +371,7 @@ export function fitLinearRegression(y: (number | null)[], predictors: Regression
       maxVif,
       notes,
     },
+    categories: design.categories,
     droppedRows: design.dropped,
     usedRows: design.used,
     fitted,
