@@ -1,7 +1,8 @@
 /**
  * Raporlar için bağımsız (kütüphanesiz) SVG grafikler. Çıktı belirleyicidir: aynı veri aynı metni üretir.
  */
-import type { DistributionSample } from './types.ts';
+import { extent } from './extent.ts';
+import type { BoxStats, DistributionSample } from './types.ts';
 
 const W = 520;
 const H = 220;
@@ -35,6 +36,76 @@ export function histogramSvg(d: DistributionSample, title: string): string {
   const ticks = [first.x0, (first.x0 + last.x1) / 2, last.x1]
     .map((t) => `<text x="${n2(sx(t))}" y="${H - 10}" text-anchor="middle" font-size="10" fill="#555">${n2(t)}</text>`)
     .join('');
-  const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${esc(title)}"><title>${esc(title)}</title><line x1="${pad.left}" y1="${n2(sy(0))}" x2="${W - pad.right}" y2="${n2(sy(0))}" stroke="#999"/>${bars}<path d="${path}" fill="none" stroke="#d98a00" stroke-width="2" stroke-dasharray="6 4"/>${ticks}<text x="${pad.left - 6}" y="${n2(sy(maxY) + 10)}" text-anchor="end" font-size="10" fill="#555">${n2(maxY)}</text></svg>`;
+}
+
+const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+/** Eksen sayıları için: büyük değerlerde ondalık gösterme. */
+const tick = (v: number) => (Math.abs(v) >= 1000 ? Math.round(v).toLocaleString('en-US') : n2(v));
+const COLORS = ['#6b6fe0', '#2a9d8f', '#d98a00', '#c2410c', '#7c3aed', '#0e7490', '#be185d', '#4d7c0f'];
+
+/** Grup başına Tukey kutu grafiği: kutu = Q1–Q3, çizgi = medyan, bıyık = sınırlar içindeki uç gözlemler, nokta = uç gözlem. */
+export function boxPlotSvg(boxes: BoxStats[], title: string): string {
+  if (!boxes.length) return '';
+  const pts = boxes.flatMap((b) => [b.whiskerLow, b.whiskerHigh, ...b.outliers]).filter(Number.isFinite);
+  const { lo, hi } = extent(pts);
+  if (!Number.isFinite(lo)) return '';
+  const span = hi - lo || 1;
+  const yLo = lo - span * 0.05;
+  const yHi = hi + span * 0.05;
+  const left = 52;
+  const bottom = 40;
+  const sy = (v: number) => H - bottom - ((v - yLo) / (yHi - yLo)) * (H - pad.top - bottom);
+  const slot = (W - left - pad.right) / boxes.length;
+  const bw = Math.min(70, slot * 0.5);
+  const grid = [0, 1, 2, 3, 4]
+    .map((i) => {
+      const v = yLo + ((yHi - yLo) * i) / 4;
+      return `<line x1="${left}" x2="${W - pad.right}" y1="${n2(sy(v))}" y2="${n2(sy(v))}" stroke="#ddd" stroke-dasharray="3 4"/><text x="${left - 6}" y="${n2(sy(v) + 3)}" text-anchor="end" font-size="10" fill="#555">${tick(v)}</text>`;
+    })
+    .join('');
+  const shapes = boxes
+    .map((b, i) => {
+      const cx = left + slot * (i + 0.5);
+      const c = COLORS[i % COLORS.length]!;
+      const dots = b.outliers.map((o) => `<circle cx="${n2(cx)}" cy="${n2(sy(o))}" r="2.5" fill="none" stroke="${c}"/>`).join('');
+      const label = b.group.length > 14 ? `${b.group.slice(0, 13)}…` : b.group;
+      return `<g><line x1="${n2(cx)}" x2="${n2(cx)}" y1="${n2(sy(b.whiskerLow))}" y2="${n2(sy(b.whiskerHigh))}" stroke="${c}" stroke-width="1.5"/><line x1="${n2(cx - bw / 4)}" x2="${n2(cx + bw / 4)}" y1="${n2(sy(b.whiskerLow))}" y2="${n2(sy(b.whiskerLow))}" stroke="${c}" stroke-width="1.5"/><line x1="${n2(cx - bw / 4)}" x2="${n2(cx + bw / 4)}" y1="${n2(sy(b.whiskerHigh))}" y2="${n2(sy(b.whiskerHigh))}" stroke="${c}" stroke-width="1.5"/><rect x="${n2(cx - bw / 2)}" y="${n2(sy(b.q3))}" width="${n2(bw)}" height="${n2(Math.max(1, sy(b.q1) - sy(b.q3)))}" fill="${c}" fill-opacity="0.3" stroke="${c}" stroke-width="1.5"/><line x1="${n2(cx - bw / 2)}" x2="${n2(cx + bw / 2)}" y1="${n2(sy(b.median))}" y2="${n2(sy(b.median))}" stroke="${c}" stroke-width="3"/>${dots}<text x="${n2(cx)}" y="${H - 22}" text-anchor="middle" font-size="11" fill="#222">${esc(label)}</text><text x="${n2(cx)}" y="${H - 9}" text-anchor="middle" font-size="9" fill="#666">n = ${b.n}</text></g>`;
+    })
+    .join('');
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${esc(title)}"><title>${esc(title)}</title>${grid}${shapes}</svg>`;
+}
+
+/** Çapraz tablo için yığılmış yatay çubuklar: her satır kendi içinde %100'e tamamlanır, sütun düzeyleri renk olur. */
+export function crosstabSvg(t: { rowNames: string[]; colNames: string[]; table: number[][] }, title: string): string {
+  if (!t.rowNames.length || !t.colNames.length) return '';
+  const rowH = 26;
+  const labelW = 130;
+  const legendH = 22;
+  const h = pad.top + t.rowNames.length * rowH + legendH + 26;
+  const plotW = W - labelW - pad.right;
+  const rows = t.rowNames
+    .map((name, r) => {
+      const counts = t.table[r] ?? [];
+      const total = counts.reduce((s, v) => s + v, 0) || 1;
+      let x = labelW;
+      const y = pad.top + r * rowH;
+      const segs = counts
+        .map((v, c) => {
+          const w = (v / total) * plotW;
+          const x0 = x;
+          x += w;
+          const pct = Math.round((v / total) * 100);
+          return `<rect x="${n2(x0)}" y="${y}" width="${n2(w)}" height="${rowH - 6}" fill="${COLORS[c % COLORS.length]}" fill-opacity="0.8"><title>${esc(`${name} / ${t.colNames[c] ?? ''}: ${v} (%${pct})`)}</title></rect>${w > 30 ? `<text x="${n2(x0 + w / 2)}" y="${y + 13}" text-anchor="middle" font-size="10" fill="#fff">%${pct}</text>` : ''}`;
+        })
+        .join('');
+      const label = name.length > 18 ? `${name.slice(0, 17)}…` : name;
+      return `<text x="${labelW - 8}" y="${y + 13}" text-anchor="end" font-size="11" fill="#222">${esc(label)}</text>${segs}`;
+    })
+    .join('');
+  const axisY = pad.top + t.rowNames.length * rowH;
+  const legend = t.colNames
+    .map((c, i) => `<rect x="${labelW + i * 110}" y="${axisY + 6}" width="10" height="10" fill="${COLORS[i % COLORS.length]}" fill-opacity="0.8"/><text x="${labelW + i * 110 + 14}" y="${axisY + 15}" font-size="10" fill="#333">${esc(c.length > 12 ? `${c.slice(0, 11)}…` : c)}</text>`)
+    .join('');
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${h}" width="100%" role="img" aria-label="${esc(title)}"><title>${esc(title)}</title>${rows}${legend}</svg>`;
 }

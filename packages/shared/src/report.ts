@@ -1,7 +1,7 @@
 import type { AnalysisResult } from './analysis.ts';
-import { histogramSvg } from './chart-svg.ts';
+import { boxPlotSvg, crosstabSvg, histogramSvg } from './chart-svg.ts';
 import { formatP, pText } from './stats.ts';
-import type { AssumptionTest, DecisionPath, DistributionSample, GroupDescriptive } from './types.ts';
+import type { AssumptionTest, BoxStats, DecisionPath, DistributionSample, GroupDescriptive } from './types.ts';
 
 /** Rapora yazılan düz veri; hem gerçek analiz sonuçlarından hem örnek özetten üretilebilir. */
 export interface ReportData {
@@ -10,6 +10,10 @@ export interface ReportData {
   /** Rapor tarihi (görüntülenecek biçimde). */
   date: string;
   descriptives: GroupDescriptive[];
+  /** Grup/koşul başına kutu grafiği özeti; verilirse tanımlayıcı istatistiklerin altına grafik eklenir. */
+  boxes?: BoxStats[];
+  /** Kategorik analizlerde çapraz tablo; verilirse tablo ve yığılmış çubuk grafiği eklenir. */
+  table?: { rowNames: string[]; colNames: string[]; table: number[][] };
   /** Sayısal hedeflerde grup içi kalıntıların dağılımı (rapora grafik olarak eklenir). */
   distribution?: DistributionSample;
   assumptions: AssumptionTest[];
@@ -34,6 +38,8 @@ export function reportFromResult(r: AnalysisResult, date: string, audit?: [strin
     datasetName: r.datasetName,
     date,
     descriptives: r.descriptives,
+    boxes: r.boxes,
+    table: r.table,
     distribution: r.distribution,
     assumptions: r.assumptions,
     decision: r.decision,
@@ -58,10 +64,41 @@ const table = (header: string[], cells: string[][]) =>
     .map((r) => `<tr>${r.map((c, i) => `<td${i > 0 ? ' class="n"' : ''}>${esc(c)}</td>`).join('')}</tr>`)
     .join('')}</tbody></table>`;
 
+/** Tanımlayıcı istatistikler iki tablo olarak yazılır (tek tablo A4'e sığmaz): konum/yayılım ve ortalama/şekil. */
+export function descriptiveTables(descriptives: GroupDescriptive[]): { title: string; header: string[]; rows: string[][] }[] {
+  const f2 = (v: number) => (Number.isFinite(v) ? v.toFixed(2) : '–');
+  if (!descriptives.length) return [];
+  return [
+    { title: 'Konum ve yayılım', header: ['Grup', 'n', 'Min', 'Q1', 'Medyan', 'Q3', 'Maks'], rows: descriptives.map((x) => [x.group, String(x.n), f2(x.min), f2(x.q1), f2(x.median), f2(x.q3), f2(x.max)]) },
+    { title: 'Ortalama ve dağılım şekli', header: ['Grup', 'Ortalama', 'SS', 'SH', 'Çarpıklık', 'Basıklık'], rows: descriptives.map((x) => [x.group, f2(x.mean), f2(x.sd), f2(x.se), f2(x.skewness), f2(x.kurtosis)]) },
+  ];
+}
+
+/** Çapraz tablo: satır başına gözlenen sayılar ve satır yüzdeleri, son sütunda toplam. */
+export function crosstabRows(t: { rowNames: string[]; colNames: string[]; table: number[][] }): { header: string[]; rows: string[][] } {
+  return {
+    header: ['', ...t.colNames, 'Toplam'],
+    rows: t.rowNames.map((name, r) => {
+      const counts = t.table[r] ?? [];
+      const total = counts.reduce((s, v) => s + v, 0);
+      return [name, ...counts.map((v) => `${v} (%${total ? Math.round((v / total) * 100) : 0})`), String(total)];
+    }),
+  };
+}
+
 /** Tek dosyalık rapor üretir. Her değer HTML'e kaçırılarak yazılır. */
 export function buildReport(d: ReportData): string {
-  const f2 = (v: number) => (Number.isFinite(v) ? v.toFixed(2) : '–');
-  const desc = table(['Grup', 'n', 'Medyan', 'Ortalama', 'SS', 'Çarpıklık', 'Basıklık'], d.descriptives.map((x) => [x.group, String(x.n), x.median.toFixed(2), x.mean.toFixed(2), f2(x.sd), f2(x.skewness), f2(x.kurtosis)]));
+  const desc = descriptiveTables(d.descriptives)
+    .map((t) => `<p class="muted">${esc(t.title)}</p>${table(t.header, t.rows)}`)
+    .join('');
+  const boxFigure = d.boxes?.length
+    ? `<figure><figcaption class="muted">Grup başına kutu grafiği (kutu: Q1–Q3, kalın çizgi: medyan, bıyık: Tukey sınırları içindeki uç gözlemler, halka: sınır dışı gözlem)</figcaption>${boxPlotSvg(d.boxes, 'Gruplara göre kutu grafiği')}</figure>`
+    : '';
+  let crosstab = '';
+  if (d.table) {
+    const ct = crosstabRows(d.table);
+    crosstab = `<p class="muted">Çapraz tablo (gözlenen sayı ve satır yüzdesi)</p>${table(ct.header, ct.rows)}<figure><figcaption class="muted">Satır içi dağılım (her satır %100)</figcaption>${crosstabSvg(d.table, 'Çapraz tablonun satır yüzdeleri')}</figure>`;
+  }
   const assump = d.assumptions.length
     ? table(['Test', 'Uygulandığı veri', 'İstatistik', 'p', 'Sonuç'], d.assumptions.map((x) => [x.name, x.subject, x.statistic, x.shape ? `sınır ±${x.shape.limit}` : formatP(x.p, true), x.passed ? 'Sağlandı' : 'İhlal edildi']))
     : '<p class="muted">Bu test türü için ayrı bir varsayım testi uygulanmadı.</p>';
@@ -73,7 +110,7 @@ export function buildReport(d: ReportData): string {
 
   const body = `<h1>${esc(d.title)}</h1>
 <p class="muted">${esc(d.datasetName)} · ${esc(d.date)} · StatAdvisor AI</p>
-<section data-section="desc"><h2>Tanımlayıcı istatistikler</h2>${desc}${notes}</section>
+<section data-section="desc"><h2>Tanımlayıcı istatistikler</h2>${desc}${boxFigure}${crosstab}${notes}</section>
 <section data-section="assump"><h2>Varsayım testleri ve karar notları</h2>${assump}${chart}
 <p>Önerilen test: <strong>${esc(d.decision.finalTest)}</strong>${d.decision.rerouteReason ? ` (${esc(d.decision.rerouteReason)})` : ''}.</p>${warnings}${alts}</section>
 <section data-section="result"><h2>Test sonucu</h2><p>${esc(d.resultLine)}</p></section>

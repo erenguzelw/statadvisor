@@ -67,6 +67,12 @@ export interface GroupDescriptive {
   /** Düzeltilmiş çarpıklık ve fazlalık basıklık (yetersiz gözlemde NaN). */
   skewness: number;
   kurtosis: number;
+  min: number;
+  q1: number;
+  q3: number;
+  max: number;
+  /** Ortalamanın standart hatası (n = 1 ise NaN). */
+  se: number;
 }
 
 export interface Interpretation {

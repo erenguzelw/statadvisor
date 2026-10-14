@@ -2,7 +2,8 @@
  * Birleşik çalıştırıcı: karar motorunun önerdiği testi (ad olarak) alır, veriye uygular, etki büyüklüğünü ve
  * gerekiyorsa post-hoc karşılaştırmaları hesaplar ve sonucu Yeni Başlayan / Uzman dillerinde yorumlar.
  */
-import { mean, median } from './assumptions.ts';
+import { mean, median, quantile, tukeyFences } from './assumptions.ts';
+import { extent } from './extent.ts';
 import { effectLabel, kruskalWallis, pText, shapeStats } from './stats.ts';
 import {
   anovaOneWay,
@@ -23,7 +24,7 @@ import {
   wilcoxonSignedRank,
   type PairResult,
 } from './tests.ts';
-import type { Interpretation } from './types.ts';
+import type { BoxStats, GroupDescriptive, Interpretation } from './types.ts';
 
 export type TestInput =
   | { kind: 'groups'; names: string[]; groups: number[][] }
@@ -75,10 +76,49 @@ function mkPairs(names: string[], pairs: PairResult[], alpha: number): OutcomePa
   return pairs.map((r) => ({ a: names[r.a]!, b: names[r.b]!, p: r.p, pAdj: r.pAdj, significant: r.pAdj < alpha }));
 }
 
-export function describeGroups(names: string[], groups: number[][]) {
+export function describeGroups(names: string[], groups: number[][]): GroupDescriptive[] {
   return groups.map((g, i) => {
     const sh = shapeStats(g);
-    return { group: names[i]!, n: g.length, median: median(g), mean: mean(g), sd: g.length > 1 ? sd(g) : NaN, skewness: sh.skewness, kurtosis: sh.kurtosis };
+    const s = g.length > 1 ? sd(g) : NaN;
+    const { lo, hi } = extent(g);
+    return {
+      group: names[i]!,
+      n: g.length,
+      median: median(g),
+      mean: mean(g),
+      sd: s,
+      skewness: sh.skewness,
+      kurtosis: sh.kurtosis,
+      min: lo,
+      q1: quantile(g, 0.25),
+      q3: quantile(g, 0.75),
+      max: hi,
+      se: s / Math.sqrt(g.length),
+    };
+  });
+}
+
+/** Rapordaki kutu grafiğinde tek tek çizilen en fazla uç gözlem sayısı (büyük veride rapor şişmesin diye). */
+const MAX_BOX_OUTLIERS = 40;
+
+/** Tukey kutu grafiği özeti; sınır dışı gözlemlerin ortancadan en uzak olan en çok 40 tanesi tutulur. */
+export function boxStatsFor(names: string[], groups: number[][]): BoxStats[] {
+  return groups.map((g, i) => {
+    const f = tukeyFences(g);
+    const inside = g.filter((x) => x >= f.lower && x <= f.upper);
+    const out = g.filter((x) => x < f.lower || x > f.upper);
+    const m = median(g);
+    const { lo, hi } = extent(inside.length ? inside : g);
+    return {
+      group: names[i]!,
+      n: g.length,
+      whiskerLow: lo,
+      q1: f.q1,
+      median: m,
+      q3: f.q3,
+      whiskerHigh: hi,
+      outliers: out.sort((a, b) => Math.abs(b - m) - Math.abs(a - m)).slice(0, MAX_BOX_OUTLIERS).sort((a, b) => a - b),
+    };
   });
 }
 
