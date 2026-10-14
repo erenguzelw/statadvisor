@@ -157,41 +157,11 @@ export function DatasetsPage() {
         title="Veri Setleri"
         description="Excel ya da CSV dosyanızı yükleyin ya da örnek bir veri setiyle başlayın. Veriler bu bilgisayarda kalır; hiçbir yere gönderilmez."
         actions={
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            {(list.data?.length ?? 0) > 0 &&
-              (confirmAll ? (
-                <span className="inline-flex flex-wrap items-center gap-2" role="group" aria-label="Tümünü silme onayı">
-                  <span className="text-caption text-fg-muted">Tüm veri setleri ve bağlı kayıtlı analizler silinsin mi?</span>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() =>
-                      removeAll.mutate(undefined, {
-                        onSuccess: () => {
-                          setDatasetId(null);
-                          setStatus('Tüm veri setleri ve bağlı analizler silindi.');
-                          setConfirmAll(false);
-                        },
-                      })
-                    }
-                  >
-                    Evet, tümünü sil
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={() => setConfirmAll(false)}>
-                    Vazgeç
-                  </Button>
-                </span>
-              ) : (
-                <Button variant="ghost" icon={Trash2} onClick={() => setConfirmAll(true)}>
-                  Tümünü sil
-                </Button>
-              ))}
-            {active && (
-              <Button variant="primary" onClick={() => navigate('/karar-sihirbazi')}>
-                Analize başla
-              </Button>
-            )}
-          </div>
+          active && (
+            <Button variant="primary" onClick={() => navigate('/karar-sihirbazi')}>
+              Analize başla
+            </Button>
+          )
         }
       />
 
@@ -229,7 +199,40 @@ export function DatasetsPage() {
       </div>
 
       <Panel className="mt-6">
-        <SectionHeader icon={Database} title="Yüklenen veri setleri" />
+        <SectionHeader
+          icon={Database}
+          title="Yüklenen veri setleri"
+          actions={
+            (list.data?.length ?? 0) > 0 &&
+            (confirmAll ? (
+              <span className="inline-flex flex-wrap items-center justify-end gap-2" role="group" aria-label="Tümünü silme onayı">
+                <span className="text-caption text-fg-muted">Tüm veri setleri ve bağlı kayıtlı analizler silinsin mi?</span>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() =>
+                    removeAll.mutate(undefined, {
+                      onSuccess: () => {
+                        setDatasetId(null);
+                        setStatus('Tüm veri setleri ve bağlı analizler silindi.');
+                        setConfirmAll(false);
+                      },
+                    })
+                  }
+                >
+                  Evet, tümünü sil
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setConfirmAll(false)}>
+                  Vazgeç
+                </Button>
+              </span>
+            ) : (
+              <Button size="sm" variant="secondary" icon={Trash2} onClick={() => setConfirmAll(true)}>
+                Tümünü sil
+              </Button>
+            ))
+          }
+        />
         <QueryView query={list}>
           {(items) =>
             items.length === 0 ? (
