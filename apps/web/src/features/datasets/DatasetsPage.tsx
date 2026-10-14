@@ -40,15 +40,15 @@ function Dropzone({ onFile, busy }: { onFile: (f: File) => void; busy: boolean }
       )}
     >
       <FileUp size={32} className="text-primary" aria-hidden />
-      <span className="text-body-lg font-semibold text-fg">CSV dosyanızı buraya bırakın ya da seçin</span>
+      <span className="text-body-lg font-semibold text-fg">Excel ya da CSV dosyanızı buraya bırakın ya da seçin</span>
       <span className="max-w-prose text-caption text-fg-subtle">
-        .csv, .tsv veya .txt; en fazla 50 MB. Ayraç (virgül, noktalı virgül, sekme) ve ondalık virgül otomatik algılanır. Dosya bu bilgisayardan
-        çıkmaz.
+        .xlsx, .csv, .tsv veya .txt; en fazla 50 MB. Excel’de ilk çalışma sayfası okunur. Ayraç (virgül, noktalı virgül, sekme) ve ondalık virgül
+        otomatik algılanır. Dosya bu bilgisayardan çıkmaz.
       </span>
       <input
         ref={input}
         type="file"
-        accept=".csv,.tsv,.txt,text/csv,text/plain"
+        accept=".xlsx,.csv,.tsv,.txt,text/csv,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         className="sr-only"
         onChange={(e) => {
           const f = e.target.files?.[0];
@@ -84,7 +84,10 @@ export function DatasetsPage() {
 
   const done = (d: DatasetInfo) => {
     setDatasetId(d.id);
-    setStatus(d.duplicate ? `“${d.name}” zaten yüklüydü; etkin veri seti yapıldı.` : `“${d.name}” yüklendi (${nf.format(d.rows)} satır, ${d.columns.length} sütun).`);
+    const excel = d.convertedFrom === 'xlsx' ? ' Excel dosyası CSV’ye dönüştürüldü; Python kodu bu CSV’yi okur.' : '';
+    setStatus(
+      (d.duplicate ? `“${d.name}” zaten yüklüydü; etkin veri seti yapıldı.` : `“${d.name}” yüklendi (${nf.format(d.rows)} satır, ${d.columns.length} sütun).`) + excel,
+    );
   };
   const error = upload.error ?? loadSample.error ?? remove.error;
 
@@ -150,7 +153,7 @@ export function DatasetsPage() {
         features={['Veri']}
         context="Yerel çalışma"
         title="Veri Setleri"
-        description="CSV dosyanızı yükleyin ya da örnek bir veri setiyle başlayın. Veriler bu bilgisayarda kalır; hiçbir yere gönderilmez."
+        description="Excel ya da CSV dosyanızı yükleyin ya da örnek bir veri setiyle başlayın. Veriler bu bilgisayarda kalır; hiçbir yere gönderilmez."
         actions={
           active && (
             <Button variant="primary" onClick={() => navigate('/karar-sihirbazi')}>

@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import JSZip from 'jszip';
 
 /** Her testten önce sunucudaki tüm veri setlerini siler (testler birbirinden bağımsızdır). */
 async function reset(request: APIRequestContext) {
@@ -78,6 +79,23 @@ test('CSV yükleme: dosya seçilir, sütun türleri çıkarılır, hatalı dosya
 
   await page.locator('input[type=file]').setInputFiles({ name: 'bozuk.csv', mimeType: 'text/csv', buffer: Buffer.from('a,b\n1,2\n') });
   await expect(page.getByText(/2 veri satırı/)).toBeVisible();
+});
+
+test('Excel yükleme: .xlsx CSV’ye dönüştürülür ve kodlu Likert sütunu sıralı tanınır', async ({ page }) => {
+  const zip = new JSZip();
+  const cell = (ref: string, text: string) => `<c r="${ref}" t="inlineStr"><is><t>${text}</t></is></c>`;
+  const rows = Array.from({ length: 20 }, (_, i) => `<row r="${i + 2}">${cell(`A${i + 2}`, i % 2 ? 'Kadın' : 'Erkek')}${cell(`B${i + 2}`, `${i % 5}:Etiket`)}<c r="C${i + 2}"><v>${10 + i}</v></c></row>`);
+  zip.file('xl/workbook.xml', '<workbook xmlns:r="r"><sheets><sheet name="Form" sheetId="1" r:id="rId1"/></sheets></workbook>');
+  zip.file('xl/_rels/workbook.xml.rels', '<Relationships><Relationship Id="rId1" Target="worksheets/sheet1.xml"/></Relationships>');
+  zip.file('xl/worksheets/sheet1.xml', `<worksheet><sheetData><row r="1">${cell('A1', 'Cinsiyet')}${cell('B1', 'Madde')}${cell('C1', 'Puan')}</row>${rows.join('')}</sheetData></worksheet>`);
+  await page.goto('/veri');
+  await page.locator('input[type=file]').setInputFiles({
+    name: 'form yanıtları.xlsx',
+    mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    buffer: await zip.generateAsync({ type: 'nodebuffer' }),
+  });
+  await expect(page.getByText(/“form yanıtları.csv” yüklendi \(20 satır, 3 sütun\)\. Excel dosyası CSV’ye dönüştürüldü/)).toBeVisible();
+  await expect(page.getByRole('cell', { name: 'Sıralı', exact: true })).toBeVisible();
 });
 
 test('örnek veri yüklenir, etkin yapılır ve silinebilir', async ({ page }) => {

@@ -31,6 +31,7 @@ import {
   type TextColumn,
 } from '@statadvisor/shared';
 import { CsvError, parseCsv, type ParsedColumn, type ParsedCsv } from './csv.ts';
+import { isOle, isZip, xlsxToCsv } from './xlsx.ts';
 import { openDb } from './db.ts';
 import { buildDocx } from './docx.ts';
 import { PdfUnavailableError, pdfAvailable, renderPdf } from './pdf.ts';
@@ -214,6 +215,13 @@ export function buildApp(opts: AppOptions): FastifyInstance {
     if (!part) throw new ApiError(400, 'no_file', 'Dosya gönderilmedi.');
     const buf = await part.toBuffer();
     if (part.file.truncated) throw new ApiError(413, 'too_large', `Dosya çok büyük (en fazla ${Math.round(maxUpload / 1024 / 1024)} MB).`);
+    if (isOle(buf)) throw new CsvError('Eski Excel biçimi (.xls) desteklenmiyor. Dosyayı Excel’de .xlsx ya da CSV olarak kaydedip yeniden yükleyin.');
+    if (isZip(buf)) {
+      // Excel dosyası CSV'ye çevrilip öyle saklanır; Python kodu ve indirilen veri bu CSV'dir.
+      const name = (part.filename || 'veri.xlsx').replace(/\.xlsx$/i, '') + '.csv';
+      const { dataset, created } = ingest(xlsxToCsv(buf), name);
+      return reply.status(created ? 201 : 200).send({ ...dataset, duplicate: !created, convertedFrom: 'xlsx' });
+    }
     const { dataset, created } = ingest(buf, part.filename);
     return reply.status(created ? 201 : 200).send({ ...dataset, duplicate: !created });
   });

@@ -257,6 +257,59 @@ suite('üretilen Python kodu, ekrandaki sonucu birebir yeniden üretir', () => {
     const { analysis } = await verify(id, cmp({ value: 'y', group: 'grup' }));
     expect(analysis.notes.join(' ')).toContain('eksik değer');
   });
+
+  const hasOpenpyxl = hasPython && spawnSync(PY, ['-c', 'import openpyxl'], { encoding: 'utf8' }).status === 0;
+  it.skipIf(!hasOpenpyxl)('Excel (.xlsx): dönüştürülen CSV pandas.read_excel ile birebir aynı; analiz kodu bu CSV üzerinde ekranla eşleşir', { timeout: T }, async () => {
+    // openpyxl ile Google Forms dışa aktarımına benzer bir dosya: zaman damgası, Türkçe etiketler, kodlu Likert, eksik hücre.
+    const make = `
+import openpyxl, datetime, random
+random.seed(5)
+wb = openpyxl.Workbook(); ws = wb.active; ws.title = 'Form Yanıtları 1'
+ws.append(['Zaman damgası', 'Cinsiyetiniz', 'Günlük kullanım süresi', 'Madde 1: Başkalarını incitmek bazen haklıdır', 'Puan'])
+labels = ['Hiç katılmıyorum', 'Katılmıyorum', 'Bazen katılıyorum', 'Katılıyorum', 'Tamamen katılıyorum']
+sure = ['1 saatten az', '1-3 saat', '4-6 saat', '7 saat ve üzeri']
+for i in range(80):
+    g = 'Kadın' if i % 2 else 'Erkek'
+    k = max(0, min(4, round(2 + (0.8 if g == 'Erkek' else 0) + random.gauss(0, 1))))
+    ws.append([datetime.datetime(2026, 3, 1, 9, 0, 0) + datetime.timedelta(minutes=37 * i, seconds=i), g, sure[i % 4], f'{k}:{labels[k]}', None if i % 17 == 0 else round(random.gauss(50 + (4 if g == 'Erkek' else 0), 10), 2)])
+wb.save('anket.xlsx')
+`;
+    execFileSync(PY, ['-c', make], { cwd: work, env: { ...process.env, PYTHONIOENCODING: 'utf-8' } });
+    const boundary = '----sapyx';
+    const payload = Buffer.concat([
+      Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="anket.xlsx"\r\nContent-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet\r\n\r\n`),
+      readFileSync(join(work, 'anket.xlsx')),
+      Buffer.from(`\r\n--${boundary}--\r\n`),
+    ]);
+    const up = await app.inject({ method: 'POST', url: '/api/datasets', payload, headers: { 'content-type': `multipart/form-data; boundary=${boundary}` } });
+    expect(up.statusCode, up.body).toBe(201);
+    const ds = up.json();
+    expect(ds.name).toBe('anket.csv');
+    const type = (n: string) => ds.columns.find((c: { name: string }) => c.name === n)?.type;
+    expect([type('Cinsiyetiniz'), type('Günlük kullanım süresi'), type('Madde 1: Başkalarını incitmek bazen haklıdır'), type('Puan')]).toEqual(['categorical', 'ordinal', 'ordinal', 'continuous']);
+
+    writeFileSync(join(work, 'anket.csv'), (await app.inject({ url: `/api/datasets/${ds.id}/download` })).rawPayload);
+    const compare = `
+import pandas as pd, numpy as np
+x = pd.read_excel('anket.xlsx')
+c = pd.read_csv('anket.csv')
+assert list(x.columns) == list(c.columns), (list(x.columns), list(c.columns))
+assert len(x) == len(c), (len(x), len(c))
+for col in x.columns:
+    a, b = x[col], c[col]
+    if pd.api.types.is_datetime64_any_dtype(a):
+        assert (a.dt.strftime('%Y-%m-%d %H:%M:%S') == b).all(), col
+    elif pd.api.types.is_numeric_dtype(a):
+        assert np.allclose(a.to_numpy(float), b.to_numpy(float), equal_nan=True), col
+    else:
+        assert (a.fillna('') == b.fillna('')).all(), col
+print('AYNI')
+`;
+    expect(execFileSync(PY, ['-c', compare], { cwd: work, encoding: 'utf8', env: { ...process.env, PYTHONIOENCODING: 'utf-8' } }).trim()).toBe('AYNI');
+
+    await verify(ds.id, cmp({ target: 'ordinal', value: 'Madde 1: Başkalarını incitmek bazen haklıdır', group: 'Cinsiyetiniz' }));
+    await verify(ds.id, cmp({ value: 'Puan', group: 'Cinsiyetiniz' }));
+  });
 });
 
 suite('üretilen temizleme kodu, uygulamanın temizlediği veriyi yeniden üretir', () => {
