@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="tr">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aşama 4 özeti: yorum, uyarı ve rapor</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&display=swap&subset=latin-ext">
+<style>
+:root {
+  --bg: #f7f8fc; --surface: #ffffff; --line: #d9dcea; --fg: #141a2e; --muted: #535a75;
+  --gap: #b91c1c; --gap-bg: #fde8e8;
+  --s1: #4338ca; --s1-bg: #eceafe;
+  --s2: #0e7490; --s2-bg: #e0f5fa;
+  --s3: #b45309; --s3-bg: #fff4e0;
+  --s4: #047857; --s4-bg: #dcf5ea;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.5 Inter, system-ui, sans-serif; }
+#page { width: 1600px; padding: 48px 56px 56px; display: grid; gap: 24px; }
+h1, h2, h3 { font-family: 'Space Grotesk', system-ui, sans-serif; margin: 0; line-height: 1.15; }
+h1 { font-size: 40px; letter-spacing: -0.02em; }
+h2 { font-size: 22px; display: flex; align-items: center; gap: 12px; }
+h3 { font-size: 18px; }
+p { margin: 0; }
+.sub { color: var(--muted); font-size: 18px; max-width: 1250px; }
+.badge { font-family: Inter, sans-serif; font-size: 13px; font-weight: 600; padding: 3px 12px; border-radius: 999px; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 22px 24px; display: grid; gap: 14px; }
+.panel.gap { border-top: 5px solid var(--gap); } .panel.gap .badge { background: var(--gap-bg); color: var(--gap); }
+.gaps { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 32px; margin: 0; padding: 0; list-style: none; }
+.gaps li { display: grid; grid-template-columns: 22px 1fr; font-size: 15px; }
+.gaps li::before { content: "✕"; color: var(--gap); font-weight: 700; }
+.gaps b { display: block; } .gaps span { color: var(--muted); }
+
+.road { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; position: relative; }
+.st { border-radius: 14px; border: 2px solid; padding: 18px 20px; display: grid; gap: 10px; align-content: start; background: var(--surface); }
+.st .top { display: flex; align-items: baseline; justify-content: space-between; }
+.st .n { font-family: 'Space Grotesk', sans-serif; font-size: 30px; font-weight: 700; line-height: 1; }
+.st .tok { font-size: 12.5px; font-weight: 600; padding: 2px 10px; border-radius: 999px; }
+.st ul { margin: 0; padding-left: 18px; font-size: 14.5px; color: var(--muted); display: grid; gap: 3px; }
+.st .acc { font-size: 13.5px; border-top: 1px dashed var(--line); padding-top: 8px; }
+.st .acc b { color: var(--fg); }
+.st1 { border-color: var(--s1); background: var(--s1-bg); } .st1 .n { color: var(--s1); } .st1 .tok { background: #fff; color: var(--s1); }
+.st2 { border-color: var(--s2); background: var(--s2-bg); } .st2 .n { color: var(--s2); } .st2 .tok { background: #fff; color: var(--s2); }
+.st3 { border-color: var(--s3); background: var(--s3-bg); } .st3 .n { color: var(--s3); } .st3 .tok { background: #fff; color: var(--s3); }
+.st4 { border-color: var(--s4); background: var(--s4-bg); } .st4 .n { color: var(--s4); } .st4 .tok { background: #fff; color: var(--s4); }
+.fix { font-size: 12.5px; font-weight: 600; color: var(--gap); }
+
+.rules { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.rule { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px 20px; display: grid; gap: 6px; }
+.rule p { font-size: 14.5px; color: var(--muted); }
+.bottom { background: var(--fg); color: #fff; border-radius: 16px; padding: 22px 26px; display: grid; grid-template-columns: 1fr auto; gap: 24px; align-items: center; }
+.bottom .k { font-size: 13px; color: #b9bdd4; font-weight: 600; letter-spacing: .03em; }
+.bottom p { font-family: 'Space Grotesk', sans-serif; font-size: 21px; line-height: 1.4; }
+.bottom .tot { text-align: right; }
+.bottom .tot b { font-family: 'Space Grotesk', sans-serif; font-size: 30px; display: block; }
+</style>
+
+<div id="page">
+  <header>
+    <h1>Yapılanlar: yorum, uyarı ve rapor (Aşama 4)</h1>
+    <p class="sub">14 Ekim 2026 · commit'ler 3943cea, 812d5b8 · tür kontrolü ve lint temiz; testler geçiyor (api 126 + 1 yavaş kabul testi · web 13 · shared 198); e2e model sayfaları geçti. Gerçek veri: bodyPerformance, 13.393 satır, 7 model, ~90 sn.</p>
+  </header>
+
+  <section>
+    <h2>Ne yapıldı <span style="font-family:Inter;font-size:15px;font-weight:400;color:var(--muted)">planın E5, E6 ve E8 maddeleri</span></h2>
+    <div class="road">
+      <div class="st st1">
+        <div class="top"><span class="n">A</span><span class="tok">yorum</span></div>
+        <h3>Otomatik yorum ve bayraklar</h3>
+        <ul>
+          <li>Eğitim–test farkı ≥ 10 puan: aşırı uyum bayrağı</li>
+          <li>Sınıf dengesi ölçülür; dengeli veride “dengesizlik” yorumu üretilmez</li>
+          <li>En iyi ↔ ikinci model: düzeltmeli t testi (Nadeau–Bengio)</li>
+          <li>Taban aşılmıyorsa uyarı; rastgele orman eğitim %100'ü bayrak sayılmaz</li>
+        </ul>
+        <p class="acc"><b>Not:</b> eşikler başparmak kuralıdır, metinde böyle yazılır.</p>
+      </div>
+      <div class="st st2">
+        <div class="top"><span class="n">B</span><span class="tok">sınıf bazında</span></div>
+        <h3>Karışıklık ve ROC</h3>
+        <ul>
+          <li>Karışıklık matrisi ve sınıf tablosu (kesinlik, duyarlılık, F1, destek, AUC)</li>
+          <li>Bire-karşı-hepsi ROC eğrileri, makro AUC ± SS</li>
+          <li>En çok karışan sınıf çifti ve komşu sınıfa giden hata oranı veriden hesaplanır</li>
+        </ul>
+        <p class="acc"><b>Doğrulama:</b> AUC, scikit-learn ile 2e-16 farkla aynı (SVM dahil, decision_function).</p>
+      </div>
+      <div class="st st3">
+        <div class="top"><span class="n">C</span><span class="tok">ilişkiler</span></div>
+        <h3>Korelasyon yönü ve sıralaması</h3>
+        <ul>
+          <li>Tüm sayısal çiftler |r| sırasıyla; yön r'nin işaretinden</li>
+          <li>Hedefle ilişki: η² (sayısal), Cramér V (kategorik)</li>
+          <li>r ≥ 0,8 çiftlerde çoklu doğrusallık notu</li>
+        </ul>
+        <p class="acc"><b>Cohen eşikleri</b> kullanılır; büyük örneklemde p değil büyüklük okunur.</p>
+      </div>
+      <div class="st st4">
+        <div class="top"><span class="n">D</span><span class="tok">rapor</span></div>
+        <h3>Rapor ve kabul testi</h3>
+        <ul>
+          <li>HTML / Word / PDF model karşılaştırma raporu (ortak blok belgesi)</li>
+          <li>Python kodu AUC'yi de yazdırır; çalıştırılıp doğrulanır</li>
+          <li>bodyPerformance kabul testi: raporun 8 iddiası gerçek veride sınanır</li>
+        </ul>
+        <p class="acc"><b>Çıktı:</b> docs/bodyperformance_denetimi.png</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Dürüst sınırlar</h2>
+    <div class="rules">
+      <div class="rule"><h3>SVM'de AUC olasılığa değil skora dayanır</h3><p>Raporunuz Platt olasılığı kullanmış; StatAdvisor scikit-learn decision_function skorlarını kullanır. Sıralama bilgisi aynıdır, değerler yakındır (0,94 / 0,78 / 0,79 / 0,95).</p></div>
+      <div class="rule"><h3>Tek bölünmeyi birebir yeniden üretmedik</h3><p>Raporun %65,99 / %69,91 / %60,92 sayıları tek bir 80/20 bölünmeye ve etiket kodlamaya dayanır. Çapraz doğrulama ortalamalarıyla ±2 SS içinde tutarlıdır; birebir eşleşme hedeflenmedi.</p></div>
+      <div class="rule"><h3>Kabul testi depoda değil</h3><p>Veri dosyası depoda bulunmadığı ve ~90 sn sürdüğü için yalnızca STATADVISOR_SLOW=1 ve dosya varken çalışır; normal test akışında atlanır.</p></div>
+    </div>
+  </section>
+
+  <div class="bottom">
+    <div>
+      <div class="k">TAMAMLANDI</div>
+      <p>Dört aşamanın tamamı bitti: doğrusal regresyon, lojistik regresyon, gerçek veride model karşılaştırma, yorum/uyarı/rapor. bodyPerformance raporu StatAdvisor'da baştan sona yeniden üretildi ve iddiaları denetlendi: 5 doğru/tutarlı, 2 kısmen, 1 yanlış.</p>
+    </div>
+    <div class="tot"><b>4 / 4</b>aşama tamam</div>
+  </div>
+</div>
