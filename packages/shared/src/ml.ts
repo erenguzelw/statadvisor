@@ -54,8 +54,7 @@ export function stratifiedSplit(y: number[], testFraction: number, seed = 11) {
       [idx[i], idx[j]] = [idx[j]!, idx[i]!];
     }
     const nTest = Math.round(idx.length * testFraction);
-    test.push(...idx.slice(0, nTest));
-    train.push(...idx.slice(nTest));
+    for (let k = 0; k < idx.length; k++) (k < nTest ? test : train).push(idx[k]!);
   }
   return { train, test };
 }

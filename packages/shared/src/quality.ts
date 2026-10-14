@@ -4,6 +4,7 @@
  */
 import { shapiroSubsample } from './analysis.ts';
 import { mean, median, shapiroWilk, tukeyFences } from './assumptions.ts';
+import { extent } from './extent.ts';
 import { histogram, skewness } from './stats.ts';
 import type { BoxStats, HistogramBin } from './types.ts';
 
@@ -87,8 +88,7 @@ function residualsByGroup(rows: { v: number; g: string }[]): number[] {
 
 function makeHist(values: number[]) {
   if (values.length === 0) return { bins: [], mean: 0, sd: 0 };
-  const lo = Math.min(...values);
-  const hi = Math.max(...values);
+  const { lo, hi } = extent(values);
   const count = Math.max(8, Math.min(40, Math.round(Math.sqrt(values.length))));
   const width = (hi - lo) / count || 1;
   const m = mean(values);
@@ -104,11 +104,11 @@ function boxes(rows: { v: number; g: string }[]): BoxStats[] {
     return {
       group: g,
       n: v.length,
-      whiskerLow: Math.min(...(inside.length ? inside : v)),
+      whiskerLow: extent(inside.length ? inside : v).lo,
       q1: f.q1,
       median: median(v),
       q3: f.q3,
-      whiskerHigh: Math.max(...(inside.length ? inside : v)),
+      whiskerHigh: extent(inside.length ? inside : v).hi,
       outliers: v.filter((x) => x < f.lower || x > f.upper).sort((a, b) => a - b),
     };
   });

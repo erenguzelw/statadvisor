@@ -3,6 +3,7 @@
  * Yalnızca seçilen maddeleri tam yanıtlayan satırlar taranır; satır numaraları 0 tabanlıdır.
  */
 import { AnalysisError } from './analysis.ts';
+import { extent } from './extent.ts';
 import type { QualityColumn } from './quality.ts';
 import { chiSquareSurvival } from './stats.ts';
 
@@ -109,7 +110,7 @@ export function screenResponses(columns: QualityColumn[], opts: ScreenOptions): 
       for (let a = 0; a < k; a++) for (let b = 0; b < k; b++) s += d[a]! * inv[a]![b]! * d[b]!;
       return s;
     });
-    maxD2 = Math.max(...d2s);
+    maxD2 = extent(d2s).hi;
     critical = chiSquareCritical(alpha, k);
     mahalanobis = d2s
       .map((d2, idx) => ({ row: complete[idx]!, d2, p: chiSquareSurvival(d2, k) }))
