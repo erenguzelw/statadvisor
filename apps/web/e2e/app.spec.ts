@@ -22,7 +22,7 @@ const routes = [
   { path: '/veri', title: 'Veri Setleri' },
   { path: '/karar-sihirbazi', title: 'Hipotez Testi ve Model Danışmanı' },
   { path: '/model-karsilastirma', title: 'Model Karşılaştırma ve Analitik Tuzak Radarı' },
-  { path: '/veri-kalitesi', title: 'Veri Kalitesi, Aykırı ve Eksik Değerler' },
+  { path: '/veri/kalite', title: 'Veri Kalitesi, Aykırı ve Eksik Değerler' },
   { path: '/kod-rapor', title: 'Kod Üretimi ve Otomatik Raporlama Merkezi' },
 ];
 
@@ -40,7 +40,7 @@ for (const { path, title } of routes) {
     await page.goto(path);
     await expect(page.getByRole('heading', { level: 1, name: title })).toBeVisible();
     if (path === '/karar-sihirbazi') await expect(page.getByText('Otomatik varsayım kontrolü')).toBeVisible();
-    if (path === '/veri-kalitesi') await expect(page.getByText('Temiz hücre oranı')).toBeVisible();
+    if (path === '/veri/kalite') await expect(page.getByText('Temiz hücre oranı')).toBeVisible();
     await settle(page);
 
     const { violations } = await new AxeBuilder({ page }).analyze();
@@ -59,6 +59,19 @@ for (const { path, title } of routes) {
     expect(overflow).toBe(0);
   });
 }
+
+test('veri kalitesi, Veri Setleri menüsünün alt sekmesidir; eski adres yönlenir', async ({ page, request }) => {
+  await loadSample(request, 'klinik');
+  await page.goto('/veri');
+  const menu = page.getByRole('navigation', { name: 'Ana menü' });
+  await expect(menu.getByRole('link', { name: 'Veri Kalitesi & Aykırılık' })).toHaveCount(0);
+  await page.getByRole('navigation', { name: 'Veri bölümleri' }).getByRole('link', { name: 'Kalite & aykırılık' }).click();
+  await expect(page).toHaveURL(/\/veri\/kalite$/);
+  await expect(page.getByRole('heading', { level: 1, name: 'Veri Kalitesi, Aykırı ve Eksik Değerler' })).toBeVisible();
+  await expect(menu.getByRole('link', { name: 'Veri Setleri' })).toHaveAttribute('aria-current', 'page');
+  await page.goto('/veri-kalitesi');
+  await expect(page).toHaveURL(/\/veri\/kalite$/);
+});
 
 test('veri yokken analiz sayfaları yönlendirir; yüklenince çalışır', async ({ page }) => {
   await page.goto('/karar-sihirbazi');
@@ -259,7 +272,7 @@ test('kod ve rapor: kaydedilmiş analiz yokken yönlendirir', async ({ page, req
 
 test('veri kalitesi: aykırı ve eksik değerler gösterilir; temizlenmiş sürüm etkin olur ve analizde kullanılır', async ({ page, request }) => {
   await loadSample(request, 'klinik');
-  await page.goto('/veri-kalitesi');
+  await page.goto('/veri/kalite');
   await expect(page.getByText(/Dallanan yol uyarısı/)).toBeVisible();
   await expect(page.getByText('Eksik değerler', { exact: true })).toBeVisible();
   await page.getByRole('radio', { name: 'Sonrası (önizleme)' }).check();

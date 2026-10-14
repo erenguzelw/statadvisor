@@ -8,7 +8,7 @@ import { chromium } from '@playwright/test';
 const out = process.argv[2] ?? 'screens';
 const width = Number(process.argv[3] ?? 1440);
 const base = 'http://127.0.0.1:4173';
-const routes = ['veri', 'karar-sihirbazi', 'model-karsilastirma', 'veri-kalitesi', 'kod-rapor'];
+const routes = ['veri', 'karar-sihirbazi', 'model-karsilastirma', 'veri/kalite', 'kod-rapor'];
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width, height: 900 } });
 page.on('console', (m) => m.type() === 'error' && console.log('console error:', m.text()));
@@ -26,7 +26,7 @@ for (const r of routes) {
   await page.waitForSelector('main h1');
   await page.waitForLoadState('networkidle');
   await page.waitForTimeout(1200);
-  await page.screenshot({ path: `${out}/${r}-${width}.png`, fullPage: true });
+  await page.screenshot({ path: `${out}/${r.replace('/', '-')}-${width}.png`, fullPage: true });
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   console.log(r, 'yatay taşma:', overflow);
 }
