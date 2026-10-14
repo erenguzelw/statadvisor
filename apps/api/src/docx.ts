@@ -38,6 +38,7 @@ export async function buildDocx(d: ReportData): Promise<Buffer> {
       : [para('Bu test türü için ayrı bir varsayım testi uygulanmadı.', { italics: true })]),
     para(`Önerilen test: ${d.decision.finalTest}${d.decision.rerouteReason ? ` (${d.decision.rerouteReason})` : ''}.`, { bold: true, spacingAfter: 80 }),
     ...d.decision.warnings.map((w) => para(`• ${w}`, { size: 20 })),
+    ...(d.decision.alternatives ?? []).map((a) => para(`Alternatif: ${a.test}. ${a.when}`, { size: 20 })),
 
     heading('Test sonucu'),
     para(d.resultLine),

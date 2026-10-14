@@ -3,7 +3,7 @@ import type { AnalysisResult, GroupDescriptive, OutcomePair } from '@statadvisor
 import { ExpertiseToggle } from '@/components/layout/ExpertiseToggle';
 import { DataTable, Panel, SectionHeader, StatusChip, Tag, type Column } from '@/components/ui';
 import { ChartLegend, HistogramWithNormal } from '@/components/charts';
-import { AssumptionTestCard, InterpretationCard, PValue, RecommendationNotes, RerouteBanner } from '@/components/domain';
+import { AlternativeMethods, AssumptionTestCard, ConditionChecks, InterpretationCard, PValue, RecommendationNotes, RerouteBanner } from '@/components/domain';
 
 const n2 = (x: number) => (Number.isFinite(x) ? x.toFixed(2) : '–');
 
@@ -29,6 +29,10 @@ export function AnalysisView({ result: r }: { result: AnalysisResult }) {
   return (
     <>
       <RerouteBanner path={r.decision} />
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <ConditionChecks checks={r.decision.checks ?? []} />
+        <AlternativeMethods finalTest={r.decision.finalTest} alternatives={r.decision.alternatives ?? []} />
+      </div>
       {r.notes.length > 0 && <RecommendationNotes title="Veri hazırlama notları" warnings={r.notes} />}
 
       {r.assumptions.length > 0 && (

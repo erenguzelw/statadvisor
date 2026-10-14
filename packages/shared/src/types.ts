@@ -19,6 +19,12 @@ export interface DecisionPath {
   rerouteReason?: string;
   /** Yöntemsel uyarılar (ön test sınırlamaları, bağımsızlık, örneklem büyüklüğü). */
   warnings: string[];
+  /** Seçilen teste alternatifler ve hangi koşulda düşünülebilecekleri. */
+  alternatives?: { test: string; when: string }[];
+  /** Koşulların kaynağı: veriden doğrulandı, kullanıcı beyanı ya da bilinmiyor. */
+  checks?: { label: string; status: 'verified' | 'declared' | 'unknown'; detail: string }[];
+  /** Normallik kararı eşiğe çok yakın. */
+  borderline?: boolean;
 }
 
 export interface AssumptionTest {

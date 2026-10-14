@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { ArrowRight, CheckCircle2, GitFork, Info } from 'lucide-react';
-import { wizardQuestions, type WizardAnswers } from '@statadvisor/shared';
-import { Callout, RadioCardGroup, Tag } from '@/components/ui';
+import { wizardQuestions, type DecisionPath as DecisionPathType, type WizardAnswers } from '@statadvisor/shared';
+import { Callout, RadioCardGroup, StatusChip, Tag } from '@/components/ui';
 
 export interface DecisionPathLike {
   conditions: string[];
@@ -109,5 +109,53 @@ export function RerouteBanner({ path, actions }: { path: DecisionPathLike; actio
       {path.rerouteReason}: <del className="text-fg-subtle">{path.plannedTest}</del> yerine{' '}
       <strong className="font-semibold text-secondary">{path.finalTest}</strong> önerildi.
     </Callout>
+  );
+}
+
+const checkStatus = {
+  verified: { chip: 'success', label: 'Doğrulandı' },
+  declared: { chip: 'info', label: 'Beyan' },
+  unknown: { chip: 'warning', label: 'Bilinmiyor' },
+} as const;
+
+/** Kararı etkileyen her koşulun kaynağı: veriden ölçüldü, kullanıcı beyanı ya da bilinmiyor. */
+export function ConditionChecks({ checks }: { checks: NonNullable<DecisionPathType['checks']> }) {
+  if (!checks.length) return null;
+  return (
+    <section aria-label="Koşulların durumu" className="rounded-card border border-line/30 bg-surface-lowest p-4">
+      <h3 className="mb-2 text-body font-semibold text-fg">Koşulların durumu</h3>
+      <ul className="flex flex-col gap-2">
+        {checks.map((c) => (
+          <li key={c.label} className="flex flex-wrap items-center gap-2 text-caption">
+            <StatusChip status={checkStatus[c.status].chip}>{checkStatus[c.status].label}</StatusChip>
+            <span className="font-medium text-fg">{c.label}</span>
+            <span className="text-fg-muted">{c.detail}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/** Seçilen teste alternatifler: hangi yöntem hangi koşulda düşünülebilir. */
+export function AlternativeMethods({ finalTest, alternatives }: { finalTest: string; alternatives: NonNullable<DecisionPathType['alternatives']> }) {
+  if (!alternatives.length) return null;
+  return (
+    <section aria-label="Alternatif yöntemler" className="rounded-card border border-line/30 bg-surface-lowest p-4">
+      <h3 className="mb-2 text-body font-semibold text-fg">Alternatif yöntemler</h3>
+      <p className="mb-2 text-caption text-fg-muted">
+        <strong className="font-semibold text-fg">{finalTest}</strong> seçildi. Şu koşullarda şunlar düşünülebilir:
+      </p>
+      <ul className="flex flex-col gap-2">
+        {alternatives.map((a) => (
+          <li key={a.test} className="flex gap-2 text-caption">
+            <GitFork size={14} className="mt-0.5 shrink-0 text-fg-subtle" aria-hidden />
+            <span>
+              <span className="font-medium text-fg">{a.test}:</span> <span className="text-fg-muted">{a.when}</span>
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
