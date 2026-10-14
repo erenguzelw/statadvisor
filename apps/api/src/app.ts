@@ -9,6 +9,7 @@ import {
   analyze,
   analyzeQuality,
   AnalysisError,
+  buildRegressionReport,
   buildReport,
   cleanColumns,
   computeScales,
@@ -24,7 +25,14 @@ import {
   generateScreeningCode,
   screenResponses,
   type ScaleDef,
+  fitLinearRegression,
   generateAnalysisCode,
+  generateRegressionCode,
+  narrateRegression,
+  regressionReportData,
+  coefficientRows,
+  modelRows,
+  type RegressionSpec,
   generateCleaningCode,
   columnsToCsv,
   ENGINE,
@@ -42,7 +50,7 @@ import { CsvError, parseCsv, type ParsedColumn, type ParsedCsv } from './csv.ts'
 import { isOle, isZip, xlsxToCsv } from './xlsx.ts';
 import { openDb } from './db.ts';
 import { buildProfile, describeColumns, effectiveColumns, ProfileBody } from './profile.ts';
-import { buildDocx } from './docx.ts';
+import { buildDocx, buildRegressionDocx } from './docx.ts';
 import { PdfUnavailableError, pdfAvailable, renderPdf } from './pdf.ts';
 
 export interface AppOptions {
@@ -711,6 +719,101 @@ export function buildApp(opts: AppOptions): FastifyInstance {
 
   /** Bu makinede hangi çıktı biçimleri kullanılabilir? */
   app.get('/api/capabilities', async () => ({ pdf: await pdfAvailable(), docx: true, html: true }));
+
+  /* ---------- Doğrusal regresyon ---------- */
+  const RegressionBody = z.object({
+    dependent: colName,
+    numeric: z.array(colName).max(60).default([]),
+    categorical: z.array(colName).max(30).default([]),
+    alpha: z.number().min(0.001).max(0.2).default(0.05),
+    reference: z.record(colName, z.string().max(200)).optional(),
+  });
+
+  /** Gövdeyi veri setine göre doğrular, modeli uydurur ve sonucu döndürür. */
+  function runRegression(id: string, rawBody: unknown) {
+    const body = RegressionBody.parse(rawBody ?? {});
+    const { row, csv } = parsed(id);
+    const col = (name: string) => {
+      const c = csv.columns.find((x) => x.name === name);
+      if (!c) throw new ApiError(422, 'unknown_column', `“${name}” adlı sütun bulunamadı.`);
+      return c;
+    };
+    const dep = col(body.dependent);
+    if (!dep.numeric) throw new ApiError(422, 'bad_dependent', `Bağımlı değişken “${dep.name}” sayısal değil; doğrusal regresyon sayısal bir sonuç ister.`);
+    const all = [...body.numeric, ...body.categorical];
+    if (all.length === 0) throw new ApiError(422, 'no_predictors', 'En az bir yordayıcı seçin.');
+    if (new Set(all).size !== all.length) throw new ApiError(422, 'duplicate_predictor', 'Bir değişken hem sayısal hem kategorik yordayıcı olarak ya da birden fazla kez seçilmiş.');
+    if (all.includes(dep.name)) throw new ApiError(422, 'dependent_in_predictors', 'Bağımlı değişken aynı zamanda yordayıcı olamaz.');
+    for (const n of body.numeric) if (!col(n).numeric) throw new ApiError(422, 'bad_predictor', `“${n}” sayısal değil; kategorik yordayıcı olarak ekleyin.`);
+    for (const n of all) if (col(n).likelyId) throw new ApiError(422, 'id_predictor', `“${n}” kimlik sütunu gibi görünüyor; yordayıcı olamaz.`);
+    const spec: RegressionSpec = {
+      dependent: dep.name,
+      numeric: body.numeric,
+      categorical: body.categorical,
+      alpha: body.alpha,
+      reference: body.reference,
+      numericCategorical: body.categorical.filter((n) => col(n).numeric),
+    };
+    const result = fitLinearRegression(
+      dep.values as (number | null)[],
+      [
+        ...body.numeric.map((n) => ({ name: n, kind: 'numeric' as const, values: col(n).values })),
+        ...body.categorical.map((n) => ({ name: n, kind: 'categorical' as const, values: col(n).values })),
+      ],
+      { alpha: body.alpha, reference: body.reference },
+    );
+    return { row, csv, spec, result };
+  }
+
+  app.post('/api/datasets/:id/regression', async (req) => {
+    const { id } = req.params as { id: string };
+    const { row, csv, spec, result } = runRegression(id, req.body);
+    const narrative = narrateRegression(result, spec.dependent);
+    const code = generateRegressionCode(fileInfo(row, csv), spec, result);
+    // Kalıntı grafiği için en çok ~2000 nokta (eşit aralıklı)
+    const step = Math.max(1, Math.ceil(result.n / 2000));
+    const plot = { fitted: [] as number[], residuals: [] as number[], step };
+    for (let i = 0; i < result.n; i += step) {
+      plot.fitted.push(result.fitted[i]!);
+      plot.residuals.push(result.residuals[i]!);
+    }
+    const { fitted, residuals, cooks, leverage, usedRows, ...summary } = result;
+    void fitted; void residuals; void cooks; void leverage; void usedRows;
+    return { datasetId: row.id, datasetName: row.name, spec, result: summary, narrative, model: modelRows(result), coefficients: coefficientRows(result), plot, code, engine: engineInfo() };
+  });
+
+  /** Regresyon raporu: html | pdf | docx (aynı gövdeyle model yeniden hesaplanır). */
+  app.post('/api/datasets/:id/regression/report', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const { format } = z.object({ format: z.enum(['html', 'pdf', 'docx']).default('html') }).parse(req.query);
+    const { row, spec, result } = runRegression(id, req.body);
+    const eng = engineInfo();
+    const audit: [string, string][] = [
+      ['Veri seti', `${row.name} (SHA-256 ${row.sha256.slice(0, 16)}…, ${row.rows} satır)`],
+      ['Bağımlı değişken', spec.dependent],
+      ['Yordayıcılar', [...spec.numeric, ...spec.categorical].join(', ')],
+      ['Referans düzeyler', result.categories.map((c) => `${c.name}: ${c.reference}`).join('; ') || '–'],
+      ['Güven düzeyi', `%${Math.round((1 - (spec.alpha ?? 0.05)) * 100)}`],
+      ['Motor sürümü', `${eng.engineName} ${eng.engine}`],
+      ['Referans doğrulama', `statsmodels OLS ile karşılaştırıldı (referans paketi: ${eng.referenceSuite.cases} vaka)`],
+      ['Çalışma ortamı', `Node ${eng.node}`],
+    ];
+    const data = regressionReportData(result, spec, row.name, new Date().toLocaleDateString('tr-TR'), audit);
+    const html = buildRegressionReport(data);
+    if (format === 'html') {
+      reply.header('Content-Type', 'text/html; charset=utf-8');
+      reply.header('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; img-src data:");
+      return html;
+    }
+    if (format === 'docx') {
+      reply.header('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+      reply.header('Content-Disposition', 'attachment; filename="regresyon-raporu.docx"');
+      return buildRegressionDocx(data);
+    }
+    reply.header('Content-Type', 'application/pdf');
+    reply.header('Content-Disposition', 'attachment; filename="regresyon-raporu.pdf"');
+    return renderPdf(html);
+  });
 
   /** Analizin Python karşılığı; betik, beklenen çıktıyla birebir aynı satırları yazdırır. */
   app.get('/api/analyses/:id/code', async (req) => {

@@ -75,7 +75,7 @@ export function readCsvLine(file: DatasetFile): string {
   return lines.join('\n');
 }
 
-const naBlock = `NA_DEGERLERI = ${pyList(NA_VALUES)}  # uygulamanın eksik saydığı değerler`;
+export const naBlock = `NA_DEGERLERI = ${pyList(NA_VALUES)}  # uygulamanın eksik saydığı değerler`;
 
 /** Betiğin yazdıracağı satırlar. */
 export function expectedLines(r: AnalysisResult): string[] {
