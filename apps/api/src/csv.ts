@@ -77,7 +77,8 @@ export function rankOrder(labels: string[]): string[] | null {
   const keyed = labels.map((label) => {
     const range = /^(\d+(?:[.,]\d+)?)\s*[-–]\s*\d+(?:[.,]\d+)?/.exec(label);
     if (range) return { label, key: Number(range[1]!.replace(',', '.')) };
-    const open = /^(\d+(?:[.,]\d+)?)\s*(\+|ve\s+(üzeri|üstü|üstünde|fazla)|ve\s+üzerinde)/i.exec(label);
+    // "7 ve üzeri", "7+", "7 saat ve üzeri" (sayı ile ifade arasında bir birim kelimesi olabilir)
+    const open = /^(\d+(?:[.,]\d+)?)\s*(?:[^\d\s]\S*\s+)?(\+|ve\s+(üzeri|üstü|üstünde|fazla)|ve\s+üzerinde)/i.exec(label);
     if (open) return { label, key: Number(open[1]!.replace(',', '.')) };
     const below = /^(\d+(?:[.,]\d+)?)\s*\S*\s*(den|dan)?\s*(az|altı|altında|daha az)\b/i.exec(label);
     if (below) return { label, key: Number(below[1]!.replace(',', '.')) - 0.5 };

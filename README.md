@@ -1,6 +1,6 @@
 # StatAdvisor AI
 
-Akıllı hipotez testi ve model seçim danışmanı. Verinizi yükleyin; uygulama veri kalitesini denetler, doğru istatistiksel testi önerir, hesaplar, Python kodunu ve raporu (HTML, PDF, DOCX) üretir. **Her şey bu bilgisayarda çalışır; veriniz dışarı gönderilmez.**
+Akıllı hipotez testi ve model seçim danışmanı. Verinizi (Excel .xlsx ya da CSV) yükleyin; uygulama veri kalitesini denetler, doğru istatistiksel testi önerir, hesaplar, Python kodunu ve raporu (HTML, PDF, DOCX) üretir. **Her şey bu bilgisayarda çalışır; veriniz dışarı gönderilmez.**
 
 ## Gereksinimler
 

@@ -91,6 +91,8 @@ export interface DatasetInfo {
   parentId: string | null;
   operations: DatasetOperations | null;
   duplicate?: boolean;
+  /** Yükleme sırasında CSV'ye dönüştürülen özgün biçim. */
+  convertedFrom?: 'xlsx';
 }
 
 export interface DatasetDetail extends DatasetInfo {
