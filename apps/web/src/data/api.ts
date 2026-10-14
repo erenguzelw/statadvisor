@@ -1,4 +1,4 @@
-import type { AnalysisResult, AnalysisSpec, CleanRule, DatasetQuality, GeneratedCode, LogisticResult, LogisticSpec, RegressionNarrative, RegressionResult, RegressionSpec } from '@statadvisor/shared';
+import type { CvResult, ModelCompareSpec, ModelId, AnalysisResult, AnalysisSpec, CleanRule, DatasetQuality, GeneratedCode, LogisticResult, LogisticSpec, RegressionNarrative, RegressionResult, RegressionSpec } from '@statadvisor/shared';
 
 /** Sunucuya gönderilen analiz isteği. */
 export type AnalysisBody = AnalysisSpec & { datasetId: string };
@@ -215,6 +215,28 @@ export interface LogisticResponse {
   hosmerLemeshow: { header: string[]; rows: string[][] } | null;
   /** Tam ayrışmada üretilmez. */
   code: GeneratedCode | null;
+}
+
+/** Gerçek veride model karşılaştırma isteği. */
+export interface ModelRunBody {
+  target: string;
+  numeric: string[];
+  categorical: string[];
+  models: ModelId[];
+  folds: number;
+  seed: number;
+}
+
+/** Arka planda çalışan model karşılaştırma işi (ilerleme ve sonuç). */
+export interface ModelRunJob {
+  id: string;
+  datasetId: string;
+  status: 'running' | 'done' | 'error';
+  progress: { done: number; total: number; model: string; fold: number };
+  elapsedSeconds: number;
+  spec: ModelCompareSpec;
+  result?: Omit<CvResult, 'foldOf'>;
+  error?: string;
 }
 
 export type QualityResponse = DatasetQuality;

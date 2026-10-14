@@ -15,6 +15,8 @@ import {
   type DatasetInfo,
   type LevelsResponse,
   type LogisticBody,
+  type ModelRunBody,
+  type ModelRunJob,
   type LogisticResponse,
   type QualityResponse,
   type RegressionBody,
@@ -269,6 +271,32 @@ export function useLogistic(datasetId: string | null, body: LogisticBody | null)
     enabled: Boolean(datasetId && body),
     retry: shouldRetry,
     placeholderData: keepPreviousData,
+  });
+}
+
+/** Model karşılaştırma işini başlatır (202); ilerleme için useModelRun kullanılır. */
+export function useStartModelRun(datasetId: string | null) {
+  return useMutation({ mutationFn: (body: ModelRunBody) => api.post<ModelRunJob>(`/api/datasets/${datasetId}/model-runs`, body) });
+}
+
+/** İşin durumunu, çalıştığı sürece her 800 ms'de bir yoklar. */
+export function useModelRun(jobId: string | null) {
+  return useQuery({
+    queryKey: ['model-run', jobId] as const,
+    queryFn: () => api.get<ModelRunJob>(`/api/model-runs/${jobId}`),
+    enabled: Boolean(jobId),
+    retry: shouldRetry,
+    refetchInterval: (q) => (q.state.data?.status === 'running' ? 800 : false),
+  });
+}
+
+export function useModelRunCode(jobId: string | null, enabled: boolean) {
+  return useQuery({
+    queryKey: ['model-run-code', jobId] as const,
+    queryFn: () => api.get<CodeResponse>(`/api/model-runs/${jobId}/code`),
+    enabled: Boolean(jobId) && enabled,
+    retry: shouldRetry,
+    staleTime: Infinity,
   });
 }
 

@@ -21,7 +21,9 @@ test.beforeEach(async ({ request }) => {
 const routes = [
   { path: '/veri', title: 'Veri Setleri' },
   { path: '/karar-sihirbazi', title: 'Hipotez Testi ve Model Danışmanı' },
-  { path: '/model-karsilastirma', title: 'Model Karşılaştırma ve Analitik Tuzak Radarı' },
+  { path: '/regresyon', title: 'Doğrusal Regresyon' },
+  { path: '/lojistik-regresyon', title: 'Lojistik Regresyon' },
+  { path: '/model-karsilastirma', title: 'Model Karşılaştırma (kendi verinizde)' },
   { path: '/veri/kalite', title: 'Veri Kalitesi, Aykırı ve Eksik Değerler' },
   { path: '/kod-rapor', title: 'Kod Üretimi ve Otomatik Raporlama Merkezi' },
 ];
@@ -363,8 +365,21 @@ test('veri kalitesi: veri seti değişince önceki seçimler yeni veriye taşın
   await expect(page.getByText(/Henüz bir eylem seçilmedi: hiçbir satır silinmez/)).toBeVisible();
 });
 
-test('model karşılaştırma: ölçütler taban çizgisiyle birlikte gösterilir; bayraklar işaretlenir', async ({ page }) => {
+test('model karşılaştırma (kendi veri): çapraz doğrulama sonuçları tabanla birlikte ve Python koduyla gelir', async ({ page, request }) => {
+  await loadSample(request, 'klinik');
   await page.goto('/model-karsilastirma');
+  await expect(page.getByText('Karşılaştırma kurulumu')).toBeVisible();
+  await page.getByRole('button', { name: 'Karşılaştırmayı başlat' }).click();
+  await expect(page.getByText('Çapraz doğrulama sonuçları')).toBeVisible({ timeout: 120_000 });
+  await expect(page.getByText('Taban doğruluğu', { exact: true })).toBeVisible();
+  await expect(page.getByRole('columnheader', { name: 'Eğitim − test' })).toBeVisible();
+  await expect(page.getByText('Python (scikit-learn) kodu')).toBeVisible();
+  await expect(page.getByText('model_karsilastirma.py')).toBeVisible({ timeout: 30_000 });
+});
+
+test('model karşılaştırma (örnek): ölçütler taban çizgisiyle birlikte gösterilir; bayraklar işaretlenir', async ({ page }) => {
+  await page.goto('/model-karsilastirma');
+  await page.getByRole('radio', { name: 'Örnek (sentetik)' }).click();
   await expect(page.getByText(/taban çizgisi %\d+\.\d/).first()).toBeVisible();
   await expect(page.getByText(/Doğruluk tek başına yanıltıcıdır/)).toBeVisible();
   await expect(page.getByRole('columnheader', { name: 'PR-AUC' })).toBeVisible();
