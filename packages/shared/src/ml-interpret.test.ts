@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { balanceOf, correctedPairedT, stratifiedKFold, gaussian, interpretComparison, mulberry32, prepareData, runCrossValidation, type MlFeature } from './index.ts';
 
 function make(n: number, classWeights: number[], seed = 3) {
@@ -104,6 +104,53 @@ describe('interpretComparison', () => {
     expect(it.balance.label).toBe('dengesiz');
     expect(it.notes.find((n) => n.title === 'Sınıflar dengesiz')!.text).toContain('yanıltıcı');
   }, 120_000);
+
+  describe('tabana göre kazanç anlatımı', () => {
+    let base: Awaited<ReturnType<typeof runCrossValidation>>;
+    beforeAll(async () => {
+      base = await runCrossValidation(make(120, [1, 1]), { folds: 3, seed: 1, models: ['baseline', 'logistic'] });
+    }, 60_000);
+
+    const liftNote = (bestAcc: number, baseline: number) => {
+      const r = structuredClone(base);
+      r.baselineAccuracy = baseline;
+      for (const m of r.models) if (m.id !== 'baseline') m.accuracy = { mean: bestAcc, sd: 0.01 };
+      return interpretComparison(r).notes.find((n) => ['Taban altında', 'Taban aşılmıyor', 'Taban çok az aşılıyor', 'En yüksek doğruluk'].includes(n.title))!;
+    };
+
+    it('taban altında: “üzerinde” demez, işaretli fark verir', () => {
+      const n = liftNote(0.65, 0.7);
+      expect(n.title).toBe('Taban altında');
+      expect(n.text).toContain('5.0 puan altında');
+      expect(n.text).not.toContain('üzerinde');
+    });
+    it('taban ile eşit: aşılmıyor der', () => {
+      const n = liftNote(0.7, 0.7);
+      expect(n.title).toBe('Taban aşılmıyor');
+      expect(n.text).toContain('aynı düzeyde');
+      expect(n.text).not.toContain('üzerinde');
+    });
+    it('küçük pozitif kazanç: aşıldığını söyler ama anlamlılık/üstünlük iddia etmez', () => {
+      const n = liftNote(0.72, 0.7);
+      expect(n.title).toBe('Taban çok az aşılıyor');
+      expect(n.level).toBe('warning');
+      expect(n.text).toContain('2.0 puan üzerinde');
+      expect(n.text).toContain('kanıtlamaz');
+    });
+    it('5 puan ve üstü kazanç: normal özet; kayan nokta artığı eşiği kaydırmaz', () => {
+      for (const [acc, b] of [[0.75, 0.7], [0.7, 0.65]] as const) {
+        const n = liftNote(acc, b);
+        expect(n.title).toBe('En yüksek doğruluk');
+        expect(n.text).toContain('kazanç 5.0 puan');
+      }
+    });
+    it('görüntüleme yuvarlaması: 0,04996 fark 5.0 puan görünür, eşik üstü sayılır; 0,0004 fark sıfır görünür', () => {
+      expect(liftNote(0.74996, 0.7).title).toBe('En yüksek doğruluk');
+      expect(liftNote(0.7004, 0.7).title).toBe('Taban aşılmıyor');
+      expect(liftNote(0.6996, 0.7).title).toBe('Taban aşılmıyor');
+      expect(liftNote(0.6994, 0.7).title).toBe('Taban altında');
+    });
+  });
 
   it('korelasyon cümleleri yönü ve sıralamayı doğru yazar', async () => {
     const r = await runCrossValidation(make(400, [1, 1, 1]), { folds: 3, seed: 2, models: ['baseline', 'logistic'] });

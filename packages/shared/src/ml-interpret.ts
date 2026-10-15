@@ -137,8 +137,15 @@ export function interpretComparison(r: CvResult): MlInterpretation {
     const sorted = [...real].sort((a, b) => b.accuracy.mean - a.accuracy.mean);
     best = sorted[0]!;
     const lift = best.accuracy.mean - r.baselineAccuracy;
-    if (lift < 0.05) {
-      notes.push({ level: 'warning', title: 'Taban aşılmıyor', text: `En yüksek doğruluk (${best.label}, ${pct(best.accuracy.mean)}) taban doğruluğunun (${pct(r.baselineAccuracy)}) yalnızca ${pts(Math.max(0, lift))} üzerinde. Seçilen özellikler hedefi bu modellerle belirgin biçimde öngörmüyor olabilir.` });
+    // Kıyas, raporda görünen duyarlıkta (0,1 puan) yapılır: kayan nokta artığı (0,7 − 0,65 gibi) eşiği kaydırmasın.
+    const liftTenths = Math.round(lift * 1000);
+    const head = `En yüksek doğruluk (${best.label}, ${pct(best.accuracy.mean)}), taban doğruluğu (${pct(r.baselineAccuracy)})`;
+    if (liftTenths < 0) {
+      notes.push({ level: 'warning', title: 'Taban altında', text: `${head} değerinin ${pts(-lift)} altında. Hiçbir model, her gözlem için en sık sınıfı yordayan basit kuralı geçemedi; seçilen özellikler hedefi bu modellerle öngörmüyor olabilir.` });
+    } else if (liftTenths === 0) {
+      notes.push({ level: 'warning', title: 'Taban aşılmıyor', text: `${head} ile aynı düzeyde (fark ${pts(lift)}, gösterilen duyarlıkta sıfır). Seçilen özellikler hedefi bu modellerle öngörmüyor olabilir.` });
+    } else if (liftTenths < 50) {
+      notes.push({ level: 'warning', title: 'Taban çok az aşılıyor', text: `${head} değerinin ${pts(lift)} üzerinde; bu fark 5 puanlık eşiğin altında. Bu küçük fark tek başına anlamlı bir öngörü gücü kanıtlamaz; seçilen özellikler hedefi bu modellerle belirgin biçimde öngörmüyor olabilir.` });
     } else {
       notes.push({ level: 'info', title: 'En yüksek doğruluk', text: `${best.label}: ${pct(best.accuracy.mean)} ± ${(best.accuracy.sd * 100).toFixed(1)} (taban ${pct(r.baselineAccuracy)}; kazanç ${pts(lift)}). Katmanlar arası standart sapma ${pts(best.accuracy.sd)}.` });
     }
