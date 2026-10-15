@@ -9,7 +9,7 @@ import type { ColumnInfo, DatasetInfo, RegressionBody, RegressionResponse } from
 import { useRegression } from '@/data/hooks';
 import { useDebounced } from '@/lib/useDebounced';
 import { columnTypeLabel } from '@/lib/variables';
-import { n2, nf, NoteList, ReferenceSelect, ReportActions } from './shared';
+import { n2, nf, NoteList, ReferenceSelect, ReportActions, SaveToReports } from './shared';
 
 /** Bağımlı değişken adayı: sayısal, kimlik olmayan, kategori kodu olarak işaretlenmemiş sütunlar. */
 const dependentCandidates = (cols: ColumnInfo[]) => cols.filter((c) => c.numeric && c.type !== 'categorical' && !c.likelyId);
@@ -141,6 +141,7 @@ function Results({ data, body, datasetId }: { data: RegressionResponse; body: Re
 
       <Panel>
         <SectionHeader icon={FileCode2} title="Python kodu ve rapor" level={3} description="Betik, ekrandaki sayıları statsmodels ile yeniden üretir (otomatik testle doğrulanır). Veri dosyasını betikle aynı klasöre koyun." />
+        <SaveToReports url={`/api/datasets/${datasetId}/regression/save`} body={body} resetKey={`${datasetId}:${JSON.stringify(body)}`} />
         <ReportActions url={`/api/datasets/${datasetId}/regression/report`} body={body} fileBase="regresyon-raporu" />
         <CodeBlock code={data.code.code} filename={data.code.filename} runtime={`Python · ${data.code.requirements.join(', ')}`} lineNumbers maxHeight="28rem" />
       </Panel>

@@ -359,13 +359,13 @@ describe('örnek veri, temizleme ve önizleme', () => {
   });
 
   it('tümünü sil: veri setleri, türetilmiş sürümler ve bağlı analizler silinir; boşken de çalışır', async () => {
-    expect((await app.inject({ method: 'DELETE', url: '/api/datasets' })).json()).toEqual({ deletedDatasets: 0, deletedAnalyses: 0 });
+    expect((await app.inject({ method: 'DELETE', url: '/api/datasets' })).json()).toEqual({ deletedDatasets: 0, deletedAnalyses: 0, deletedReports: 0 });
     const raw = (await app.inject({ method: 'POST', url: '/api/samples/klinik' })).json();
     await app.inject({ method: 'POST', url: `/api/datasets/${raw.id}/clean`, payload: { impute: 'median' } });
     await app.inject({ method: 'POST', url: '/api/analyses', payload: { datasetId: raw.id, goal: 'compare', design: 'independent', target: 'continuous', value: 'kan_basinci', group: 'grup' } });
     const r = await app.inject({ method: 'DELETE', url: '/api/datasets' });
     expect(r.statusCode).toBe(200);
-    expect(r.json()).toEqual({ deletedDatasets: 2, deletedAnalyses: 1 });
+    expect(r.json()).toEqual({ deletedDatasets: 2, deletedAnalyses: 1, deletedReports: 0 });
     expect((await app.inject({ url: '/api/datasets' })).json().datasets).toHaveLength(0);
     expect((await app.inject({ url: '/api/analyses' })).json().analyses).toHaveLength(0);
     expect((await app.inject({ url: `/api/datasets/${raw.id}` })).statusCode).toBe(404);

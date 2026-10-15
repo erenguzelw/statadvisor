@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node
 import { join } from 'node:path';
 import multipart from '@fastify/multipart';
 import fastifyStatic from '@fastify/static';
-import Fastify, { type FastifyInstance } from 'fastify';
+import Fastify, { type FastifyInstance, type FastifyReply } from 'fastify';
 import { z } from 'zod';
 import {
   ALL_MODELS,
@@ -54,6 +54,9 @@ import {
   coefficientRows,
   modelRows,
   type RegressionSpec,
+  type RegressionResult,
+  type LogisticResult,
+  pText,
   generateCleaningCode,
   columnsToCsv,
   ENGINE,
@@ -510,10 +513,11 @@ export function buildApp(opts: AppOptions): FastifyInstance {
   app.delete('/api/datasets', async () => {
     const rows = db.prepare('SELECT sha256 FROM datasets').all() as { sha256: string }[];
     const analyses = (db.prepare('SELECT COUNT(*) AS n FROM analyses').get() as { n: number }).n;
+    const reports = (db.prepare('SELECT COUNT(*) AS n FROM saved_reports').get() as { n: number }).n;
     db.prepare('DELETE FROM datasets').run();
     for (const r of rows) removeFile(r.sha256);
     cache.clear();
-    return { deletedDatasets: rows.length, deletedAnalyses: analyses };
+    return { deletedDatasets: rows.length, deletedAnalyses: analyses, deletedReports: reports };
   });
 
   app.delete('/api/datasets/:id', async (req, reply) => {
@@ -751,6 +755,85 @@ export function buildApp(opts: AppOptions): FastifyInstance {
   /** Bu makinede hangi çıktı biçimleri kullanılabilir? */
   app.get('/api/capabilities', async () => ({ pdf: await pdfAvailable(), docx: true, html: true }));
 
+  /* ---------- Rapor yardımcıları (regresyon, lojistik regresyon, model karşılaştırma) ---------- */
+  const FormatQuery = z.object({ format: z.enum(['html', 'pdf', 'docx']).default('html') });
+  type ReportFormat = z.infer<typeof FormatQuery>['format'];
+  type EngineInfo = ReturnType<typeof engineInfo>;
+  type Audit = [string, string][];
+  interface RenderedReport {
+    html: string;
+    docx: () => Promise<Buffer>;
+    fileBase: string;
+  }
+
+  /** Raporu istenen biçimde gönderir: HTML tarayıcıda açılır, Word ve PDF indirilir. */
+  async function sendReport(reply: FastifyReply, format: ReportFormat, doc: RenderedReport) {
+    if (format === 'html') {
+      reply.header('Content-Type', 'text/html; charset=utf-8');
+      reply.header('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; img-src data:");
+      return doc.html;
+    }
+    if (format === 'docx') {
+      reply.header('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+      reply.header('Content-Disposition', `attachment; filename="${doc.fileBase}.docx"`);
+      return doc.docx();
+    }
+    reply.header('Content-Type', 'application/pdf');
+    reply.header('Content-Disposition', `attachment; filename="${doc.fileBase}.pdf"`);
+    return renderPdf(doc.html);
+  }
+
+  const datasetAudit = (row: DatasetRow): [string, string] => ['Veri seti', `${row.name} (SHA-256 ${row.sha256.slice(0, 16)}…, ${row.rows} satır)`];
+  const engineAudit = (eng: EngineInfo, reference: string): Audit => [
+    ['Motor sürümü', `${eng.engineName} ${eng.engine}`],
+    ['Referans doğrulama', `${reference} (referans paketi: ${eng.referenceSuite.cases} vaka)`],
+    ['Çalışma ortamı', `Node ${eng.node}`],
+  ];
+  const confidenceAudit = (alpha: number | undefined): [string, string] => ['Güven düzeyi', `%${Math.round((1 - (alpha ?? 0.05)) * 100)}`];
+  const referenceAudit = (cats: { name: string; reference: string }[]): [string, string] => ['Referans düzeyler', cats.map((c) => `${c.name}: ${c.reference}`).join('; ') || '–'];
+
+  const regressionAudit = (row: DatasetRow, spec: RegressionSpec, r: RegressionResult, eng: EngineInfo): Audit => [
+    datasetAudit(row),
+    ['Bağımlı değişken', spec.dependent],
+    ['Yordayıcılar', [...spec.numeric, ...spec.categorical].join(', ')],
+    referenceAudit(r.categories),
+    confidenceAudit(spec.alpha),
+    ...engineAudit(eng, 'statsmodels OLS ile karşılaştırıldı'),
+  ];
+  const logisticAudit = (row: DatasetRow, spec: LogisticSpec, r: LogisticResult, eng: EngineInfo): Audit => [
+    datasetAudit(row),
+    ['Bağımlı değişken', `${spec.dependent} (olay: ${r.eventLevel}; referans: ${r.referenceLevel})`],
+    ['Yordayıcılar', [...spec.numeric, ...spec.categorical].join(', ')],
+    referenceAudit(r.categories),
+    confidenceAudit(spec.alpha),
+    ['Sınıflandırma eşiği', String(r.classification.threshold)],
+    ...engineAudit(eng, 'statsmodels Logit ile karşılaştırıldı'),
+  ];
+  const modelAudit = (row: DatasetRow, spec: ModelCompareSpec, r: CvResult, eng: EngineInfo): Audit => {
+    const foldSizes = r.models.find((m) => !m.skipped)?.folds.map((f) => `${f.nTrain}/${f.nTest}`).join(', ') ?? '–';
+    return [
+      datasetAudit(row),
+      ['Çapraz doğrulama', `tabakalı ${spec.folds} katlı, tohum ${spec.seed}; katman başına eğitim/test: ${foldSizes}`],
+      ['Modeller', r.models.map((m) => m.label + (m.skipped ? ' (atlandı)' : '')).join(', ')],
+      ['Ön işleme', 'Katman içinde uydurulan: medyan/mod doldurma, standartlaştırma (sayısal), tek-sıcak kodlama (kategorik)'],
+      ...engineAudit(eng, 'scikit-learn ile aynı katmanlarda karşılaştırıldı'),
+    ];
+  };
+
+  const regressionDoc = (row: DatasetRow, spec: RegressionSpec, r: RegressionResult, date: string, audit: Audit): RenderedReport => {
+    const data = regressionReportData(r, spec, row.name, date, audit);
+    return { html: buildRegressionReport(data), docx: () => buildRegressionDocx(data), fileBase: 'regresyon-raporu' };
+  };
+  const logisticDoc = (row: DatasetRow, spec: LogisticSpec, r: LogisticResult, date: string, audit: Audit): RenderedReport => {
+    const data = logisticReportData(r, spec, row.name, date, audit);
+    return { html: buildRegressionReport(data), docx: () => buildRegressionDocx(data), fileBase: 'lojistik-regresyon-raporu' };
+  };
+  const modelDoc = (row: DatasetRow, spec: ModelCompareSpec, r: CvResult, date: string, audit: Audit): RenderedReport => {
+    const doc = buildModelCompareDoc(r, spec, { datasetName: row.name, date, audit });
+    return { html: renderReportHtml(doc), docx: () => buildDocxFromDoc(doc), fileBase: 'model-karsilastirma-raporu' };
+  };
+  const trDate = (d: Date | string | number) => new Date(d).toLocaleDateString('tr-TR');
+
   /* ---------- Doğrusal regresyon ---------- */
   const RegressionBody = z.object({
     dependent: colName,
@@ -816,34 +899,9 @@ export function buildApp(opts: AppOptions): FastifyInstance {
   /** Regresyon raporu: html | pdf | docx (aynı gövdeyle model yeniden hesaplanır). */
   app.post('/api/datasets/:id/regression/report', async (req, reply) => {
     const { id } = req.params as { id: string };
-    const { format } = z.object({ format: z.enum(['html', 'pdf', 'docx']).default('html') }).parse(req.query);
+    const { format } = FormatQuery.parse(req.query);
     const { row, spec, result } = runRegression(id, req.body);
-    const eng = engineInfo();
-    const audit: [string, string][] = [
-      ['Veri seti', `${row.name} (SHA-256 ${row.sha256.slice(0, 16)}…, ${row.rows} satır)`],
-      ['Bağımlı değişken', spec.dependent],
-      ['Yordayıcılar', [...spec.numeric, ...spec.categorical].join(', ')],
-      ['Referans düzeyler', result.categories.map((c) => `${c.name}: ${c.reference}`).join('; ') || '–'],
-      ['Güven düzeyi', `%${Math.round((1 - (spec.alpha ?? 0.05)) * 100)}`],
-      ['Motor sürümü', `${eng.engineName} ${eng.engine}`],
-      ['Referans doğrulama', `statsmodels OLS ile karşılaştırıldı (referans paketi: ${eng.referenceSuite.cases} vaka)`],
-      ['Çalışma ortamı', `Node ${eng.node}`],
-    ];
-    const data = regressionReportData(result, spec, row.name, new Date().toLocaleDateString('tr-TR'), audit);
-    const html = buildRegressionReport(data);
-    if (format === 'html') {
-      reply.header('Content-Type', 'text/html; charset=utf-8');
-      reply.header('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; img-src data:");
-      return html;
-    }
-    if (format === 'docx') {
-      reply.header('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-      reply.header('Content-Disposition', 'attachment; filename="regresyon-raporu.docx"');
-      return buildRegressionDocx(data);
-    }
-    reply.header('Content-Type', 'application/pdf');
-    reply.header('Content-Disposition', 'attachment; filename="regresyon-raporu.pdf"');
-    return renderPdf(html);
+    return sendReport(reply, format, regressionDoc(row, spec, result, trDate(Date.now()), regressionAudit(row, spec, result, engineInfo())));
   });
 
   /* ---------- İkili lojistik regresyon ---------- */
@@ -909,35 +967,9 @@ export function buildApp(opts: AppOptions): FastifyInstance {
 
   app.post('/api/datasets/:id/logistic/report', async (req, reply) => {
     const { id } = req.params as { id: string };
-    const { format } = z.object({ format: z.enum(['html', 'pdf', 'docx']).default('html') }).parse(req.query);
+    const { format } = FormatQuery.parse(req.query);
     const { row, spec, result } = runLogistic(id, req.body);
-    const eng = engineInfo();
-    const audit: [string, string][] = [
-      ['Veri seti', `${row.name} (SHA-256 ${row.sha256.slice(0, 16)}…, ${row.rows} satır)`],
-      ['Bağımlı değişken', `${spec.dependent} (olay: ${result.eventLevel}; referans: ${result.referenceLevel})`],
-      ['Yordayıcılar', [...spec.numeric, ...spec.categorical].join(', ')],
-      ['Referans düzeyler', result.categories.map((c) => `${c.name}: ${c.reference}`).join('; ') || '–'],
-      ['Güven düzeyi', `%${Math.round((1 - (spec.alpha ?? 0.05)) * 100)}`],
-      ['Sınıflandırma eşiği', String(result.classification.threshold)],
-      ['Motor sürümü', `${eng.engineName} ${eng.engine}`],
-      ['Referans doğrulama', `statsmodels Logit ile karşılaştırıldı (referans paketi: ${eng.referenceSuite.cases} vaka)`],
-      ['Çalışma ortamı', `Node ${eng.node}`],
-    ];
-    const data = logisticReportData(result, spec, row.name, new Date().toLocaleDateString('tr-TR'), audit);
-    const html = buildRegressionReport(data);
-    if (format === 'html') {
-      reply.header('Content-Type', 'text/html; charset=utf-8');
-      reply.header('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; img-src data:");
-      return html;
-    }
-    if (format === 'docx') {
-      reply.header('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-      reply.header('Content-Disposition', 'attachment; filename="lojistik-regresyon-raporu.docx"');
-      return buildRegressionDocx(data);
-    }
-    reply.header('Content-Type', 'application/pdf');
-    reply.header('Content-Disposition', 'attachment; filename="lojistik-regresyon-raporu.pdf"');
-    return renderPdf(html);
+    return sendReport(reply, format, logisticDoc(row, spec, result, trDate(Date.now()), logisticAudit(row, spec, result, engineInfo())));
   });
 
   /* ---------- Gerçek veride model karşılaştırma (arka plan işi) ---------- */
@@ -1053,36 +1085,186 @@ export function buildApp(opts: AppOptions): FastifyInstance {
 
   /** Model karşılaştırma raporu: html | pdf | docx (iş bittikten sonra). */
   app.get('/api/model-runs/:id/report', async (req, reply) => {
-    const { format } = z.object({ format: z.enum(['html', 'pdf', 'docx']).default('html') }).parse(req.query);
+    const { format } = FormatQuery.parse(req.query);
     const j = getModelJob((req.params as { id: string }).id);
     if (!j.result) throw new ApiError(409, 'not_ready', 'Model karşılaştırması henüz bitmedi.');
     const { row } = parsed(j.datasetId);
-    const eng = engineInfo();
-    const foldSizes = j.result.models.find((m) => !m.skipped)?.folds.map((f) => `${f.nTrain}/${f.nTest}`).join(', ') ?? '–';
-    const audit: [string, string][] = [
-      ['Veri seti', `${row.name} (SHA-256 ${row.sha256.slice(0, 16)}…, ${row.rows} satır)`],
-      ['Çapraz doğrulama', `tabakalı ${j.spec.folds} katlı, tohum ${j.spec.seed}; katman başına eğitim/test: ${foldSizes}`],
-      ['Modeller', j.result.models.map((m) => m.label + (m.skipped ? ' (atlandı)' : '')).join(', ')],
-      ['Ön işleme', 'Katman içinde uydurulan: medyan/mod doldurma, standartlaştırma (sayısal), tek-sıcak kodlama (kategorik)'],
-      ['Motor sürümü', `${eng.engineName} ${eng.engine}`],
-      ['Referans doğrulama', `scikit-learn ile aynı katmanlarda karşılaştırıldı (referans paketi: ${eng.referenceSuite.cases} vaka)`],
-      ['Çalışma ortamı', `Node ${eng.node}`],
+    return sendReport(reply, format, modelDoc(row, j.spec, j.result, trDate(j.finishedAt ?? Date.now()), modelAudit(row, j.spec, j.result, engineInfo())));
+  });
+
+  /* ---------- Rapor merkezi: kaydedilmiş regresyon, lojistik regresyon ve model karşılaştırma sonuçları ---------- */
+  type SavedKind = 'regression' | 'logistic' | 'model';
+  interface SavedReportRow {
+    id: string;
+    dataset_id: string;
+    kind: SavedKind;
+    created_at: string;
+    title: string;
+    detail: string;
+    spec_json: string;
+    result_json: string;
+    input_hash: string;
+    engine_json: string;
+  }
+  type SavedReportHead = Pick<SavedReportRow, 'id' | 'dataset_id' | 'kind' | 'created_at' | 'title' | 'detail' | 'input_hash'>;
+  const HEAD_COLUMNS = 'id, dataset_id, kind, created_at, title, detail, input_hash';
+  const reportItem = (r: SavedReportHead) => ({ id: r.id, kind: r.kind, datasetId: r.dataset_id, createdAt: r.created_at, title: r.title, detail: r.detail, inputHash: r.input_hash });
+  const dec3 = (x: number) => (Number.isFinite(x) ? x.toFixed(3).replace(/^(-?)0\./, '$1.') : '–');
+  const pctText = (x: number) => `%${(x * 100).toFixed(1)}`;
+  const countText = (x: number) => new Intl.NumberFormat('tr-TR').format(x);
+  const predictorList = (s: RegressionSpec) => [...s.numeric, ...s.categorical].join(', ');
+  const clip = (s: string, n = 200) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
+  const NO_LOGIT_CODE = 'Tam ayrışma olduğu için kod üretilmedi: en çok olabilirlik çözümü yoktur ve statsmodels da bu durumda hata verir.';
+
+  // Saklanan sonuçta rapor ve kod için gerekmeyen gözlem başına diziler tutulmaz (büyük veride megabaytlarca yer kaplar).
+  const storedRegression = (r: RegressionResult): RegressionResult => ({ ...r, usedRows: [], fitted: [], residuals: [], cooks: [], leverage: [] });
+  const storedLogistic = (r: LogisticResult): LogisticResult => ({ ...r, usedRows: [], probs: [] });
+  const storedCv = (r: CvResult): CvResult => ({ ...r, foldOf: [] });
+
+  /** Sonucu rapor merkezine kaydeder. Aynı veri ve aynı ayarlarla kaydedilmiş rapor varsa yenisi eklenmez, o döner. */
+  function saveReport(kind: SavedKind, row: DatasetRow, spec: unknown, result: unknown, title: string, detail: string) {
+    const inputHash = sha256(`${row.sha256}\n${kind}\n${canonical(spec)}`);
+    const existing = db.prepare(`SELECT ${HEAD_COLUMNS} FROM saved_reports WHERE dataset_id = ? AND kind = ? AND input_hash = ?`).get(row.id, kind, inputHash) as SavedReportHead | undefined;
+    if (existing) return { item: reportItem(existing), created: false };
+    const head: SavedReportHead = { id: randomUUID(), dataset_id: row.id, kind, created_at: new Date().toISOString(), title: clip(title), detail, input_hash: inputHash };
+    db.prepare('INSERT INTO saved_reports (id, dataset_id, kind, created_at, title, detail, spec_json, result_json, input_hash, engine_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
+      head.id,
+      head.dataset_id,
+      kind,
+      head.created_at,
+      head.title,
+      detail,
+      JSON.stringify(spec),
+      JSON.stringify(result),
+      inputHash,
+      JSON.stringify(engineInfo()),
+    );
+    return { item: reportItem(head), created: true };
+  }
+
+  app.post('/api/datasets/:id/regression/save', async (req, reply) => {
+    const { row, spec, result } = runRegression((req.params as { id: string }).id, req.body);
+    const { item, created } = saveReport('regression', row, spec, storedRegression(result), `${spec.dependent} ← ${predictorList(spec)}`, `R² = ${dec3(result.r2)} · ${pText(result.pF)} · n = ${countText(result.n)}`);
+    return reply.status(created ? 201 : 200).send({ ...item, created });
+  });
+
+  app.post('/api/datasets/:id/logistic/save', async (req, reply) => {
+    const { row, spec, result } = runLogistic((req.params as { id: string }).id, req.body);
+    const { item, created } = saveReport('logistic', row, spec, storedLogistic(result), `${spec.dependent} = ${result.eventLevel} ← ${predictorList(spec)}`, `Nagelkerke R² = ${dec3(result.nagelkerke)} · AUC = ${dec3(result.auc)} · n = ${countText(result.n)}`);
+    return reply.status(created ? 201 : 200).send({ ...item, created });
+  });
+
+  app.post('/api/model-runs/:id/save', async (req, reply) => {
+    const j = getModelJob((req.params as { id: string }).id);
+    if (!j.result) throw new ApiError(409, 'not_ready', 'Model karşılaştırması henüz bitmedi.');
+    const { row } = parsed(j.datasetId);
+    const bestId = interpretComparison(j.result).best?.id;
+    const best = j.result.models.find((m) => m.id === bestId);
+    const baseline = `taban ${pctText(j.result.baselineAccuracy)}`;
+    const detail = best ? `En yüksek: ${best.label} ${pctText(best.accuracy.mean)} · ${baseline}` : baseline;
+    const features = j.spec.numeric.length + j.spec.categorical.length;
+    const { item, created } = saveReport('model', row, j.spec, storedCv(j.result), `${j.spec.target} ← ${features} özellik · ${j.spec.folds} katlı çapraz doğrulama`, detail);
+    return reply.status(created ? 201 : 200).send({ ...item, created });
+  });
+
+  /** Tüm kayıtlar tek listede: Karar Sihirbazı testleri ve kaydedilmiş regresyon/lojistik/model raporları (yeniden eskiye). */
+  app.get('/api/reports', async (req) => {
+    const { datasetId } = z.object({ datasetId: z.string().min(1).max(64).optional() }).parse(req.query);
+    const where = datasetId ? ' WHERE dataset_id = ?' : '';
+    const args = datasetId ? [datasetId] : [];
+    const tests = db.prepare(`SELECT id, dataset_id, created_at, test, p, request_json, input_hash FROM analyses${where} ORDER BY created_at DESC LIMIT 500`).all(...args) as unknown as Pick<AnalysisRow, 'id' | 'dataset_id' | 'created_at' | 'test' | 'p' | 'request_json' | 'input_hash'>[];
+    const saved = db.prepare(`SELECT ${HEAD_COLUMNS} FROM saved_reports${where} ORDER BY created_at DESC LIMIT 500`).all(...args) as unknown as SavedReportHead[];
+    const reports = [
+      ...tests.map((t) => {
+        const q = JSON.parse(t.request_json) as AnalysisBodyType;
+        const vars = [...new Set([q.value, q.group, q.x, q.y, q.rowVar, q.colVar, ...(q.conditions ?? [])].filter((v): v is string => Boolean(v)))];
+        const detail = [vars.join(', '), t.p === null ? '' : pText(t.p)].filter(Boolean).join(' · ');
+        return { id: t.id, kind: 'test' as const, datasetId: t.dataset_id, createdAt: t.created_at, title: t.test, detail, inputHash: t.input_hash };
+      }),
+      ...saved.map(reportItem),
     ];
-    const doc = buildModelCompareDoc(j.result, j.spec, { datasetName: row.name, date: new Date(j.finishedAt ?? Date.now()).toLocaleDateString('tr-TR'), audit });
-    const html = renderReportHtml(doc);
-    if (format === 'html') {
-      reply.header('Content-Type', 'text/html; charset=utf-8');
-      reply.header('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; img-src data:");
-      return html;
+    reports.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    return { reports };
+  });
+
+  const getSaved = (id: string): SavedReportRow => {
+    const r = db.prepare('SELECT * FROM saved_reports WHERE id = ?').get(id) as SavedReportRow | undefined;
+    if (!r) throw new ApiError(404, 'not_found', 'Rapor bulunamadı.');
+    return r;
+  };
+
+  /** Kaydedilmiş raporu çözer. Rapor tarihi kayıt tarihidir ve motor bilgisi kayıt anınınkidir: aynı kayıt her zaman aynı raporu verir. */
+  function openSaved(r: SavedReportRow) {
+    // Veri seti silinince raporlar da silinir (ON DELETE CASCADE); kayıt varsa veri seti de vardır.
+    const row = db.prepare('SELECT * FROM datasets WHERE id = ?').get(r.dataset_id) as unknown as DatasetRow;
+    const eng = JSON.parse(r.engine_json) as EngineInfo;
+    const date = trDate(r.created_at);
+    const head: Audit = [['Rapor kimliği', r.id], ['Girdi karması (SHA-256)', r.input_hash]];
+    if (r.kind === 'regression') {
+      const spec = JSON.parse(r.spec_json) as RegressionSpec;
+      const result = JSON.parse(r.result_json) as RegressionResult;
+      const audit = [...head, ...regressionAudit(row, spec, result, eng)];
+      return { kind: r.kind, row, eng, audit, spec, result, doc: () => regressionDoc(row, spec, result, date, audit) };
     }
-    if (format === 'docx') {
-      reply.header('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-      reply.header('Content-Disposition', 'attachment; filename="model-karsilastirma-raporu.docx"');
-      return buildDocxFromDoc(doc);
+    if (r.kind === 'logistic') {
+      const spec = JSON.parse(r.spec_json) as LogisticSpec;
+      const result = JSON.parse(r.result_json) as LogisticResult;
+      const audit = [...head, ...logisticAudit(row, spec, result, eng)];
+      return { kind: r.kind, row, eng, audit, spec, result, doc: () => logisticDoc(row, spec, result, date, audit) };
     }
-    reply.header('Content-Type', 'application/pdf');
-    reply.header('Content-Disposition', 'attachment; filename="model-karsilastirma-raporu.pdf"');
-    return renderPdf(html);
+    const spec = JSON.parse(r.spec_json) as ModelCompareSpec;
+    const result = JSON.parse(r.result_json) as CvResult;
+    const audit = [...head, ...modelAudit(row, spec, result, eng)];
+    return { kind: r.kind, row, eng, audit, spec, result, doc: () => modelDoc(row, spec, result, date, audit) };
+  }
+
+  /** Rapor merkezinde gösterilen özet: öne çıkan sayılar, APA özeti, yorum ve uyarılar, denetim izi. */
+  app.get('/api/reports/:id', async (req) => {
+    const r = getSaved((req.params as { id: string }).id);
+    const o = openSaved(r);
+    const base = { ...reportItem(r), datasetName: o.row.name, engine: o.eng, audit: o.audit };
+    if (o.kind === 'regression') {
+      const x = o.result;
+      const n = narrateRegression(x, o.spec.dependent);
+      const highlights: Audit = [['R²', dec3(x.r2)], ['Düzeltilmiş R²', dec3(x.adjR2)], [`F(${x.dfModel}, ${x.dfResid})`, `${x.F.toFixed(2)}, ${pText(x.pF)}`], ['Gözlem', countText(x.n)]];
+      return { ...base, highlights, apaSummary: n.apaSummary, summary: n.interpretation, notes: n.notes, codeUnavailable: null };
+    }
+    if (o.kind === 'logistic') {
+      const x = o.result;
+      const n = narrateLogistic(x, o.spec.dependent);
+      const highlights: Audit = [['Nagelkerke R²', dec3(x.nagelkerke)], [`LR χ²(${x.lrDf})`, `${x.lrChi2.toFixed(2)}, ${pText(x.lrP)}`], ['AUC', dec3(x.auc)], ['Doğru sınıflandırma', pctText(x.classification.accuracy)], ['Gözlem', countText(x.n)]];
+      return { ...base, highlights, apaSummary: n.apaSummary, summary: n.interpretation, notes: n.notes, codeUnavailable: x.separation === 'complete' ? NO_LOGIT_CODE : null };
+    }
+    const x = o.result;
+    const interp = interpretComparison(x);
+    const best = x.models.find((m) => m.id === interp.best?.id);
+    const highlights: Audit = [['En yüksek doğruluk', best ? `${best.label}: ${pctText(best.accuracy.mean)}` : '–'], ['Taban doğruluğu', pctText(x.baselineAccuracy)], ['Gözlem', countText(x.n)], ['Çapraz doğrulama', `${x.folds} katlı`]];
+    return { ...base, highlights, apaSummary: null, summary: interp.summary, notes: interp.notes, codeUnavailable: null };
+  });
+
+  app.get('/api/reports/:id/code', async (req) => {
+    const r = getSaved((req.params as { id: string }).id);
+    const o = openSaved(r);
+    const { row, csv } = parsed(r.dataset_id);
+    const file = fileInfo(row, csv);
+    if (o.kind === 'regression') return generateRegressionCode(file, o.spec, o.result);
+    if (o.kind === 'logistic') {
+      if (o.result.separation === 'complete') throw new ApiError(409, 'no_code', NO_LOGIT_CODE);
+      return generateLogisticCode(file, o.spec, o.result);
+    }
+    return generateModelCompareCode(file, o.spec, o.result);
+  });
+
+  app.get('/api/reports/:id/report', async (req, reply) => {
+    const { format } = FormatQuery.parse(req.query);
+    return sendReport(reply, format, openSaved(getSaved((req.params as { id: string }).id)).doc());
+  });
+
+  app.delete('/api/reports/:id', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    getSaved(id);
+    db.prepare('DELETE FROM saved_reports WHERE id = ?').run(id);
+    return reply.status(204).send();
   });
 
   /** Analizin Python karşılığı; betik, beklenen çıktıyla birebir aynı satırları yazdırır. */

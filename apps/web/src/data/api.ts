@@ -1,4 +1,4 @@
-import type { CvResult, MlInterpretation, ModelCompareSpec, ModelId, AnalysisResult, AnalysisSpec, CleanRule, DatasetQuality, GeneratedCode, LogisticResult, LogisticSpec, RegressionNarrative, RegressionResult, RegressionSpec } from '@statadvisor/shared';
+import type { CvResult, MlInterpretation, ModelCompareSpec, ModelId, AnalysisResult, AnalysisSpec, CleanRule, DatasetQuality, GeneratedCode, LogisticResult, LogisticSpec, RegressionNarrative, RegressionNote, RegressionResult, RegressionSpec } from '@statadvisor/shared';
 
 /** Sunucuya gönderilen analiz isteği. */
 export type AnalysisBody = AnalysisSpec & { datasetId: string };
@@ -241,3 +241,34 @@ export interface ModelRunJob {
 }
 
 export type QualityResponse = DatasetQuality;
+
+/** Rapor merkezindeki kayıt türleri: Karar Sihirbazı testi ya da kaydedilmiş regresyon/lojistik/model raporu. */
+export type ReportKind = 'test' | 'regression' | 'logistic' | 'model';
+
+export interface ReportListItem {
+  id: string;
+  kind: ReportKind;
+  datasetId: string;
+  createdAt: string;
+  title: string;
+  detail: string;
+  inputHash: string;
+}
+
+/** Kaydetme yanıtı; aynı veri ve ayarlarla kayıt zaten varsa created = false ve mevcut kayıt döner. */
+export interface SavedReportItem extends ReportListItem {
+  created: boolean;
+}
+
+export interface SavedReportView extends ReportListItem {
+  kind: Exclude<ReportKind, 'test'>;
+  datasetName: string;
+  engine: EngineInfo;
+  audit: [string, string][];
+  highlights: [string, string][];
+  apaSummary: string | null;
+  summary: string[];
+  notes: RegressionNote[];
+  /** Kod üretilemiyorsa nedeni (ör. lojistik regresyonda tam ayrışma). */
+  codeUnavailable: string | null;
+}

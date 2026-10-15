@@ -31,6 +31,20 @@ const MIGRATIONS: string[] = [
    ALTER TABLE datasets ADD COLUMN operations_json TEXT;`,
   // Sütun profili: kullanıcının düzelttiği türler ve doğruladığı geçerli değerler
   `ALTER TABLE datasets ADD COLUMN profile_json TEXT;`,
+  // Rapor merkezine kaydedilen regresyon, lojistik regresyon ve model karşılaştırma sonuçları
+  `CREATE TABLE saved_reports (
+     id TEXT PRIMARY KEY,
+     dataset_id TEXT NOT NULL REFERENCES datasets(id) ON DELETE CASCADE,
+     kind TEXT NOT NULL CHECK (kind IN ('regression', 'logistic', 'model')),
+     created_at TEXT NOT NULL,
+     title TEXT NOT NULL,
+     detail TEXT NOT NULL,
+     spec_json TEXT NOT NULL,
+     result_json TEXT NOT NULL,
+     input_hash TEXT NOT NULL,
+     engine_json TEXT NOT NULL
+   );
+   CREATE INDEX saved_reports_dataset ON saved_reports(dataset_id, created_at DESC);`,
 ];
 
 export function openDb(path: string): DatabaseSync {

@@ -1,8 +1,10 @@
 import { useState } from 'react';
-import { Download, Eye, Info, OctagonAlert, TriangleAlert } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { BookmarkPlus, Download, Eye, FolderOpen, Info, OctagonAlert, TriangleAlert } from 'lucide-react';
 import type { RegressionNote } from '@statadvisor/shared';
 import { Button, Callout, Select, StatusLine } from '@/components/ui';
-import { useCapabilities, useLevels } from '@/data/hooks';
+import type { SavedReportItem } from '@/data/api';
+import { useCapabilities, useLevels, useSaveToReports } from '@/data/hooks';
 import { fetchReport } from '@/lib/download';
 
 export const nf = new Intl.NumberFormat('tr-TR');
@@ -63,6 +65,37 @@ export function ReportActions({ url, body, fileBase }: { url: string; body: unkn
       <Button variant="primary" icon={Download} disabled={busy !== null} onClick={() => run('docx')}>{busy === 'docx' ? 'Hazırlanıyor…' : 'Word (.docx)'}</Button>
       <Button variant="secondary" icon={Download} disabled={busy !== null || caps.data?.pdf === false} title={caps.data?.pdf === false ? 'PDF için Chromium gerekir: npx playwright install chromium' : undefined} onClick={() => run('pdf')}>{busy === 'pdf' ? 'Hazırlanıyor…' : 'PDF'}</Button>
       {err && <StatusLine status="danger" className="text-caption">{err}</StatusLine>}
+    </div>
+  );
+}
+
+/**
+ * “Rapor merkezine kaydet”: sonucu kalıcı olarak saklar ve kayıttan sonra rapor merkezine bağlantı gösterir.
+ * resetKey değişince (ayarlar ya da iş değişti) düğme yeniden görünür.
+ */
+export function SaveToReports({ url, body, resetKey }: { url: string; body?: unknown; resetKey: string }) {
+  const save = useSaveToReports();
+  const [saved, setSaved] = useState<{ key: string; item: SavedReportItem } | null>(null);
+  const done = saved?.key === resetKey ? saved.item : null;
+  const failed = save.isError && save.variables?.url === url && !done;
+  return (
+    <div className="mb-4 flex flex-wrap items-center gap-3">
+      {done ? (
+        <>
+          <StatusLine status="success">{done.created ? 'Rapor merkezine kaydedildi.' : 'Bu sonuç rapor merkezinde zaten kayıtlı.'}</StatusLine>
+          <Link className="inline-flex h-10 items-center gap-2 rounded-control border border-line-strong px-4 text-body text-fg transition hover:bg-surface-highest/60" to={`/kod-rapor?rapor=${done.id}`}>
+            <FolderOpen size={16} aria-hidden /> Rapor merkezinde aç
+          </Link>
+        </>
+      ) : (
+        <>
+          <Button variant="primary" icon={BookmarkPlus} disabled={save.isPending} onClick={() => save.mutate({ url, body }, { onSuccess: (item) => setSaved({ key: resetKey, item }) })}>
+            {save.isPending ? 'Kaydediliyor…' : 'Rapor merkezine kaydet'}
+          </Button>
+          <span className="text-caption text-fg-subtle">Kaydedilen sonuç sunucu kapansa da kalır; kodu ve raporu rapor merkezinden indirilebilir.</span>
+        </>
+      )}
+      {failed && <StatusLine status="danger" className="text-caption">{save.error.message}</StatusLine>}
     </div>
   );
 }

@@ -284,10 +284,55 @@ test('kaydet → kod ve rapor: kod indirilir, rapor sunucudan gelir ve denetim i
   }
 });
 
-test('kod ve rapor: kaydedilmiş analiz yokken yönlendirir', async ({ page, request }) => {
+test('kod ve rapor: kaydedilmiş rapor yokken yönlendirir', async ({ page, request }) => {
   await loadSample(request, 'klinik');
   await page.goto('/kod-rapor');
-  await expect(page.getByText('Henüz kaydedilmiş analiz yok')).toBeVisible();
+  await expect(page.getByText('Henüz kaydedilmiş rapor yok')).toBeVisible();
+});
+
+test('rapor merkezi: regresyon kaydedilir, testle aynı listede görünür, açılır, süzülür ve silinir', async ({ page, request }) => {
+  const ds = await loadSample(request, 'klinik');
+  await request.post('/api/analyses', { data: { datasetId: ds.id, goal: 'compare', design: 'independent', target: 'continuous', value: 'kan_basinci', group: 'grup' } });
+  await page.goto('/regresyon');
+  await page.getByLabel('Bağımlı değişken (sayısal sonuç)').selectOption('kan_basinci');
+  await page.getByRole('checkbox', { name: /^yas/ }).check();
+  await expect(page.getByRole('heading', { name: 'Katsayılar' })).toBeVisible();
+  await page.getByRole('button', { name: 'Rapor merkezine kaydet' }).click();
+  await expect(page.getByText('Rapor merkezine kaydedildi.')).toBeVisible();
+  // Ayar değişince düğme yeniden görünür
+  await page.getByRole('checkbox', { name: /^gelir_duzeyi/ }).check();
+  await expect(page.getByRole('button', { name: 'Rapor merkezine kaydet' })).toBeVisible();
+  await page.getByRole('checkbox', { name: /^gelir_duzeyi/ }).uncheck();
+  await expect(page.getByRole('link', { name: 'Rapor merkezinde aç' })).toBeVisible();
+  await page.getByRole('link', { name: 'Rapor merkezinde aç' }).click();
+
+  await expect(page).toHaveURL(/\/kod-rapor\?rapor=/);
+  const list = page.getByRole('list', { name: 'Kayıtlı raporlar' });
+  await expect(list.getByRole('listitem')).toHaveCount(2);
+  await expect(list.getByText('kan_basinci ← yas')).toBeVisible();
+  await expect(page.getByText('regresyon.py').first()).toBeVisible();
+  await expect(page.getByText('Beklenen konsol çıktısı')).toBeVisible();
+  await expect(page.getByText('APA 7 stili metin özeti')).toBeVisible();
+  const href = await page.getByRole('link', { name: 'Raporu incele' }).getAttribute('href');
+  const html = await (await request.get(href!)).text();
+  expect(html).toContain('Rapor kimliği');
+  expect(html).toContain('klinik_ornek.csv');
+
+  // Türe göre süzme ve testi açma
+  await page.getByRole('radio', { name: /^Test/ }).click();
+  await expect(list.getByRole('listitem')).toHaveCount(1);
+  await list.getByRole('listitem').first().getByRole('button').first().click();
+  await expect(page).toHaveURL(/\/kod-rapor\?analiz=/);
+  await expect(page.getByText('Önerilen test', { exact: true })).toBeVisible();
+
+  // Silme onay ister
+  await page.getByRole('radio', { name: /^Tümü/ }).click();
+  await list.getByRole('button', { name: /kan_basinci ← yas.*kaydını sil/ }).click();
+  await list.getByRole('button', { name: 'Vazgeç' }).click();
+  await expect(list.getByRole('listitem')).toHaveCount(2);
+  await list.getByRole('button', { name: /kan_basinci ← yas.*kaydını sil/ }).click();
+  await list.getByRole('button', { name: 'Evet, sil' }).click();
+  await expect(list.getByRole('listitem')).toHaveCount(1);
 });
 
 test('veri kalitesi: varsayılan olarak hiçbir şey seçili değildir; uç değer yalnızca açık eylemle silinir; temizlenmiş sürüm etkin olur ve analizde kullanılır', async ({ page, request }) => {
@@ -375,6 +420,16 @@ test('model karşılaştırma (kendi veri): çapraz doğrulama sonuçları taban
   await expect(page.getByRole('columnheader', { name: 'Eğitim − test' })).toBeVisible();
   await expect(page.getByText('Python (scikit-learn) kodu')).toBeVisible();
   await expect(page.getByText('model_karsilastirma.py')).toBeVisible({ timeout: 30_000 });
+
+  // Rapor merkezine kaydedilir ve oradan kod ve raporla açılır
+  await page.getByRole('button', { name: 'Rapor merkezine kaydet' }).click();
+  await page.getByRole('link', { name: 'Rapor merkezinde aç' }).click();
+  await expect(page).toHaveURL(/\/kod-rapor\?rapor=/);
+  await expect(page.getByText('Model karşılaştırma', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText('model_karsilastirma.py')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText('Genel sonuç')).toBeVisible();
+  const href = await page.getByRole('link', { name: 'Raporu incele' }).getAttribute('href');
+  expect(await (await request.get(href!)).text()).toContain('Çapraz doğrulama');
 });
 
 test('model karşılaştırma (örnek): ölçütler taban çizgisiyle birlikte gösterilir; bayraklar işaretlenir', async ({ page }) => {
