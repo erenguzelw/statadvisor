@@ -56,7 +56,7 @@ export function buildBody(datasetId: string, cols: ColumnInfo[], a: Answers, p: 
     if (a.target === 'categorical') return has(p.rowVar) && has(p.colVar) && p.rowVar !== p.colVar ? { ...base, rowVar: p.rowVar, colVar: p.colVar } : null;
     return has(p.x) && has(p.y) && p.x !== p.y ? { ...base, x: p.x, y: p.y } : null;
   }
-  if (a.design === 'paired' && a.target !== 'categorical') {
+  if (a.design === 'paired') {
     const conds = p.conditions.filter(has);
     return conds.length >= 2 ? { ...base, conditions: conds } : null;
   }
@@ -68,7 +68,7 @@ export function buildBody(datasetId: string, cols: ColumnInfo[], a: Answers, p: 
 export function missingHint(a: Answers): string {
   if (a.goal === 'predict') return 'Tahmin ve modelleme için Doğrusal Regresyon, Lojistik Regresyon ya da Model Karşılaştırma sayfalarını kullanın.';
   if (a.goal === 'relate') return a.target === 'categorical' ? 'İki farklı kategorik sütun seçin.' : 'İki farklı sayısal sütun seçin.';
-  if (a.design === 'paired' && a.target !== 'categorical') return 'Karşılaştırılacak en az iki sütun (koşul) seçin.';
+  if (a.design === 'paired') return a.target === 'categorical' ? 'Karşılaştırılacak en az iki ikili (2 değerli, ör. evet/hayır) sütun seçin.' : 'Karşılaştırılacak en az iki sütun (koşul) seçin.';
   if (a.target === 'categorical') return 'Bir grup sütunu ve bir sonuç sütunu seçin (farklı sütunlar).';
   return 'Bir sonuç sütunu ve bir grup sütunu seçin (farklı sütunlar).';
 }

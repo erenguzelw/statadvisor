@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { ArrowRight, CheckCircle2, GitFork, Info } from 'lucide-react';
-import { wizardQuestions, type DecisionPath as DecisionPathType, type WizardAnswers } from '@statadvisor/shared';
+import { RUNNABLE_TESTS, wizardQuestions, type DecisionPath as DecisionPathType, type WizardAnswers } from '@statadvisor/shared';
 import { Callout, RadioCardGroup, StatusChip, Tag } from '@/components/ui';
 
 export interface DecisionPathLike {
@@ -138,7 +138,7 @@ export function ConditionChecks({ checks }: { checks: NonNullable<DecisionPathTy
 }
 
 /** Seçilen teste alternatifler: hangi yöntem hangi koşulda düşünülebilir. */
-export function AlternativeMethods({ finalTest, alternatives }: { finalTest: string; alternatives: NonNullable<DecisionPathType['alternatives']> }) {
+export function AlternativeMethods({ finalTest, alternatives, onRun }: { finalTest: string; alternatives: NonNullable<DecisionPathType['alternatives']>; onRun?: (test: string) => void }) {
   if (!alternatives.length) return null;
   return (
     <section aria-label="Alternatif yöntemler" className="rounded-card border border-line/30 bg-surface-lowest p-4">
@@ -152,6 +152,11 @@ export function AlternativeMethods({ finalTest, alternatives }: { finalTest: str
             <GitFork size={14} className="mt-0.5 shrink-0 text-fg-subtle" aria-hidden />
             <span>
               <span className="font-medium text-fg">{a.test}:</span> <span className="text-fg-muted">{a.when}</span>
+              {onRun && RUNNABLE_TESTS.has(a.test) && (
+                <button type="button" onClick={() => onRun(a.test)} className="ml-2 rounded-control border border-line-strong px-2 py-0.5 text-caption font-medium text-secondary transition hover:bg-surface-highest/60">
+                  Bunu çalıştır
+                </button>
+              )}
             </span>
           </li>
         ))}

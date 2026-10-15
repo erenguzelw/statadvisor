@@ -57,7 +57,7 @@ h2 { font-size: 22px; }
       <p class="sub">Dosyanın yüklenmesinden raporun alınmasına kadar adımlar.</p>
       <pre class="mermaid">
 flowchart TD
-  A["Veri dosyasını yükle<br/><small>Excel / CSV</small>"]:::user
+  A["Veri dosyasını yükle<br/><small>Excel · CSV · SPSS (.sav)</small>"]:::user
   B["Sütun türleri tanınır<br/><small>sayısal · sıralı · kategorik<br/>“2:Katılıyorum” → 2</small>"]:::auto
   C["İsteğe bağlı hazırlık<br/><small>yanıt taraması · ölçek puanı · eksik veri</small>"]:::user
   D["Sihirbaz soruları ve sütun seçimi<br/><small>amaç · aynı kişiler mi? · hangi sütunlar</small>"]:::user
@@ -89,13 +89,17 @@ flowchart TD
   RN -->|Evet| R3["Pearson<br/>korelasyonu"]:::out
   RN -->|Hayır| R2
   Q -->|Karşılaştırma| T{"Sonuç değişkeni<br/>türü?"}:::user
-  T -->|Kategorik| K
+  T -->|Kategorik| DK{"Aynı kişiler mi<br/>tekrar ölçüldü?"}:::user
+  DK -->|Hayır| K
+  DK -->|Evet| MC["Eşleşmiş kategorik test<br/><small>2 koşul: McNemar · 3+ koşul: Cochran Q</small>"]:::out
   T -->|Sıralı| NP["Parametrik olmayan test<br/><small>2 grup: Mann-Whitney U · Wilcoxon<br/>3+ grup: Kruskal-Wallis · Friedman</small>"]:::out
   T -->|Sayısal| N{"Veri normal mi?"}:::auto
   N -->|Hayır| NP
   N -->|Evet| D{"Aynı kişiler mi<br/>tekrar ölçüldü?"}:::user
   D -->|Hayır| W["Welch testi<br/><small>2 grup: Welch t · 3+ grup: Welch ANOVA</small>"]:::out
   D -->|Evet| P["Eşleştirilmiş test<br/><small>2 grup: eşleştirilmiş t<br/>3+ grup: tekrarlı ölçümler ANOVA</small>"]:::out
+  Q -->|Çok faktörlü tasarım| FA["Faktöriyel ANOVA sayfası<br/><small>Tip III / II · post-hoc · basit etkiler</small>"]:::out
+  Q -->|Yordama| RG["Regresyon sayfaları<br/><small>doğrusal · lojistik</small>"]:::out
   classDef user fill:#fff4e0,stroke:#b45309,stroke-width:2px,color:#141a2e
   classDef auto fill:#e0f2fe,stroke:#0369a1,stroke-width:2px,color:#141a2e
   classDef out fill:#dcf5ea,stroke:#047857,stroke-width:2px,color:#141a2e
@@ -103,10 +107,11 @@ flowchart TD
     </section>
   </div>
 
-  <div class="notes">
+  <div class="notes" style="grid-template-columns: repeat(2, 1fr)">
     <div class="note"><b>“Veri normal mi?” nasıl yanıtlanır?</b><span>Kullanıcı ölçütü seçer: Shapiro-Wilk testi (p ≥ 0,05) ya da çarpıklık ve basıklığın ±1,5 veya ±2 içinde olması. Sonuç “hayır” çıkarsa program rotayı değiştirir ve nedenini yazar.</span></div>
     <div class="note"><b>Metinler nereden geliyor?</b><span>Sade anlatım ve APA cümlesi, her test için önceden yazılmış cümle kalıplarına hesaplanan sayıların yerleştirilmesiyle oluşur. Metni bir yapay zekâ yazmaz.</span></div>
-    <div class="note"><b>Makine öğrenmesi nerede?</b><span>Yalnızca Model Karşılaştırma sayfasında: lojistik regresyon, rastgele orman ve gradyan artırma tarayıcıda örnek (sentetik) veriyle eğitilip karşılaştırılır.</span></div>
+    <div class="note"><b>Alternatifi de çalıştırabilirsiniz</b><span>Önerilen testin yanında alternatifler (ör. Spearman yerine Kendall tau, Wilcoxon yerine işaret testi) listelenir; “Bunu çalıştır” ile aynı veride denenir. Python kodu ve rapor da buna göre değişir.</span></div>
+    <div class="note"><b>Makine öğrenmesi nerede?</b><span>Yalnızca Model Karşılaştırma sayfasında: lojistik regresyon, rastgele orman ve gradyan artırma sizin verinizle, bu bilgisayarda çapraz doğrulamayla karşılaştırılır.</span></div>
   </div>
 </div>
 

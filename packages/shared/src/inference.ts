@@ -24,6 +24,7 @@ import {
   wilcoxonSignedRank,
   type PairResult,
 } from './tests.ts';
+import { cochranQ, kendallTau, mcnemar, signTest } from './tests-extra.ts';
 import type { BoxStats, GroupDescriptive, Interpretation, ScatterSample } from './types.ts';
 
 export type TestInput =
@@ -410,6 +411,89 @@ export function runTest(finalTest: string, input: TestInput, alpha = 0.05): Test
         kind: 'table',
         notes,
       };
+    }
+    case 'Kendall tau': {
+      need('xy');
+      if (input.kind !== 'xy') throw new Error('x ve y girdisi gerekir.');
+      const r = kendallTau(input.x, input.y);
+      if (r.method === 'asymptotic') notes.push('P değeri bağ düzeltmeli normal yaklaşımla hesaplandı (bağ yoksa ve n ≤ 33 ise kesin p kullanılır).');
+      return {
+        test: finalTest,
+        statisticText: `τ = ${n2(r.tau)}`,
+        statistic: { symbol: 'τ', value: r.tau, df: [] },
+        p: r.p,
+        alpha,
+        significant: r.p < alpha,
+        effect: { symbol: 'τ', name: 'Kendall tau-b', value: r.tau, magnitude: magR(r.tau) },
+        n: r.n,
+        kind: 'xy',
+        direction: r.tau >= 0 ? 'pozitif' : 'negatif',
+        notes,
+      };
+    }
+    case 'İşaret testi': {
+      need('paired');
+      if (input.kind !== 'paired' || input.conditions.length !== 2) throw new Error('İşaret testi için 2 koşul gerekir.');
+      const [x, y] = input.conditions as [number[], number[]];
+      const r = signTest(x, y);
+      if (r.zeros > 0) notes.push(`${r.zeros} sıfır fark (eşit çift) atıldı; test ${r.n} farkla yapıldı.`);
+      notes.push(`Pozitif fark: ${r.nPlus}, negatif fark: ${r.nMinus} (ilk koşul − ikinci koşul).`);
+      const eff = (r.nPlus - r.nMinus) / r.n;
+      return {
+        test: finalTest,
+        statisticText: `S = ${r.nPlus}`,
+        statistic: { symbol: 'S', value: r.nPlus, df: [] },
+        p: r.p,
+        alpha,
+        significant: r.p < alpha,
+        effect: { symbol: 'r', name: 'işaret farkı oranı', value: eff, magnitude: magR(eff) },
+        n: r.n,
+        kind: 'paired',
+        notes,
+      };
+    }
+    case 'McNemar testi': {
+      need('paired');
+      if (input.kind !== 'paired' || input.conditions.length !== 2) throw new Error('McNemar testi için 2 koşul gerekir.');
+      const [x, y] = input.conditions as [number[], number[]];
+      const r = mcnemar(x, y);
+      notes.push(`Tutarsız çiftler: b = ${r.b} (0 → 1), c = ${r.c} (1 → 0); tutarlı çiftler: ${r.a} (0, 0) ve ${r.d} (1, 1).`);
+      notes.push(r.method === 'exact' ? 'b + c < 25 olduğundan p değeri kesin iki terimli testle hesaplandı.' : 'p değeri sürekliklik düzeltmeli χ² ile hesaplandı.');
+      const eff = r.b + r.c > 0 ? (r.b - r.c) / (r.b + r.c) : 0;
+      return {
+        test: finalTest,
+        statisticText: r.method === 'exact' ? `min(b, c) = ${r.statistic}` : `χ²(1) = ${n2(r.statistic)}`,
+        statistic: { symbol: r.method === 'exact' ? 'min(b, c)' : 'χ²', value: r.statistic, df: r.method === 'exact' ? [] : [1] },
+        p: r.p,
+        alpha,
+        significant: r.p < alpha,
+        effect: { symbol: 'g', name: 'tutarsız çiftlerde fark oranı (b − c)/(b + c)', value: eff, magnitude: magR(eff) },
+        n: r.n,
+        kind: 'paired',
+        notes,
+      };
+    }
+    case 'Cochran Q testi': {
+      need('paired');
+      if (input.kind !== 'paired' || input.conditions.length < 3) throw new Error('Cochran Q testi için en az 3 koşul gerekir.');
+      const r = cochranQ(input.conditions);
+      notes.push(`Koşul başına “1” oranı: ${input.names.map((nm, i) => `${nm} %${(r.proportions[i]! * 100).toFixed(1)}`).join(', ')}.`);
+      const out: TestOutcome = {
+        test: finalTest,
+        statisticText: `Q(${r.df}) = ${n2(r.Q)}`,
+        statistic: { symbol: 'Q', value: r.Q, df: [r.df] },
+        p: r.p,
+        alpha,
+        significant: r.p < alpha,
+        effect: { symbol: 'W', name: 'Kendall W benzeri: Q / (n (k − 1))', value: r.effect, magnitude: magR(r.effect) },
+        n: r.n,
+        kind: 'paired',
+        notes,
+      };
+      if (out.significant) {
+        out.postHoc = postHocOf('İkili McNemar testleri (Holm düzeltmeli)', 'holm', input.names, mkPairs(input.names, pairwisePaired(input.conditions, 'mcnemar'), alpha), input.conditions, 'Ortalama');
+      }
+      return out;
     }
     default:
       throw new Error(`Desteklenmeyen test: ${finalTest}`);

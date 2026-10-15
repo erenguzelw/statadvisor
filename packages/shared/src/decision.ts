@@ -131,6 +131,26 @@ const targetLabel: Record<Target, string> = { continuous: 'Hedef: sürekli', ord
 const groupLabel: Record<GroupCount, string> = { '2': '2 grup', '3+': '3+ grup' };
 const designLabel: Record<Design, string> = { independent: 'bağımsız', paired: 'eşleşmiş', unknown: 'bağımsızlık doğrulanmadı' };
 
+/** Uygulamada gerçekten çalıştırılabilen testler (runTest); “alternatifi çalıştır” yalnızca bunlar için sunulur. */
+export const RUNNABLE_TESTS: ReadonlySet<string> = new Set([
+  'Bağımsız örneklem t-testi',
+  'Welch t-testi',
+  'Mann-Whitney U testi',
+  'Tek Yönlü ANOVA',
+  'Welch ANOVA',
+  'Kruskal-Wallis H testi',
+  'Eşleştirilmiş t-testi',
+  'Wilcoxon işaretli sıra testi',
+  'İşaret testi',
+  'Tekrarlı ölçümler ANOVA',
+  'Friedman testi',
+  'Pearson korelasyonu',
+  'Spearman sıra korelasyonu',
+  'Kendall tau',
+  'McNemar testi',
+  'Cochran Q testi',
+]);
+
 export const defaultAnswers: WizardAnswers = { goal: 'compare', groups: '3+', design: 'unknown', target: 'continuous' };
 
 export function recommendTest(answers: WizardAnswers, a: AssumptionInput): Recommendation {
@@ -183,7 +203,11 @@ export function recommendTest(answers: WizardAnswers, a: AssumptionInput): Recom
   const paired = answers.design === 'paired';
   const two = answers.groups === '2';
 
-  if (answers.target === 'categorical') {
+  if (answers.target === 'categorical' && paired) {
+    // Aynı denekler tekrar ölçüldüğünde (ör. önce–sonra evet/hayır) ki-kare değil, eşleşmiş ikili testler gerekir.
+    planned = final = two ? 'McNemar testi' : 'Cochran Q testi';
+    warnings.push('Eşleşmiş kategorik test ikili (iki düzeyli) sonuç gerektirir; ikinci düzey “1” (olay) olarak kodlanır.');
+  } else if (answers.target === 'categorical') {
     planned = final = 'Ki-kare homojenlik testi';
     warnings.push('Beklenen hücre sayıları 5’ten küçükse Fisher kesin testini kullanın.');
   } else if (answers.target === 'ordinal') {
@@ -289,7 +313,12 @@ const ALTERNATIVES: Record<string, Alternative[]> = {
     { test: 'Doğrusal karma model', when: 'Eksik ölçümler varsa ya da küresellik varsayımı bozuksa.' },
   ],
   'Friedman testi': [{ test: 'Tekrarlı ölçümler ANOVA', when: 'Kalıntılar yaklaşık normalse; daha güçlüdür.' }],
-  'Pearson korelasyonu': [{ test: 'Spearman sıra korelasyonu', when: 'İlişki monoton ama doğrusal değilse ya da uç değer varsa.' }],
+  'Pearson korelasyonu': [
+    { test: 'Spearman sıra korelasyonu', when: 'İlişki monoton ama doğrusal değilse ya da uç değer varsa.' },
+    { test: 'Kendall tau', when: 'Örneklem küçükse ya da çok sayıda bağ (eşit değer) varsa.' },
+  ],
+  'McNemar testi': [{ test: 'Cochran Q testi', when: 'Aynı denekler ikiden fazla koşulda ölçüldüyse.' }],
+  'Cochran Q testi': [{ test: 'McNemar testi', when: 'Anlamlı Q sonrasında koşulları ikili karşılaştırmak için (Holm düzeltmeli); sonuç raporda verilir.' }],
   'Spearman sıra korelasyonu': [
     { test: 'Pearson korelasyonu', when: 'Saçılım grafiği doğrusal ve uç değersizse.' },
     { test: 'Kendall tau', when: 'Örneklem küçükse ya da çok sayıda bağ (eşit değer) varsa.' },

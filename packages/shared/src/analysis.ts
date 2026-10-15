@@ -34,6 +34,10 @@ export interface AnalysisRequest {
   group?: TextColumn;
   /** Karşılaştırma (eşleşmiş): her koşul bir sütundur, satırlar aynı denekleri gösterir. */
   conditions?: NumericColumn[];
+  /** Eşleşmiş kategorik karşılaştırma (McNemar, Cochran Q): her koşul ikili bir metin sütunudur; ikinci düzey (sıralı) “1” kodlanır. */
+  binaryConditions?: TextColumn[];
+  /** Önerilen yerine, önerinin alternatifleri arasından bir testi zorla çalıştırır (ör. “Kendall tau”). */
+  test?: string;
   /** İlişki (sayısal): iki sütun. */
   x?: NumericColumn;
   y?: NumericColumn;
@@ -66,6 +70,8 @@ export interface AnalysisResult {
   notes: string[];
   /** Gösterimde kullanılan değişken adları. */
   variables: string[];
+  /** Eşleşmiş kategorik testlerde (McNemar, Cochran Q) 0 ve 1 olarak kodlanan düzeyler. */
+  binaryLevels?: [string, string];
   /** Kategorik analizlerde çapraz tablo ve etiket sırası. */
   table?: { rowNames: string[]; colNames: string[]; table: number[][] };
 }
@@ -88,6 +94,10 @@ const REFERENCES: Record<string, string> = {
   welch: 'Welch, B. L. (1951). On the comparison of several mean values: An alternative approach. Biometrika, 38(3–4), 330–336.',
   student: 'Student. (1908). The probable error of a mean. Biometrika, 6(1), 1–25.',
   mannwhitney: 'Mann, H. B., & Whitney, D. R. (1947). On a test of whether one of two random variables is stochastically larger than the other. The Annals of Mathematical Statistics, 18(1), 50–60.',
+  kendall: 'Kendall, M. G. (1938). A new measure of rank correlation. Biometrika, 30(1–2), 81–93.',
+  sign: 'Dixon, W. J., & Mood, A. M. (1946). The statistical sign test. Journal of the American Statistical Association, 41(236), 557–566.',
+  mcnemar: 'McNemar, Q. (1947). Note on the sampling error of the difference between correlated proportions or percentages. Psychometrika, 12(2), 153–157.',
+  cochran: 'Cochran, W. G. (1950). The comparison of percentages in matched samples. Biometrika, 37(3–4), 256–266.',
   wilcoxon: 'Wilcoxon, F. (1945). Individual comparisons by ranking methods. Biometrics Bulletin, 1(6), 80–83.',
   friedman: 'Friedman, M. (1937). The use of ranks to avoid the assumption of normality implicit in the analysis of variance. Journal of the American Statistical Association, 32(200), 675–701.',
   spearman: 'Spearman, C. (1904). The proof and measurement of association between two things. The American Journal of Psychology, 15(1), 72–101.',
@@ -109,6 +119,10 @@ function referencesFor(o: TestOutcome, normality: NormalityMethod | null, usedLe
   if (t === 'Friedman testi') out.push(REFERENCES.friedman!);
   if (t === 'Spearman sıra korelasyonu') out.push(REFERENCES.spearman!);
   if (t === 'Fisher kesin testi') out.push(REFERENCES.fisher!);
+  if (t === 'Kendall tau') out.push(REFERENCES.kendall!);
+  if (t === 'İşaret testi') out.push(REFERENCES.sign!);
+  if (t === 'McNemar testi') out.push(REFERENCES.mcnemar!);
+  if (t === 'Cochran Q testi') out.push(REFERENCES.cochran!);
   if (o.postHoc?.method.startsWith('Dunn')) out.push(REFERENCES.dunn!);
   if (o.postHoc?.method.startsWith('Tukey')) out.push(REFERENCES.tukey!);
   if (o.postHoc?.method.includes('Kramer')) out.push(REFERENCES.kramer!);
@@ -288,6 +302,7 @@ export function analyze(req: AnalysisRequest): AnalysisResult {
   let boxes: BoxStats[] | undefined;
   let scatter: ScatterSample | undefined;
   let variables: string[];
+  let binaryLevels: [string, string] | undefined;
   const normality: NormalityMethod = req.normality ?? 'shapiro';
   const limit = normality === 'skewkurt-2' ? 2 : 1.5;
   let usedNormality = false;
@@ -299,7 +314,22 @@ export function analyze(req: AnalysisRequest): AnalysisResult {
     if (dropped > 0) notes.push(`${what} sütunlarında eksik değer bulunan ${dropped} satır analizden çıkarıldı.`);
   };
 
-  if (req.goal === 'compare' && req.target === 'categorical') {
+  if (req.goal === 'compare' && req.target === 'categorical' && req.design === 'paired') {
+    const cols = req.binaryConditions;
+    if (!cols || cols.length < 2) throw new AnalysisError('Eşleşmiş kategorik karşılaştırma için en az 2 sütun (koşul) seçin.');
+    const { keep, dropped } = completeRows(cols);
+    drop(dropped, 'koşul');
+    const levels = [...new Set(keep.flatMap((i) => cols.map((c) => c.values[i]!)))].sort(collator.compare);
+    if (levels.length !== 2) throw new AnalysisError(`Eşleşmiş kategorik testler (McNemar, Cochran Q) ikili sonuç gerektirir; seçilen sütunlarda ${levels.length} farklı değer var.`);
+    binaryLevels = [levels[0]!, levels[1]!];
+    notes.push(`Düzeyler kodlandı: “${levels[0]}” = 0, “${levels[1]}” = 1 (olay).`);
+    const conds = cols.map((c) => keep.map((i) => (c.values[i] === levels[1] ? 1 : 0)));
+    if (conds[0]!.length < 3) throw new AnalysisError('Eşleşmiş test için en az 3 tam denek gerekir.');
+    groupCount = conds.length === 2 ? '2' : '3+';
+    input = { kind: 'paired', names: cols.map((c) => c.name), conditions: conds };
+    variables = cols.map((c) => c.name);
+    descriptives = describeGroups(variables, conds);
+  } else if (req.goal === 'compare' && req.target === 'categorical') {
     if (!req.rowVar || !req.colVar) throw new AnalysisError('Kategorik karşılaştırma için bir grup sütunu ve bir sonuç sütunu seçin.');
     const { keep, dropped } = completeRows([req.rowVar, req.colVar]);
     drop(dropped, `“${req.rowVar.name}” ve “${req.colVar.name}”`);
@@ -393,11 +423,23 @@ export function analyze(req: AnalysisRequest): AnalysisResult {
   const assumptionInput: AssumptionInput = { normalP, varianceP, alpha, n: nTotal, minGroupN, normality, maxShape, variancePolicy: req.variance };
   const rec = recommendTest(answers, assumptionInput);
 
+  // Kullanıcı önerinin alternatiflerinden birini seçtiyse o çalıştırılır; öneri ilk alternatif olarak kalır.
+  let chosen = rec.finalTest;
+  let rerouteReason = rec.rerouteReason;
+  let alternatives = rec.alternatives;
+  if (req.test && req.test !== rec.finalTest) {
+    if (!rec.alternatives.some((a) => a.test === req.test)) throw new AnalysisError(`“${req.test}” bu durumda önerilen testin alternatifi değil.`);
+    chosen = req.test;
+    rerouteReason = `Alternatif yöntem isteğinizle çalıştırıldı (önerilen: ${rec.finalTest})`;
+    alternatives = [{ test: rec.finalTest, when: 'Karar motorunun önerdiği test.' }, ...rec.alternatives.filter((a) => a.test !== req.test)];
+  }
+
   let outcome: TestOutcome;
   try {
-    outcome = runTest(rec.finalTest, input, alpha);
+    outcome = runTest(chosen, input, alpha);
   } catch (e) {
-    throw new AnalysisError(e instanceof Error ? e.message : 'Test çalıştırılamadı.');
+    const msg = e instanceof Error ? e.message : 'Test çalıştırılamadı.';
+    throw new AnalysisError(msg.startsWith('Desteklenmeyen test') ? `“${chosen}” henüz uygulamada çalıştırılamıyor; yalnızca öneri olarak gösterilir.` : msg);
   }
 
   let distribution: DistributionSample | undefined;
@@ -416,9 +458,9 @@ export function analyze(req: AnalysisRequest): AnalysisResult {
       conditions: rec.conditions,
       plannedTest: rec.plannedTest,
       finalTest: outcome.test,
-      rerouteReason: rec.rerouteReason,
+      rerouteReason,
       warnings: rec.warnings,
-      alternatives: rec.alternatives,
+      alternatives,
       checks: rec.checks,
       borderline: rec.borderline,
     },
@@ -430,6 +472,7 @@ export function analyze(req: AnalysisRequest): AnalysisResult {
     scatter,
     outcome,
     interpretation: interpretOutcome(outcome),
+    binaryLevels,
     table: input.kind === 'table' ? { rowNames: input.rowNames, colNames: input.colNames, table: input.table } : undefined,
     apaSummary: apaSentence(outcome, assumptions),
     references: referencesFor(outcome, usedNormality ? normality : null, groupsForLevene !== undefined),
