@@ -25,7 +25,7 @@ function table(header: string[], rows: string[][]): Table {
 const IMAGE_WIDTH = 560;
 
 /** Grafik: açıklama satırı + PNG görüntü (alternatif metin olarak başlık). */
-function figure(f: ReportFigure): Paragraph[] {
+function figure(f: Pick<ReportFigure, 'caption' | 'title' | 'svg'>): Paragraph[] {
   const png = svgToPng(f.svg);
   return [
     para(f.caption, { italics: true, size: 18, spacingAfter: 60 }),
@@ -136,6 +136,9 @@ export async function buildDocxFromDoc(d: ReportDoc): Promise<Buffer> {
       case 'table':
         if (b.caption) children.push(para(b.caption, { italics: true, size: 20, spacingAfter: 60 }));
         children.push(table(b.header, b.rows), para('', { spacingAfter: 60 }));
+        break;
+      case 'figure':
+        children.push(...figure(b));
         break;
       case 'kv':
         if (b.caption) children.push(para(b.caption, { italics: true, size: 20, spacingAfter: 60 }));

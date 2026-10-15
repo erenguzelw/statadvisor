@@ -51,6 +51,9 @@ import {
   generateRegressionCode,
   narrateRegression,
   regressionReportData,
+  fitFactorialAnova,
+  buildFactorialDoc,
+  interpretFactorial,
   coefficientRows,
   modelRows,
   type RegressionSpec,
@@ -72,6 +75,7 @@ import {
 } from '@statadvisor/shared';
 import { CsvError, parseCsv, type ParsedColumn, type ParsedCsv } from './csv.ts';
 import { isOle, isZip, xlsxToCsv } from './xlsx.ts';
+import { isSav, isZsav, savToCsv } from './sav.ts';
 import { openDb } from './db.ts';
 import { buildProfile, describeColumns, effectiveColumns, ProfileBody } from './profile.ts';
 import { buildDocx, buildDocxFromDoc, buildRegressionDocx } from './docx.ts';
@@ -314,6 +318,12 @@ export function buildApp(opts: AppOptions): FastifyInstance {
     const buf = await part.toBuffer();
     if (part.file.truncated) throw new ApiError(413, 'too_large', `Dosya çok büyük (en fazla ${Math.round(maxUpload / 1024 / 1024)} MB).`);
     if (isOle(buf)) throw new CsvError('Eski Excel biçimi (.xls) desteklenmiyor. Dosyayı Excel’de .xlsx ya da CSV olarak kaydedip yeniden yükleyin.');
+    if (isSav(buf) || isZsav(buf)) {
+      // SPSS dosyası CSV'ye çevrilip öyle saklanır (değer etiketleri ve tarihler çözülür).
+      const name = (part.filename || 'veri.sav').replace(/\.sav$/i, '') + '.csv';
+      const { dataset, created } = ingest(savToCsv(buf), name);
+      return reply.status(created ? 201 : 200).send({ ...dataset, duplicate: !created, convertedFrom: 'sav' });
+    }
     if (isZip(buf)) {
       // Excel dosyası CSV'ye çevrilip öyle saklanır; Python kodu ve indirilen veri bu CSV'dir.
       const name = (part.filename || 'veri.xlsx').replace(/\.xlsx$/i, '') + '.csv';
@@ -831,7 +841,23 @@ export function buildApp(opts: AppOptions): FastifyInstance {
     return { html: buildRegressionReport(data), docx: () => buildRegressionDocx(data), fileBase: 'lojistik-regresyon-raporu' };
   };
   const modelDoc = (row: DatasetRow, spec: ModelCompareSpec, r: CvResult, date: string, audit: Audit): RenderedReport => {
-    const doc = buildModelCompareDoc(r, spec, { datasetName: row.name, date, audit });
+    // veri bölümleri (betimleyici, aykırı değer, normallik) için özellik değerleri; veri okunamazsa bölümler atlanır
+    let features: ReturnType<typeof prepareData>['features'] | undefined;
+    let classOf: string[] | undefined;
+    try {
+      const { csv } = parsed(row.id);
+      const col = (name: string) => csv.columns.find((x) => x.name === name)!;
+      const prep = prepareData(col(spec.target).values, [
+        ...spec.numeric.map((n) => ({ name: n, kind: 'numeric' as const, values: col(n).values })),
+        ...spec.categorical.map((n) => ({ name: n, kind: 'categorical' as const, values: col(n).values })),
+      ]);
+      features = prep.features;
+      classOf = Array.from(prep.y, (k) => prep.classes[k]!);
+    } catch {
+      features = undefined;
+      classOf = undefined;
+    }
+    const doc = buildModelCompareDoc(r, spec, { datasetName: row.name, date, audit, features, classOf });
     return { html: renderReportHtml(doc), docx: () => buildDocxFromDoc(doc), fileBase: 'model-karsilastirma-raporu' };
   };
   const trDate = (d: Date | string | number) => new Date(d).toLocaleDateString('tr-TR');
@@ -904,6 +930,64 @@ export function buildApp(opts: AppOptions): FastifyInstance {
     const { format } = FormatQuery.parse(req.query);
     const { row, spec, result } = runRegression(id, req.body);
     return sendReport(reply, format, regressionDoc(row, spec, result, trDate(Date.now()), regressionAudit(row, spec, result, engineInfo())));
+  });
+
+  /* ---------- Faktöriyel (çok faktörlü) ANOVA ---------- */
+  const FactorialBody = z.object({
+    dependent: colName,
+    factors: z.array(colName).min(1).max(4),
+    alpha: z.number().min(0.001).max(0.2).default(0.05),
+    ssType: z.enum(['auto', 'II', 'III']).default('auto'),
+  });
+
+  function runFactorial(id: string, rawBody: unknown) {
+    const body = FactorialBody.parse(rawBody ?? {});
+    const { row, csv } = parsed(id);
+    const col = (name: string) => {
+      const c = csv.columns.find((x) => x.name === name);
+      if (!c) throw new ApiError(422, 'unknown_column', `“${name}” adlı sütun bulunamadı.`);
+      return c;
+    };
+    const dep = col(body.dependent);
+    if (!dep.numeric) throw new ApiError(422, 'bad_dependent', `Bağımlı değişken “${dep.name}” sayısal değil; ANOVA sayısal bir sonuç ister.`);
+    if (new Set(body.factors).size !== body.factors.length) throw new ApiError(422, 'duplicate_factor', 'Bir faktör birden fazla kez seçilmiş.');
+    if (body.factors.includes(dep.name)) throw new ApiError(422, 'dependent_in_factors', 'Bağımlı değişken aynı zamanda faktör olamaz.');
+    for (const n of body.factors) {
+      if (col(n).likelyId) throw new ApiError(422, 'id_factor', `“${n}” kimlik sütunu gibi görünüyor; faktör olamaz.`);
+      if (col(n).unique > 20) throw new ApiError(422, 'too_many_levels', `“${n}” ${col(n).unique} farklı değer içeriyor; faktör olarak en fazla 20 düzey desteklenir.`);
+    }
+    let result;
+    try {
+      result = fitFactorialAnova(dep.name, dep.values as (number | null)[], body.factors.map((n) => ({ name: n, values: col(n).values })), { alpha: body.alpha, ssType: body.ssType });
+    } catch (e) {
+      if (e instanceof AnalysisError) throw new ApiError(422, 'analysis_failed', e.message);
+      throw e;
+    }
+    return { row, spec: body, result };
+  }
+  const factorialAudit = (row: DatasetRow, spec: z.infer<typeof FactorialBody>, eng: EngineInfo): Audit => [
+    datasetAudit(row),
+    ['Bağımlı değişken', spec.dependent],
+    ['Faktörler', spec.factors.join(', ')],
+    ['Anlamlılık düzeyi', String(spec.alpha)],
+    ['Kareler toplamı (istenen)', spec.ssType === 'auto' ? 'otomatik (boş hücre yoksa Tip III, varsa Tip II)' : `Tip ${spec.ssType}`],
+    ['Referans doğrulama', `Tip III sonuçları statsmodels (Sum kodlaması) ile karşılaştırıldı; ${eng.engineName} ${eng.engine}, Node ${eng.node}`],
+  ];
+
+  app.post('/api/datasets/:id/factorial', async (req) => {
+    const { id } = req.params as { id: string };
+    const { row, spec, result } = runFactorial(id, req.body);
+    const { residuals, ...summary } = result;
+    void residuals;
+    return { datasetId: row.id, datasetName: row.name, spec, result: summary, interpretation: interpretFactorial(result), engine: engineInfo() };
+  });
+
+  app.post('/api/datasets/:id/factorial/report', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const { format } = FormatQuery.parse(req.query);
+    const { row, spec, result } = runFactorial(id, req.body);
+    const doc = buildFactorialDoc(result, { datasetName: row.name, date: trDate(Date.now()), audit: factorialAudit(row, spec, engineInfo()) });
+    return sendReport(reply, format, { html: renderReportHtml(doc), docx: () => buildDocxFromDoc(doc), fileBase: 'faktoriyel-anova-raporu' });
   });
 
   /* ---------- İkili lojistik regresyon ---------- */

@@ -5,6 +5,8 @@
 import type { CvResult, ModelCv } from './ml-cv.ts';
 import type { ModelCompareSpec } from './ml-code.ts';
 import { interpretComparison, type MlInterpretation } from './ml-interpret.ts';
+import type { MlFeature } from './ml-prep.ts';
+import { classSplitBlocks, comparisonFigures, descriptiveBlocks, normalityBlocks, outlierBlocks, purposeBlocks } from './ml-profile.ts';
 import type { DocBlock, ReportDoc } from './report-doc.ts';
 
 const pct = (x: number, d = 1) => (Number.isFinite(x) ? `%${(x * 100).toFixed(d)}` : '–');
@@ -22,6 +24,10 @@ export interface ModelReportOptions {
   datasetName: string;
   date: string;
   audit?: [string, string][];
+  /** Modelde kullanılan özelliklerin değerleri (hedefi eksik satırlar çıkarılmış); verilirse betimleyici, aykırı değer ve normallik bölümleri eklenir. */
+  features?: MlFeature[];
+  /** features ile aynı sırada her gözlemin hedef sınıf adı; verilirse sınıflara göre dağılım bölümü eklenir. */
+  classOf?: string[];
 }
 
 export function confusionTable(m: ModelCv, classes: string[]): { header: string[]; rows: string[][] } {
@@ -50,7 +56,7 @@ export function resultsTable(r: CvResult): { header: string[]; rows: string[][] 
 export function buildModelCompareDoc(r: CvResult, spec: ModelCompareSpec, opts: ModelReportOptions, interp: MlInterpretation = interpretComparison(r)): ReportDoc {
   const blocks: DocBlock[] = [];
   const best = interp.best ? r.models.find((m) => m.id === interp.best!.id) : undefined;
-  blocks.push({ type: 'heading', text: 'Özet' }, { type: 'list', items: interp.summary });
+  blocks.push(...purposeBlocks(r, spec, opts.datasetName));
   blocks.push(
     { type: 'heading', text: 'Veri ve yöntem' },
     {
@@ -68,8 +74,10 @@ export function buildModelCompareDoc(r: CvResult, spec: ModelCompareSpec, opts: 
     },
     { type: 'p', text: 'Eksik değer doldurma, standartlaştırma ve tek-sıcak kodlama her katmanda yalnızca eğitim satırlarına uydurulmuştur; test satırlarından eğitime bilgi sızmaz.', muted: true },
   );
+  if (opts.features?.length) blocks.push(...descriptiveBlocks(r, opts.features), ...(opts.classOf ? classSplitBlocks(r, opts.features, opts.classOf) : []), ...outlierBlocks(opts.features), ...normalityBlocks(opts.features));
+  blocks.push({ type: 'heading', text: 'Özet' }, { type: 'list', items: interp.summary });
   const res = resultsTable(r);
-  blocks.push({ type: 'heading', text: 'Sonuçlar' }, { type: 'table', caption: 'Test katmanlarının ortalaması ± standart sapma. Eğitim doğruluğu en çok 3000 gözlemlik tohumlu bir alt örnekte hesaplanmıştır.', header: res.header, rows: res.rows });
+  blocks.push({ type: 'heading', text: 'Sonuçlar' }, { type: 'table', caption: 'Test katmanlarının ortalaması ± standart sapma. Eğitim doğruluğu en çok 3000 gözlemlik tohumlu bir alt örnekte hesaplanmıştır.', header: res.header, rows: res.rows }, ...comparisonFigures(r));
   blocks.push({ type: 'heading', text: 'Yorum ve uyarılar' }, ...interp.notes.map((n): DocBlock => ({ type: 'note', level: n.level, title: n.title, text: n.text })));
   if (best) {
     const pc = perClassTable(best);
