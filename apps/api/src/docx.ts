@@ -1,5 +1,5 @@
 import { AlignmentType, Document, HeadingLevel, ImageRun, Packer, Paragraph, Table, TableCell, TableRow, TextRun, WidthType } from 'docx';
-import { crosstabRows, LINEAR_COEFFICIENT_NOTE, type ReportDoc, type RegressionReportData, descriptiveTables, formatP, reportFigures, type ReportData, type ReportFigure } from '@statadvisor/shared';
+import { crosstabRows, LINEAR_COEFFICIENT_NOTE, type ReportDoc, type RegressionReportData, descriptiveTables, formatP, postHocTables, reportFigures, type ReportData, type ReportFigure } from '@statadvisor/shared';
 import { svgToPng } from './raster.ts';
 
 const para = (text: string, opts: { bold?: boolean; italics?: boolean; size?: number; spacingAfter?: number } = {}) =>
@@ -69,6 +69,7 @@ export async function buildDocx(d: ReportData): Promise<Buffer> {
 
     heading('Test sonucu'),
     para(d.resultLine),
+    ...(d.postHoc ? postHocTables(d.postHoc).flatMap((t) => [para(t.title, { italics: true, size: 20, spacingAfter: 60 }), table(t.header, t.rows), para('', { spacingAfter: 60 })]) : []),
 
     heading('APA 7 stilinde özet'),
     para(d.apaSummary),

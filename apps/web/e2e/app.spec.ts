@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import JSZip from 'jszip';
+import { gaussian, mulberry32 } from '@statadvisor/shared';
 
 /** Her testten önce sunucudaki tüm veri setlerini siler (testler birbirinden bağımsızdır). */
 async function reset(request: APIRequestContext) {
@@ -210,6 +211,29 @@ test('sihirbaz: gerçek veriden analiz hesaplar, varsayımları ve yorumu göste
   await expect(page.getByText(/N = 1420/).first()).toBeVisible();
   await page.reload();
   await expect(page.getByRole('radio', { name: 'Uzman' }).first()).toHaveAttribute('aria-checked', 'true');
+});
+
+test('sihirbaz: ANOVA sonrası post-hoc — varsayılan Games–Howell, Levene tercihiyle Tukey; anlamlılık harfleri', async ({ page, request }) => {
+  // 4 grup, normal ve eşit varyanslı (bu tohumda Shapiro p = .83, Levene p = .93)
+  const rng = mulberry32(2027);
+  const rows = ['g,y'];
+  for (const [name, n, m] of [['A', 25, 10], ['B', 32, 12], ['C', 18, 10.4], ['D', 28, 13.5]] as const) {
+    for (let i = 0; i < n; i++) rows.push(`${name},${(Math.round((m + 2 * gaussian(rng)) * 100) / 100).toFixed(2)}`);
+  }
+  const up = await request.post('/api/datasets', { multipart: { file: { name: 'posthoc.csv', mimeType: 'text/csv', buffer: Buffer.from(rows.join('\n') + '\n') } } });
+  expect(up.ok()).toBe(true);
+  await page.goto('/karar-sihirbazi');
+  const panel = page.getByRole('heading', { name: 'Post-hoc karşılaştırmalar' });
+  await expect(panel).toBeVisible();
+  await expect(page.getByText(/^Games–Howell\./)).toBeVisible();
+  await expect(page.getByRole('columnheader', { name: '%95 GA' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Anlamlılık harfleri' })).toBeVisible();
+
+  await page.getByLabel('Varyans eşitliği yaklaşımı').selectOption('levene');
+  await expect(page.getByText(/^Tukey HSD \(Tukey–Kramer\)\./)).toBeVisible();
+  const letters = page.getByRole('table', { name: 'Anlamlılık harfleri' });
+  await expect(letters.getByRole('row').nth(1)).toContainText('D');
+  await expect(letters.getByRole('row').nth(1)).toContainText('a');
 });
 
 test('sihirbaz: soruları ve sütunları değiştirince farklı test çalışır', async ({ page, request }) => {

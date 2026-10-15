@@ -29,7 +29,19 @@ describe('recommendTest', () => {
   it('normal ama varyanslar eşit değilken Games-Howell uyarısı verir', () => {
     const r = recommendTest(answers({}), unequal);
     expect(r.finalTest).toBe('Welch ANOVA');
-    expect(r.warnings.join(' ')).toContain('ikili Welch');
+    expect(r.warnings.join(' ')).toContain('Games–Howell');
+  });
+
+  it('Levene tercihi: varyanslar eşitse klasik test, değilse yine Welch', () => {
+    const lev = { ...ok, variancePolicy: 'levene' as const };
+    const r = recommendTest(answers({}), lev);
+    expect(r.finalTest).toBe('Tek Yönlü ANOVA');
+    expect(r.rerouteReason).toBeUndefined();
+    expect(r.warnings.join(' ')).toContain('varyansların eşit olduğunu kanıtlamaz');
+    expect(recommendTest(answers({ groups: '2' }), lev).finalTest).toBe('Bağımsız örneklem t-testi');
+    expect(recommendTest(answers({}), { ...unequal, variancePolicy: 'levene' }).finalTest).toBe('Welch ANOVA');
+    expect(recommendTest(answers({}), { ...nonNormal, variancePolicy: 'levene' }).finalTest).toBe('Kruskal-Wallis H testi');
+    expect(recommendTest(answers({ design: 'paired' }), lev).finalTest).toBe('Tekrarlı ölçümler ANOVA');
   });
 
   it('2 grup', () => {

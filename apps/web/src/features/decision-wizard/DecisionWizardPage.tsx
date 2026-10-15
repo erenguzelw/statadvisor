@@ -43,11 +43,15 @@ function Wizard({ dataset }: { dataset: DatasetInfo }) {
   const save = useSaveAnalysis();
   // Ölçek puanı içeren (anket) veri setlerinde varsayılan ölçüt çarpıklık-basıklıktır.
   const [normality, setNormality] = useState<NormalityMethod>(dataset.operations?.scales ? 'skewkurt-1.5' : 'shapiro');
+  const [variance, setVariance] = useState<'welch' | 'levene'>('welch');
+  // Varyans yaklaşımı yalnızca bağımsız grupların sürekli karşılaştırmasında anlamlıdır; varsayılan (welch) gövdeye yazılmaz.
+  const independentCompare = answers.goal === 'compare' && answers.design !== 'paired' && answers.target === 'continuous';
 
   const body = useMemo(() => {
     const b = buildBody(dataset.id, cols, answers, picks);
-    return b && answers.target === 'continuous' ? { ...b, normality } : b;
-  }, [dataset.id, cols, answers, picks, normality]);
+    if (!b || answers.target !== 'continuous') return b;
+    return { ...b, normality, ...(independentCompare && variance === 'levene' ? { variance } : {}) };
+  }, [dataset.id, cols, answers, picks, normality, variance, independentCompare]);
   const settled = useDebounced(body, 350);
   const preview = useAnalysisPreview(settled);
   const result = preview.data?.result;
@@ -155,6 +159,19 @@ function Wizard({ dataset }: { dataset: DatasetInfo }) {
                     ]}
                     hint="Anket ve ölçek puanlarında çarpıklık-basıklık ölçütü yaygındır; büyük örneklemde Shapiro-Wilk çok küçük sapmaları da reddeder."
                   />
+                  {independentCompare && (
+                    <Select
+                      className="mt-4"
+                      label="Varyans eşitliği yaklaşımı"
+                      value={variance}
+                      onChange={(v) => setVariance(v as 'welch' | 'levene')}
+                      options={[
+                        { value: 'welch', label: 'Her zaman Welch (önerilen) · post-hoc: Games–Howell' },
+                        { value: 'levene', label: 'Levene anlamsızsa klasik test · post-hoc: Tukey HSD' },
+                      ]}
+                      hint="Welch, varyanslar eşitken de güç kaybettirmez. İkinci seçenek SPSS alışkanlığıdır: Levene p ≥ α ise Student t / tek yönlü ANOVA ve Tukey, değilse Welch ve Games–Howell."
+                    />
+                  )}
                 </div>
               )}
             </div>

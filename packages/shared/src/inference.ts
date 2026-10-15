@@ -4,6 +4,7 @@
  */
 import { mean, median, quantile, tukeyFences } from './assumptions.ts';
 import { extent } from './extent.ts';
+import { compactLetters, gamesHowell, tukeyHsd, type PostHocPair } from './posthoc.ts';
 import { effectLabel, kruskalWallis, pText, shapeStats } from './stats.ts';
 import {
   anovaOneWay,
@@ -14,7 +15,6 @@ import {
   friedmanTest,
   mannWhitneyU,
   pairwisePaired,
-  pairwiseWelch,
   pearson,
   sd,
   spearman,
@@ -37,9 +37,27 @@ export type Magnitude = 'ihmal edilebilir' | 'küçük' | 'orta' | 'geniş';
 export interface OutcomePair {
   a: string;
   b: string;
+  /** Ham p; Tukey ve Games–Howell'de p zaten aile bazındadır ve pAdj ile aynıdır. */
   p: number;
   pAdj: number;
   significant: boolean;
+  /** Tukey / Games–Howell: ortalama farkı (a − b), %95 eşzamanlı güven aralığı, Hedges g ve serbestlik derecesi. */
+  diff?: number;
+  ciLow?: number;
+  ciHigh?: number;
+  hedgesG?: number;
+  df?: number;
+}
+
+export interface PostHocResult {
+  method: string;
+  /** familywise: yöntem aile bazında hata oranını kendi içinde korur (Tukey, Games–Howell); holm: ham p değerleri Holm ile düzeltilir. */
+  adjustment: 'familywise' | 'holm';
+  pairs: OutcomePair[];
+  /** Anlamlılık harfleri: aynı harfi paylaşan gruplar arasındaki fark anlamlı değildir. Sıra merkeze göre büyükten küçüğe. */
+  letters: { group: string; center: number; letters: string }[];
+  /** Harflerin sıralandığı ölçü. */
+  centerLabel: 'Ortalama' | 'Medyan';
 }
 
 export interface TestOutcome {
@@ -53,7 +71,7 @@ export interface TestOutcome {
   significant: boolean;
   effect: { symbol: string; name: string; value: number; magnitude: Magnitude };
   ci?: { label: string; low: number; high: number };
-  postHoc?: { method: string; pairs: OutcomePair[] };
+  postHoc?: PostHocResult;
   n: number;
   kind: TestInput['kind'];
   /** Korelasyon için işaret; karşılaştırmalar için anlamsız. */
@@ -74,6 +92,20 @@ const dfText = (df: number[]) => df.map((d) => (Number.isInteger(d) ? String(d) 
 
 function mkPairs(names: string[], pairs: PairResult[], alpha: number): OutcomePair[] {
   return pairs.map((r) => ({ a: names[r.a]!, b: names[r.b]!, p: r.p, pAdj: r.pAdj, significant: r.pAdj < alpha }));
+}
+
+function mkRangePairs(names: string[], pairs: PostHocPair[], alpha: number): OutcomePair[] {
+  return pairs.map((r) => ({ a: names[r.a]!, b: names[r.b]!, p: r.p, pAdj: r.p, significant: r.p < alpha, diff: r.diff, ciLow: r.ciLow, ciHigh: r.ciHigh, hedgesG: r.hedgesG, df: r.df }));
+}
+
+/** Post-hoc sonucunu anlamlılık harfleriyle kurar; harfler merkeze (ortalama/medyan) göre büyükten küçüğe dağıtılır. */
+function postHocOf(method: string, adjustment: PostHocResult['adjustment'], names: string[], pairs: OutcomePair[], samples: number[][], centerLabel: PostHocResult['centerLabel']): PostHocResult {
+  const center = samples.map((g) => (centerLabel === 'Ortalama' ? mean(g) : median(g)));
+  const order = center.map((_, i) => i).sort((x, y) => center[y]! - center[x]! || x - y);
+  const index = new Map(names.map((n, i) => [n, i]));
+  const sig = pairs.filter((q) => q.significant).map((q) => [index.get(q.a)!, index.get(q.b)!] as [number, number]);
+  const letters = compactLetters(names.length, sig, order);
+  return { method, adjustment, pairs, letters: order.map((i) => ({ group: names[i]!, center: center[i]!, letters: letters[i]! })), centerLabel };
 }
 
 export function describeGroups(names: string[], groups: number[][]): GroupDescriptive[] {
@@ -209,7 +241,13 @@ export function runTest(finalTest: string, input: TestInput, alpha = 0.05): Test
         notes,
       };
       if (significant && input.groups.length > 2) {
-        out.postHoc = { method: 'İkili Welch t-testleri (Holm düzeltmeli)', pairs: mkPairs(input.names, pairwiseWelch(input.groups), alpha) };
+        // Eşit varyans varsayan ANOVA'dan sonra Tukey HSD (grup büyüklükleri farklıysa Tukey–Kramer);
+        // Welch ANOVA'dan sonra her çift için ayrı varyans kullanan Games–Howell.
+        const welch = finalTest === 'Welch ANOVA';
+        const unequal = new Set(input.groups.map((g) => g.length)).size > 1;
+        const method = welch ? 'Games–Howell' : unequal ? 'Tukey HSD (Tukey–Kramer)' : 'Tukey HSD';
+        const pairs = mkRangePairs(input.names, welch ? gamesHowell(input.groups) : tukeyHsd(input.groups), alpha);
+        out.postHoc = postHocOf(method, 'familywise', input.names, pairs, input.groups, 'Ortalama');
       }
       return out;
     }
@@ -231,7 +269,7 @@ export function runTest(finalTest: string, input: TestInput, alpha = 0.05): Test
         notes,
       };
       if (significant && input.groups.length > 2) {
-        out.postHoc = { method: 'Dunn testi (Holm düzeltmeli)', pairs: mkPairs(input.names, dunnTest(input.groups), alpha) };
+        out.postHoc = postHocOf('Dunn testi (Holm düzeltmeli)', 'holm', input.names, mkPairs(input.names, dunnTest(input.groups), alpha), input.groups, 'Medyan');
       }
       return out;
     }
@@ -291,7 +329,7 @@ export function runTest(finalTest: string, input: TestInput, alpha = 0.05): Test
         notes,
       };
       if (out.significant && input.conditions.length > 2) {
-        out.postHoc = { method: 'İkili eşleştirilmiş t-testleri (Holm düzeltmeli)', pairs: mkPairs(input.names, pairwisePaired(input.conditions, 't'), alpha) };
+        out.postHoc = postHocOf('İkili eşleştirilmiş t-testleri (Holm düzeltmeli)', 'holm', input.names, mkPairs(input.names, pairwisePaired(input.conditions, 't'), alpha), input.conditions, 'Ortalama');
       }
       return out;
     }
@@ -312,7 +350,7 @@ export function runTest(finalTest: string, input: TestInput, alpha = 0.05): Test
         notes,
       };
       if (out.significant && input.conditions.length > 2) {
-        out.postHoc = { method: 'İkili Wilcoxon testleri (Holm düzeltmeli)', pairs: mkPairs(input.names, pairwisePaired(input.conditions, 'wilcoxon'), alpha) };
+        out.postHoc = postHocOf('İkili Wilcoxon testleri (Holm düzeltmeli)', 'holm', input.names, mkPairs(input.names, pairwisePaired(input.conditions, 'wilcoxon'), alpha), input.conditions, 'Medyan');
       }
       return out;
     }
@@ -380,6 +418,13 @@ export function runTest(finalTest: string, input: TestInput, alpha = 0.05): Test
 
 /* ---------- Yorum ---------- */
 
+/** "A – B (fark = −2.10, %95 GA [−3.40, −0.80], p = .002)"; farkı olmayan yöntemlerde yalnızca p. */
+export function pairText(p: OutcomePair): string {
+  return p.diff === undefined
+    ? `${p.a} – ${p.b} (${pText(p.pAdj)})`
+    : `${p.a} – ${p.b} (fark = ${n2(p.diff)}, %95 GA [${n2(p.ciLow!)}, ${n2(p.ciHigh!)}], ${pText(p.pAdj)})`;
+}
+
 function pPhrase(p: number): string {
   if (p < 0.001) return 'binde birden az';
   if (p < 0.01) return `yaklaşık binde ${Math.round(p * 1000)}`;
@@ -416,9 +461,9 @@ export function interpretOutcome(o: TestOutcome): Interpretation {
     ? sigPairs.length
       ? {
           label: 'Post-hoc sonucu',
-          text: `${o.postHoc.method}: anlamlı çiftler: ${sigPairs.map((p) => `${p.a} – ${p.b} (${pText(p.pAdj)})`).join('; ')}.`,
+          text: `${o.postHoc.method}: anlamlı çiftler: ${sigPairs.map(pairText).join('; ')}. Aynı harfi paylaşan gruplar birbirinden anlamlı biçimde farklı değildir: ${o.postHoc.letters.map((l) => `${l.group} (${l.letters})`).join(', ')}.`,
         }
-      : { label: 'Post-hoc sonucu', text: `${o.postHoc.method}: düzeltmeden sonra anlamlı çift bulunamadı.` }
+      : { label: 'Post-hoc sonucu', text: `${o.postHoc.method}: ${o.postHoc.adjustment === 'holm' ? 'düzeltmeden sonra ' : ''}anlamlı çift bulunamadı.` }
     : o.significant && o.kind === 'groups'
       ? { label: 'Sıradaki adım', text: 'İkiden fazla grup yoksa fark doğrudan grup ortalamalarından/medyanlarından okunur.' }
       : undefined;

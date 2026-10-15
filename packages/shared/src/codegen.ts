@@ -25,6 +25,7 @@ export interface AnalysisSpec {
   target: 'continuous' | 'ordinal' | 'categorical';
   alpha?: number;
   normality?: NormalityMethod;
+  variance?: 'welch' | 'levene';
   value?: string;
   group?: string;
   conditions?: string[];
@@ -95,7 +96,13 @@ export function expectedLines(r: AnalysisResult): string[] {
   L.push(`N: ${o.n}`);
   if (o.postHoc) {
     L.push(`Post-hoc: ${o.postHoc.method}`);
-    for (const p of o.postHoc.pairs) L.push(`${p.a} - ${p.b}: p_duz = ${fmt(p.pAdj, 6)}`);
+    for (const p of o.postHoc.pairs) {
+      L.push(
+        p.diff === undefined
+          ? `${p.a} - ${p.b}: p_duz = ${fmt(p.pAdj, 6)}`
+          : `${p.a} - ${p.b}: fark = ${fmt(p.diff, 4)} GA: [${fmt(p.ciLow!, 4)}, ${fmt(p.ciHigh!, 4)}] p_duz = ${fmt(p.pAdj, 6)}`,
+      );
+    }
   }
   return L;
 }
@@ -136,20 +143,47 @@ function printStat(varStat: string, varP: string, effLabel: string, effVar: stri
   ];
 }
 
-function postHocBlock(r: AnalysisResult, names: string, kind: 'dunn' | 'welch' | 'paired-t' | 'wilcoxon', dataVar: string): string[] {
+function postHocBlock(r: AnalysisResult, names: string, kind: 'dunn' | 'tukey' | 'games-howell' | 'paired-t' | 'wilcoxon', dataVar: string): string[] {
   const ph = r.outcome.postHoc;
   if (!ph) return [];
   const header = `print("Post-hoc: ${ph.method}")`;
   const lines: string[] = [`if p_deger < ALPHA and len(${dataVar}) > 2:`, `    ${header}`, '    ciftler = list(combinations(range(len(' + dataVar + ')), 2))'];
+  const printRange = `        print(f"{${names}[a]} - {${names}[b]}: fark = {fark:.4f} GA: [{alt:.4f}, {ust:.4f}] p_duz = {p:.6f}")`;
+  if (kind === 'tukey') {
+    // Tukey HSD (eşit olmayan grup büyüklüklerinde Tukey–Kramer): ortak hata varyansı, studentize edilmiş aralık
+    lines.push(
+      `    tk = stats.tukey_hsd(*${dataVar})`,
+      '    tk_ga = tk.confidence_interval(0.95)',
+      '    for a, b in ciftler:',
+      '        fark, alt, ust, p = tk.statistic[a, b], tk_ga.low[a, b], tk_ga.high[a, b], tk.pvalue[a, b]',
+      printRange,
+    );
+    return lines;
+  }
+  if (kind === 'games-howell') {
+    // Games–Howell: her çift için ayrı varyans ve Welch–Satterthwaite serbestlik derecesi
+    lines.push(
+      `    k = len(${dataVar})`,
+      '    for a, b in ciftler:',
+      `        ga_, gb_ = ${dataVar}[a], ${dataVar}[b]`,
+      '        va, vb = ga_.var(ddof=1) / len(ga_), gb_.var(ddof=1) / len(gb_)',
+      '        se = np.sqrt(va + vb)',
+      '        sd_ = (va + vb) ** 2 / (va ** 2 / (len(ga_) - 1) + vb ** 2 / (len(gb_) - 1))',
+      '        fark = ga_.mean() - gb_.mean()',
+      '        p = stats.studentized_range.sf(np.sqrt(2) * abs(fark) / se, k, sd_)',
+      '        kritik = stats.studentized_range.ppf(0.95, k, sd_) / np.sqrt(2)',
+      '        alt, ust = fark - kritik * se, fark + kritik * se',
+      printRange,
+    );
+    return lines;
+  }
   if (kind === 'dunn') {
     lines.push('    import scikit_posthocs as sp', `    dunn = sp.posthoc_dunn(${dataVar}, p_adjust="holm").to_numpy()`, '    duz = [dunn[a, b] for a, b in ciftler]');
   } else {
     const raw =
-      kind === 'welch'
-        ? `stats.ttest_ind(${dataVar}[a], ${dataVar}[b], equal_var=False).pvalue`
-        : kind === 'paired-t'
-          ? `stats.ttest_rel(${dataVar}[a], ${dataVar}[b]).pvalue`
-          : `stats.wilcoxon(${dataVar}[a], ${dataVar}[b], alternative="two-sided", method="auto").pvalue`;
+      kind === 'paired-t'
+        ? `stats.ttest_rel(${dataVar}[a], ${dataVar}[b]).pvalue`
+        : `stats.wilcoxon(${dataVar}[a], ${dataVar}[b], alternative="two-sided", method="auto").pvalue`;
     lines.push('    from statsmodels.stats.multitest import multipletests', `    ham = [${raw} for a, b in ciftler]`, '    duz = multipletests(ham, method="holm")[1]');
   }
   lines.push(`    for (a, b), p in zip(ciftler, duz):`, `        print(f"{${names}[a]} - {${names}[b]}: p_duz = {p:.6f}")`);
@@ -247,7 +281,7 @@ export function generateAnalysisCode(file: DatasetFile, spec: AnalysisSpec, r: A
           ...printStat('F', 'p_deger', 'eta2', 'eta2', 'len(tum)', '{df1:.4f}, {df2:.4f}'),
         );
         imports.add('from itertools import combinations');
-        body.push(...postHocBlock(r, 'siralama', 'welch', 'gruplar'));
+        body.push(...postHocBlock(r, 'siralama', welch ? 'games-howell' : 'tukey', 'gruplar'));
         break;
       }
       case 'Kruskal-Wallis H testi':

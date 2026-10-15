@@ -28,7 +28,7 @@ npm run dev          # geliştirme: API 3001, arayüz http://localhost:5173
 
 ## Mimari
 
-- `packages/shared`: istatistik motoru (testler, varsayımlar, karar kuralları), doğrusal/lojistik regresyon, sınıflandırma modelleri ve çapraz doğrulama, veri temizleme, kod ve rapor üretimi. SciPy/statsmodels/scikit-learn ile üretilmiş 1198 referans vakayla doğrulanır (regresyonlar statsmodels ile 1e-7 içinde; lojistik, k-NN ve SVM scikit-learn ile aynı katmanlarda birebir).
+- `packages/shared`: istatistik motoru (testler, varsayımlar, karar kuralları), doğrusal/lojistik regresyon, sınıflandırma modelleri ve çapraz doğrulama, veri temizleme, kod ve rapor üretimi. SciPy/statsmodels/scikit-learn/pingouin ile üretilmiş 1568 referans vakayla doğrulanır (regresyonlar statsmodels ile 1e-7 içinde; lojistik, k-NN ve SVM scikit-learn ile aynı katmanlarda birebir; Tukey HSD ve Games–Howell SciPy/pingouin ile 1e-8 içinde).
 - `apps/api`: Fastify sunucusu + SQLite. Yalnızca `127.0.0.1` dinler; Host ve Origin denetimi yapar.
 - `apps/web`: React + Tailwind arayüzü (`ui/` klasöründeki tasarımlardan).
 - `docs/`: gereksinimler, uygulama planı, risk ve fırsat raporu, gizlilik notu.
@@ -52,7 +52,7 @@ npm run render   # out/statadvisor-tanitim.mp4
 
 - Model karşılaştırmada hiper-parametre ayarı yoktur (scikit-learn varsayılanları). Ağaç, orman ve gradyan artırma rastgelelik içerdiğinden scikit-learn'den birkaç binde ayrışabilir. SVM 15 bin eğitim gözleminin, k-NN ise yaklaşık 3·10¹⁰ uzaklık hesabının üzerinde atlanır (süre gözlem sayısının karesiyle büyür).
 - Regresyonda dayanıklı (HC) standart hata ve Firth/ceza lojistik regresyonu yoktur; bunlar gerektiğinde uyarı verilir.
-- Tukey HSD / Games-Howell yok (yerine ikili Welch + Holm); tekrarlı ölçümlü ANOVA'da Greenhouse-Geisser düzeltmesi yok.
+- ANOVA sonrası post-hoc: Welch ANOVA'dan sonra Games–Howell, klasik ANOVA'dan sonra Tukey HSD (Tukey–Kramer); Karar Sihirbazı varsayılan olarak Welch'i seçer, “Levene anlamsızsa klasik test” seçeneği SPSS alışkanlığına uyar. Tekrarlı ölçümlü ANOVA'da Greenhouse-Geisser düzeltmesi yok.
 - R kodu üretilmez; yalnızca doğrulanabilen Python kodu üretilir.
 - Regresyon ve model karşılaştırma raporları (HTML/DOCX/PDF) grafik içermez; grafikler arayüzdedir.
 - Kaynakça künyeleri yayın öncesi doğrulanmalıdır; bağımsız bir istatistikçi incelemesi önerilir.

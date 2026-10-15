@@ -99,12 +99,27 @@ suite('üretilen Python kodu, ekrandaki sonucu birebir yeniden üretir', () => {
     expect(code.code).toContain('sep=";"');
   });
 
-  it('3 grup normal, eşit olmayan varyans: Welch ANOVA ve ikili Welch post-hoc', { timeout: T }, async () => {
+  it('3 grup normal, eşit olmayan varyans: Welch ANOVA ve Games–Howell (fark, GA ve p birebir)', { timeout: T }, async () => {
     const rows = [...g(40, 0, 1).map((v) => ['a', v]), ...g(50, 1.5, 1.5).map((v) => ['b', v]), ...g(45, 3, 0.8).map((v) => ['c', v])];
     const id = await uploadCsv(csv(['grup', 'y'], rows));
-    const { analysis } = await verify(id, cmp({ value: 'y', group: 'grup' }));
+    const { analysis, code } = await verify(id, cmp({ value: 'y', group: 'grup' }));
     expect(analysis.outcome.test).toBe('Welch ANOVA');
+    expect(analysis.outcome.postHoc?.method).toBe('Games–Howell');
     expect(analysis.outcome.postHoc?.pairs).toHaveLength(3);
+    expect(code.expectedOutput.some((l: string) => /^a - b: fark = -?\d+\.\d{4} GA: \[/.test(l))).toBe(true);
+  });
+
+  it('4 grup normal, eşit varyans, farklı grup büyüklükleri; Levene tercihiyle klasik ANOVA ve Tukey–Kramer', { timeout: T }, async () => {
+    // Kendi tohumuyla üretilir: ortak üretecin durumu önceki testlere bağlıdır ve Levene'i şans eseri anlamlı yapabilir.
+    const r2 = mulberry32(2027); // bu tohumda Shapiro p = .83, Levene p = .93
+    const h = (n: number, mu: number) => Array.from({ length: n }, () => Math.round((mu + 2 * gaussian(r2)) * 100) / 100);
+    const rows = [...h(25, 10).map((v) => ['A', v]), ...h(32, 12).map((v) => ['B', v]), ...h(18, 10.4).map((v) => ['C', v]), ...h(28, 13.5).map((v) => ['D', v])];
+    const id = await uploadCsv(csv(['grup', 'y'], rows));
+    const { analysis } = await verify(id, cmp({ value: 'y', group: 'grup', variance: 'levene' }));
+    expect(analysis.outcome.test, JSON.stringify(analysis.assumptions.map((x: { name: string; p: number }) => [x.name, x.p]))).toBe('Tek Yönlü ANOVA');
+    expect(analysis.outcome.postHoc?.method).toBe('Tukey HSD (Tukey–Kramer)');
+    expect(analysis.outcome.postHoc?.pairs).toHaveLength(6);
+    expect(analysis.outcome.postHoc?.letters.map((l: { group: string }) => l.group)[0]).toBe('D');
   });
 
   it('ilişki: Pearson ve Spearman', { timeout: T }, async () => {

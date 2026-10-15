@@ -84,6 +84,11 @@ export interface AssumptionInput {
   maxShape?: number;
   /** false ise normallik/varyans veriden ölçülmemiştir (varsayılan değerler); koşul rozetleri "bilinmiyor" olur. */
   measured?: boolean;
+  /**
+   * Bağımsız gruplarda varyans yaklaşımı. welch (varsayılan): normal dağılımda her zaman Welch t / Welch ANOVA
+   * (+ Games–Howell). levene: Levene p ≥ α ise klasik Student t / tek yönlü ANOVA (+ Tukey HSD), değilse Welch.
+   */
+  variancePolicy?: 'welch' | 'levene';
 }
 
 /** Seçilen teste yakın, belirli koşullarda düşünülebilecek bir yöntem. */
@@ -189,10 +194,16 @@ export function recommendTest(answers: WizardAnswers, a: AssumptionInput): Recom
       final = paired ? (two ? 'Wilcoxon işaretli sıra testi' : 'Friedman testi') : two ? 'Mann-Whitney U testi' : 'Kruskal-Wallis H testi';
       reroute = 'Normallik varsayımı sağlanmadı';
     } else if (!paired) {
-      final = two ? 'Welch t-testi' : 'Welch ANOVA';
-      reroute = equalVar
-        ? 'Welch, varyans eşitliği varsayımı gerektirmez ve varyanslar eşitken de kayıp yaratmaz'
-        : 'Varyanslar eşit değil: klasik testin varsayımı bozuldu';
+      if (a.variancePolicy === 'levene' && equalVar) {
+        // Kullanıcı tercihi: Levene anlamsızsa klasik test (SPSS alışkanlığı)
+        final = planned;
+        warnings.push('Levene testinin anlamsız çıkması varyansların eşit olduğunu kanıtlamaz; klasik test bu tercihle seçildi. Grup büyüklükleri belirgin farklıysa Welch daha güvenlidir.');
+      } else {
+        final = two ? 'Welch t-testi' : 'Welch ANOVA';
+        reroute = equalVar
+          ? 'Welch, varyans eşitliği varsayımı gerektirmez ve varyanslar eşitken de kayıp yaratmaz'
+          : 'Varyanslar eşit değil: klasik testin varsayımı bozuldu';
+      }
     } else {
       final = planned;
     }
@@ -330,7 +341,7 @@ function general(a: AssumptionInput, normal: boolean, equalVar: boolean, usesVar
     out.push(`n = ${a.n}: Shapiro-Wilk önemsiz sapmalara bile duyarlıdır. Q-Q grafiğine ve çarpıklığa da bakın.`);
   }
   if (usesVariance && normal && !equalVar) {
-    out.push('Varyanslar eşit değil: post-hoc için ikili Welch t-testleri (Holm düzeltmeli) kullanın.');
+    out.push('Varyanslar eşit değil: post-hoc karşılaştırmalar her çift için ayrı varyans kullanan Games–Howell testiyle yapılır.');
   }
   if (checksNormality && !shapiro && a.minGroupN < 30) {
     out.push(`En küçük grupta ${a.minGroupN} gözlem var: küçük örneklemde çarpıklık ve basıklık kararsızdır; histogramı da inceleyin.`);
