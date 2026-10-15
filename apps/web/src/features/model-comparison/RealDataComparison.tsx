@@ -1,11 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Activity, BarChart3, Database, Download, Eye, FileCode2, Flag, Info, ListChecks, OctagonAlert, Play, Scale, ShieldCheck, Table2 } from 'lucide-react';
 import { ALL_MODELS, MODEL_INFO, type ModelCv, type ModelId } from '@statadvisor/shared';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Button, Callout, CheckboxGroup, CodeBlock, DataTable, LinkButton, MetricTile, Panel, ProgressBar, SectionHeader, Select, StatusLine, Tag, type Column } from '@/components/ui';
 import { useActiveDataset } from '@/context/AppContext';
-import type { ColumnInfo, DatasetInfo, ModelRunBody, ModelRunJob } from '@/data/api';
+import { ApiClientError, type ColumnInfo, type DatasetInfo, type ModelRunBody, type ModelRunJob } from '@/data/api';
 import { useCapabilities, useModelRun, useModelRunCode, useStartModelRun } from '@/data/hooks';
 import { columnTypeLabel } from '@/lib/variables';
 import { NoteList, SaveToReports } from '../regression/shared';
@@ -20,6 +20,25 @@ const numericFeatures = (cols: ColumnInfo[], target: string | undefined) => cols
 const categoricalFeatures = (cols: ColumnInfo[], target: string | undefined) => cols.filter((c) => c.name !== target && !c.likelyId && (!c.numeric || c.type === 'categorical') && c.unique >= 2 && c.unique <= 30);
 
 const DEFAULT_MODELS: ModelId[] = ['baseline', 'logistic', 'tree', 'knn', 'rf', 'gb'];
+
+/** Son iş kimliği veri seti başına bu sekmenin oturumunda saklanır; depolama kapalı ya da bozuksa sessizce yok sayılır. */
+const jobKey = (datasetId: string) => `statadvisor.modelRun.${datasetId}`;
+function readJobId(datasetId: string): string | null {
+  try {
+    const v = sessionStorage.getItem(jobKey(datasetId));
+    return v && /^[\w-]{1,100}$/.test(v) ? v : null;
+  } catch {
+    return null;
+  }
+}
+function writeJobId(datasetId: string, id: string | null) {
+  try {
+    if (id === null) sessionStorage.removeItem(jobKey(datasetId));
+    else sessionStorage.setItem(jobKey(datasetId), id);
+  } catch {
+    // Depolama kapalıysa iş yalnızca bu açılışta izlenir.
+  }
+}
 
 export function RealDataComparison() {
   const { dataset, loading, error } = useActiveDataset();
@@ -185,7 +204,15 @@ function Comparison({ dataset }: { dataset: DatasetInfo }) {
   const [models, setModels] = useState<ModelId[]>(DEFAULT_MODELS);
   const [folds, setFolds] = useState('5');
   const [seed, setSeed] = useState('42');
-  const [jobId, setJobId] = useState<string | null>(null);
+  const [jobId, setJobId] = useState<string | null>(() => readJobId(dataset.id));
+  const syncedJob = useRef<string | null>(null);
+  // Yalnızca açılışta geri yüklenen işin ayarları forma yansıtılır; kullanıcı forma dokunduysa üzerine yazılmaz.
+  const restoredJobId = useRef(jobId);
+  const touched = useRef(false);
+  const touch = <T,>(set: (v: T) => void) => (v: T) => {
+    touched.current = true;
+    set(v);
+  };
 
   const numOptions = numericFeatures(cols, target);
   const catOptions = categoricalFeatures(cols, target);
@@ -194,16 +221,47 @@ function Comparison({ dataset }: { dataset: DatasetInfo }) {
   const catSel = (categorical ?? catOptions.map((c) => c.name)).filter((n) => catOptions.some((c) => c.name === n));
   const start = useStartModelRun(dataset.id);
   const job = useModelRun(jobId);
-  const running = job.data?.status === 'running' || start.isPending;
+  // Kayıtlı işin ilk durumu gelene kadar yeni iş başlatılamaz (iş zaten çalışıyor olabilir).
+  const checking = jobId !== null && job.isPending;
+  const running = job.data?.status === 'running' || start.isPending || checking;
   const seedNum = Number(seed);
   const seedOk = Number.isInteger(seedNum) && seedNum >= 0 && seedNum <= 2_147_483_647;
   const body = useMemo<ModelRunBody | null>(() => (target && numSel.length + catSel.length > 0 && models.length > 0 && seedOk ? { target, numeric: numSel, categorical: catSel, models, folds: Number(folds), seed: seedNum } : null), [target, numSel, catSel, models, folds, seedNum, seedOk]);
 
+  // Kesin 404 (sunucu yeniden başladı ya da iş silindi): eski başvuruyu bırak; geçici ağ hatalarında tutulur.
+  const stale = job.error instanceof ApiClientError && job.error.status === 404;
+  useEffect(() => {
+    if (!stale) return;
+    writeJobId(dataset.id, null);
+    setJobId(null);
+  }, [stale, dataset.id]);
+  // Geri yüklenen işin ayarlarını forma yansıt; form gösterilen sonuçla çelişmesin.
+  const spec = job.data?.spec;
+  const specJobId = job.data?.id;
+  useEffect(() => {
+    if (!spec || !specJobId || syncedJob.current === specJobId) return;
+    syncedJob.current = specJobId;
+    if (touched.current || specJobId !== restoredJobId.current) return;
+    setTarget(spec.target);
+    setNumeric(spec.numeric);
+    setCategorical(spec.categorical);
+    setModels(spec.models);
+    setFolds(String(spec.folds));
+    setSeed(String(spec.seed));
+  }, [spec, specJobId]);
+
   const run = () => {
-    if (!body) return;
-    start.mutate(body, { onSuccess: (j) => setJobId(j.id) });
+    if (!body || running) return;
+    touched.current = true;
+    start.mutate(body, {
+      onSuccess: (j) => {
+        writeJobId(dataset.id, j.id);
+        setJobId(j.id);
+      },
+    });
   };
   const onTarget = (name: string) => {
+    touched.current = true;
     setTarget(name);
     setNumeric(null);
     setCategorical(null);
@@ -229,10 +287,10 @@ function Comparison({ dataset }: { dataset: DatasetInfo }) {
           <div className="flex flex-col gap-5">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <Select label="Hedef sütun (sınıf)" value={target} onChange={onTarget} options={targets.map((c) => ({ value: c.name, label: `${c.name} · ${c.unique} sınıf` }))} />
-              <Select label="Katman sayısı" value={folds} onChange={setFolds} options={['3', '5', '10'].map((v) => ({ value: v, label: `${v} katlı` }))} hint="Her sınıfta en az katman sayısı kadar gözlem olmalı." />
+              <Select label="Katman sayısı" value={folds} onChange={touch(setFolds)} options={['3', '5', '10'].map((v) => ({ value: v, label: `${v} katlı` }))} hint="Her sınıfta en az katman sayısı kadar gözlem olmalı." />
               <label className="flex min-w-0 flex-col gap-1.5 text-caption font-medium text-fg-subtle">
                 Tohum (tekrarlanabilirlik)
-                <input className="h-10 w-full rounded-card border border-line/40 bg-surface-lowest px-3 text-body text-fg hover:border-line-strong" inputMode="numeric" value={seed} onChange={(e) => setSeed(e.target.value)} aria-invalid={!seedOk} />
+                <input className="h-10 w-full rounded-card border border-line/40 bg-surface-lowest px-3 text-body text-fg hover:border-line-strong" inputMode="numeric" value={seed} onChange={(e) => touch(setSeed)(e.target.value)} aria-invalid={!seedOk} />
                 {!seedOk && <span className="font-normal text-danger">0 ile 2147483647 arasında bir tamsayı girin.</span>}
               </label>
             </div>
@@ -240,21 +298,21 @@ function Comparison({ dataset }: { dataset: DatasetInfo }) {
               legend="Sayısal özellikler"
               options={numOptions.map((c) => ({ value: c.name, label: c.name, hint: columnTypeLabel[c.type] }))}
               values={numSel}
-              onChange={setNumeric}
+              onChange={touch(setNumeric)}
               hint="Varsayılan: hedef dışındaki tüm sayısal sütunlar. Kimlik benzeri sütunlar listede yoktur."
             />
             <CheckboxGroup
               legend="Kategorik özellikler (tek-sıcak kodlanır)"
               options={catOptions.map((c) => ({ value: c.name, label: c.name, hint: `${c.unique} düzey` }))}
               values={catSel}
-              onChange={setCategorical}
+              onChange={touch(setCategorical)}
               hint="Metin sütunları ve “kategorik” olarak işaretlenmiş sayısal kodlar."
             />
             <CheckboxGroup
               legend="Modeller"
               options={ALL_MODELS.map((id) => ({ value: id, label: MODEL_INFO[id].label, hint: MODEL_INFO[id].family }))}
               values={models}
-              onChange={(v) => setModels(v as ModelId[])}
+              onChange={(v) => touch(setModels)(v as ModelId[])}
               hint="Taban modeli her zaman eklemeniz önerilir. Destek vektör makinesi gözlem sayısıyla hızla yavaşlar (13 bin satırda yaklaşık 1 dakika; 15 bin eğitim gözleminin üzerinde atlanır)."
             />
             <div className="flex flex-wrap items-center gap-3">
@@ -280,7 +338,7 @@ function Comparison({ dataset }: { dataset: DatasetInfo }) {
           {j.error}
         </Callout>
       )}
-      {job.isError && (
+      {job.isError && !stale && (
         <Callout tone="danger" icon={OctagonAlert} title="Durum alınamadı">
           {job.error.message}
         </Callout>
