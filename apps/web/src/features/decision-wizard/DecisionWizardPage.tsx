@@ -47,11 +47,16 @@ function Wizard({ dataset }: { dataset: DatasetInfo }) {
   // Varyans yaklaşımı yalnızca bağımsız grupların sürekli karşılaştırmasında anlamlıdır; varsayılan (welch) gövdeye yazılmaz.
   const independentCompare = answers.goal === 'compare' && answers.design !== 'paired' && answers.target === 'continuous';
 
-  const body = useMemo(() => {
+  // Kullanıcı bir alternatifi çalıştırdıysa istek buna göre kurulur; seçimler değişince öneri yeniden geçerli olur.
+  const [forced, setForced] = useState<{ key: string; test: string } | null>(null);
+  const baseBody = useMemo(() => {
     const b = buildBody(dataset.id, cols, answers, picks);
     if (!b || answers.target !== 'continuous') return b;
     return { ...b, normality, ...(independentCompare && variance === 'levene' ? { variance } : {}) };
   }, [dataset.id, cols, answers, picks, normality, variance, independentCompare]);
+  const baseKey = JSON.stringify(baseBody);
+  const forcedTest = forced?.key === baseKey ? forced.test : null;
+  const body = useMemo(() => (baseBody && forcedTest ? { ...baseBody, test: forcedTest } : baseBody), [baseBody, forcedTest]);
   const settled = useDebounced(body, 350);
   const preview = useAnalysisPreview(settled);
   const result = preview.data?.result;
@@ -82,14 +87,16 @@ function Wizard({ dataset }: { dataset: DatasetInfo }) {
         </div>
       );
     }
-    if (answers.design === 'paired' && answers.target !== 'categorical') {
+    if (answers.design === 'paired') {
+      const categorical = answers.target === 'categorical';
+      const candidates = categorical ? groups.filter((c) => c.unique === 2) : nums;
       return (
         <CheckboxGroup
-          legend="Karşılaştırılacak sütunlar (aynı kişilerin ölçümleri; seçim sırası önemlidir)"
-          options={nums.map((c) => ({ value: c.name, label: c.name, hint: columnTypeLabel[c.type] }))}
+          legend={categorical ? 'Karşılaştırılacak ikili sütunlar (aynı kişilerin evet/hayır gibi sonuçları)' : 'Karşılaştırılacak sütunlar (aynı kişilerin ölçümleri; seçim sırası önemlidir)'}
+          options={candidates.map((c) => ({ value: c.name, label: c.name, hint: categorical ? '2 değer' : columnTypeLabel[c.type] }))}
           values={picks.conditions}
           onChange={(v) => setPick({ conditions: v })}
-          hint="En az 2 sütun seçin. Her satır aynı denekle ilgili olmalıdır."
+          hint={categorical ? '2 sütun: McNemar, 3+ sütun: Cochran Q. Her sütun aynı iki değeri içermeli; ikinci değer (sıralı) “olay” sayılır.' : 'En az 2 sütun seçin. Her satır aynı denekle ilgili olmalıdır.'}
         />
       );
     }
@@ -210,7 +217,7 @@ function Wizard({ dataset }: { dataset: DatasetInfo }) {
               <p className="flex flex-wrap items-center gap-2 text-caption text-fg-subtle">
                 <Tag>{result.outcome.test}</Tag> hesaplandı: {result.variables.join(' · ')}
               </p>
-              <AnalysisView result={result} />
+              <AnalysisView result={result} onRunAlternative={(test) => setForced({ key: baseKey, test })} />
             </div>
           )}
         </div>

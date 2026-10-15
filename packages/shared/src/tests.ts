@@ -4,6 +4,7 @@
  */
 import { fSurvival, incompleteBeta, mean, normalQuantile, normalSurvival } from './assumptions.ts';
 import { chiSquareSurvival, lnGamma } from './stats.ts';
+import { mcnemar } from './tests-extra.ts';
 
 /* ---------- Ortak yardımcılar ---------- */
 
@@ -506,13 +507,16 @@ export function pairwiseWelch(groups: number[][], method: AdjustMethod = 'holm')
 }
 
 /** Eşleşmiş koşullar için ikili karşılaştırma: paired t ya da Wilcoxon; p değerleri düzeltilir. */
-export function pairwisePaired(conditions: number[][], kind: 't' | 'wilcoxon', method: AdjustMethod = 'holm'): PairResult[] {
+export function pairwisePaired(conditions: number[][], kind: 't' | 'wilcoxon' | 'mcnemar', method: AdjustMethod = 'holm'): PairResult[] {
   const pairs: PairResult[] = [];
   for (let a = 0; a < conditions.length; a++) {
     for (let b = a + 1; b < conditions.length; b++) {
       if (kind === 't') {
         const r = tTestPaired(conditions[a]!, conditions[b]!);
         pairs.push({ a, b, statistic: r.t, p: r.p, pAdj: 0 });
+      } else if (kind === 'mcnemar') {
+        const r = mcnemar(conditions[a]!, conditions[b]!);
+        pairs.push({ a, b, statistic: r.statistic, p: r.p, pAdj: 0 });
       } else {
         const r = wilcoxonSignedRank(conditions[a]!, conditions[b]!);
         pairs.push({ a, b, statistic: r.W, p: r.p, pAdj: 0 });

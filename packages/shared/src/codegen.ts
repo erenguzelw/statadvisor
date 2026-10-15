@@ -31,6 +31,8 @@ export interface AnalysisSpec {
   conditions?: string[];
   x?: string;
   y?: string;
+  /** Kullanıcının seçtiği alternatif test (varsa); kod, sonuçtaki testi üretir. */
+  test?: string;
   rowVar?: string;
   colVar?: string;
 }
@@ -53,7 +55,7 @@ export function fmt(x: number, digits: number): string {
   return x.toFixed(digits);
 }
 
-const ASCII_SYMBOL: Record<string, string> = { 'ε²': 'epsilon2', 'η²': 'eta2', 'η²p': 'eta2_kismi', ρ: 'rho', 'V': 'V' };
+const ASCII_SYMBOL: Record<string, string> = { 'ε²': 'epsilon2', 'η²': 'eta2', 'η²p': 'eta2_kismi', ρ: 'rho', τ: 'tau', 'V': 'V' };
 const sym = (s: string) => ASCII_SYMBOL[s] ?? s;
 
 const NA_VALUES = ['', 'na', 'NA', 'n/a', 'N/A', 'nan', 'NaN', 'NAN', 'null', 'NULL', 'none', 'None', '-', '?', '#N/A'];
@@ -143,7 +145,7 @@ function printStat(varStat: string, varP: string, effLabel: string, effVar: stri
   ];
 }
 
-function postHocBlock(r: AnalysisResult, names: string, kind: 'dunn' | 'tukey' | 'games-howell' | 'paired-t' | 'wilcoxon', dataVar: string): string[] {
+function postHocBlock(r: AnalysisResult, names: string, kind: 'dunn' | 'tukey' | 'games-howell' | 'paired-t' | 'wilcoxon' | 'mcnemar', dataVar: string): string[] {
   const ph = r.outcome.postHoc;
   if (!ph) return [];
   const header = `print("Post-hoc: ${ph.method}")`;
@@ -183,7 +185,9 @@ function postHocBlock(r: AnalysisResult, names: string, kind: 'dunn' | 'tukey' |
     const raw =
       kind === 'paired-t'
         ? `stats.ttest_rel(${dataVar}[a], ${dataVar}[b]).pvalue`
-        : `stats.wilcoxon(${dataVar}[a], ${dataVar}[b], alternative="two-sided", method="auto").pvalue`;
+        : kind === 'mcnemar'
+          ? `mcnemar_p(${dataVar}[a], ${dataVar}[b])`
+          : `stats.wilcoxon(${dataVar}[a], ${dataVar}[b], alternative="two-sided", method="auto").pvalue`;
     lines.push('    from statsmodels.stats.multitest import multipletests', `    ham = [${raw} for a, b in ciftler]`, '    duz = multipletests(ham, method="holm")[1]');
   }
   lines.push(`    for (a, b), p in zip(ciftler, duz):`, `        print(f"{${names}[a]} - {${names}[b]}: p_duz = {p:.6f}")`);
@@ -206,7 +210,7 @@ export function generateAnalysisCode(file: DatasetFile, spec: AnalysisSpec, r: A
   const imports = new Set(['import numpy as np', 'import pandas as pd', 'from scipy import stats']);
   const body: string[] = [];
   const names = r.descriptives.map((d) => d.group);
-  const needsEtiket = spec.group || spec.rowVar || spec.colVar;
+  const needsEtiket = spec.group || spec.rowVar || spec.colVar || r.binaryLevels;
   const limit = spec.normality === 'skewkurt-2' ? 2 : 1.5;
   const byShape = spec.normality === 'skewkurt-1.5' || spec.normality === 'skewkurt-2';
   const normBlock = (label: string, arr: string) => (byShape ? skewKurtBlock(label, arr) : shapiroBlock(label, arr));
@@ -300,12 +304,22 @@ export function generateAnalysisCode(file: DatasetFile, spec: AnalysisSpec, r: A
     }
   } else if (o.kind === 'paired') {
     const cols = spec.conditions!;
-    body.push(
-      `d = df[${pyList(cols)}].apply(pd.to_numeric, errors="coerce").dropna()`,
-      `kosul_adlari = ${pyList(cols)}`,
-      'kosullar = [d[c].to_numpy(dtype=float) for c in kosul_adlari]',
-      '',
-    );
+    if (r.binaryLevels) {
+      body.push(
+        `d = df[${pyList(cols)}].dropna()`,
+        `kosul_adlari = ${pyList(cols)}`,
+        `SEVIYELER = ${pyList(r.binaryLevels)}  # 0 ve 1 olarak kodlanan düzeyler (uygulamayla aynı sıra)`,
+        'kosullar = [(d[c].map(etiket) == SEVIYELER[1]).astype(int).to_numpy() for c in kosul_adlari]',
+        '',
+      );
+    } else {
+      body.push(
+        `d = df[${pyList(cols)}].apply(pd.to_numeric, errors="coerce").dropna()`,
+        `kosul_adlari = ${pyList(cols)}`,
+        'kosullar = [d[c].to_numpy(dtype=float) for c in kosul_adlari]',
+        '',
+      );
+    }
     if (r.assumptions.length) {
       const two = cols.length === 2;
       body.push(
@@ -336,6 +350,52 @@ export function generateAnalysisCode(file: DatasetFile, spec: AnalysisSpec, r: A
           'rank_biserial = (w_arti - w_eksi) / (w_arti + w_eksi)',
           'p_deger = res.pvalue',
           ...printStat('res.statistic', 'p_deger', 'r', 'rank_biserial', 'len(fark)'),
+        );
+        break;
+      case 'İşaret testi':
+        body.push(
+          'fark = kosullar[0] - kosullar[1]',
+          'fark = fark[fark != 0]  # sıfır farklar atılır',
+          'n_arti = int((fark > 0).sum())',
+          'res = stats.binomtest(n_arti, len(fark), 0.5, alternative="two-sided")',
+          'isaret_orani = (n_arti - (len(fark) - n_arti)) / len(fark)',
+          'p_deger = res.pvalue',
+          ...printStat('n_arti', 'p_deger', 'r', 'isaret_orani', 'len(fark)'),
+        );
+        break;
+      case 'McNemar testi':
+        imports.add('from statsmodels.stats.contingency_tables import mcnemar');
+        body.push(
+          'a = int(((kosullar[0] == 0) & (kosullar[1] == 0)).sum())',
+          'b = int(((kosullar[0] == 0) & (kosullar[1] == 1)).sum())',
+          'c = int(((kosullar[0] == 1) & (kosullar[1] == 0)).sum())',
+          'dd = int(((kosullar[0] == 1) & (kosullar[1] == 1)).sum())',
+          'if b + c == 0:',
+          '    istatistik, p_deger = 0.0, 1.0',
+          'else:',
+          '    res = mcnemar([[a, b], [c, dd]], exact=(b + c) < 25, correction=True)  # b + c < 25: kesin iki terimli test',
+          '    istatistik, p_deger = float(res.statistic), float(res.pvalue)',
+          'fark_orani = (b - c) / (b + c) if b + c else 0.0',
+          ...printStat('istatistik', 'p_deger', 'g', 'fark_orani', 'a + b + c + dd', o.statistic.df.length ? '{1:.4f}' : undefined),
+        );
+        break;
+      case 'Cochran Q testi':
+        imports.add('from itertools import combinations');
+        imports.add('from statsmodels.stats.contingency_tables import cochrans_q, mcnemar');
+        body.push(
+          'def mcnemar_p(u, v):',
+          '    b = int(((u == 0) & (v == 1)).sum())',
+          '    c = int(((u == 1) & (v == 0)).sum())',
+          '    if b + c == 0:',
+          '        return 1.0',
+          '    return float(mcnemar([[0, b], [c, 0]], exact=(b + c) < 25, correction=True).pvalue)',
+          '',
+          'res = cochrans_q(np.column_stack(kosullar), return_object=True)',
+          'n, k = len(kosullar[0]), len(kosullar)',
+          'etki_w = res.statistic / (n * (k - 1))',
+          'p_deger = res.pvalue',
+          ...printStat('res.statistic', 'p_deger', 'W', 'etki_w', 'n', '{k - 1:.4f}'),
+          ...postHocBlock(r, 'kosul_adlari', 'mcnemar', 'kosullar'),
         );
         break;
       case 'Friedman testi':
@@ -381,7 +441,9 @@ export function generateAnalysisCode(file: DatasetFile, spec: AnalysisSpec, r: A
       body.push('# Normallik her değişken için ayrı sınanır', ...normBlock('x', 'x'), ...normBlock('y', 'y'), '');
     }
     body.push(`print("Test: ${o.test}")`);
-    if (o.test === 'Pearson korelasyonu') {
+    if (o.test === 'Kendall tau') {
+      body.push('res = stats.kendalltau(x, y)  # bağ yoksa ve n ≤ 33 ise kesin p, aksi halde bağ düzeltmeli yaklaşım', 'p_deger = res.pvalue', ...printStat('res.statistic', 'p_deger', 'tau', 'res.statistic', 'len(x)'));
+    } else if (o.test === 'Pearson korelasyonu') {
       body.push('res = stats.pearsonr(x, y)', 'ci = res.confidence_interval(0.95)', 'p_deger = res.pvalue', ...printStat('res.statistic', 'p_deger', 'r', 'res.statistic', 'len(x)', '{len(x) - 2:.4f}', ['ci.low', 'ci.high']));
     } else {
       body.push(

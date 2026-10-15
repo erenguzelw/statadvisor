@@ -24,6 +24,8 @@ function inputFor(a: WizardAnswers): TestInput {
     const x = col(40, 0);
     return { kind: 'xy', xName: 'x', yName: 'y', x, y: x.map((v) => v * 0.5 + gaussian(rng)) };
   }
+  // Eşleşmiş kategorik sonuç: aynı denekler tekrar ölçülmüş 0/1 koşullar (McNemar, Cochran Q)
+  if (a.target === 'categorical' && a.design === 'paired') return { kind: 'paired', names, conditions: names.map((_, i) => Array.from({ length: 40 }, (_, r) => ((r * (i + 3) + i) % 7 < 3 + i ? 1 : 0))) };
   if (a.target === 'categorical') return { kind: 'table', rowNames: names, colNames: ['evet', 'hayır'], table: names.map((_, i) => [10 + i * 3, 20 - i * 2]) };
   if (a.design === 'paired') return { kind: 'paired', names, conditions: names.map((_, i) => col(25, i)) };
   return { kind: 'groups', names, groups: names.map((_, i) => col(20 + i, i * 0.8)) };
@@ -63,7 +65,7 @@ describe('karar motoru ↔ çalıştırıcı', () => {
     for (const t of [
       'Welch t-testi', 'Mann-Whitney U testi', 'Welch ANOVA', 'Kruskal-Wallis H testi', 'Eşleştirilmiş t-testi',
       'Wilcoxon işaretli sıra testi', 'Tekrarlı ölçümler ANOVA', 'Friedman testi', 'Pearson korelasyonu',
-      'Spearman sıra korelasyonu', 'Ki-kare homojenlik testi', 'Ki-kare bağımsızlık testi',
+      'Spearman sıra korelasyonu', 'Ki-kare homojenlik testi', 'Ki-kare bağımsızlık testi', 'McNemar testi', 'Cochran Q testi',
     ]) {
       expect(seen.has(t) || seen.has('Fisher kesin testi'), `${t} hiç çalıştırılmadı`).toBe(true);
     }

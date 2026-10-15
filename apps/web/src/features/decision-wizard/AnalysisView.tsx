@@ -69,14 +69,14 @@ function PostHocPanel({ ph }: { ph: PostHocResult }) {
   );
 }
 
-export function AnalysisView({ result: r }: { result: AnalysisResult }) {
+export function AnalysisView({ result: r, onRunAlternative }: { result: AnalysisResult; onRunAlternative?: (test: string) => void }) {
   const o = r.outcome;
   return (
     <>
       <RerouteBanner path={r.decision} />
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <ConditionChecks checks={r.decision.checks ?? []} />
-        <AlternativeMethods finalTest={r.decision.finalTest} alternatives={r.decision.alternatives ?? []} />
+        <AlternativeMethods finalTest={r.decision.finalTest} alternatives={r.decision.alternatives ?? []} onRun={onRunAlternative} />
       </div>
       {r.notes.length > 0 && <RecommendationNotes title="Veri hazırlama notları" warnings={r.notes} />}
 
