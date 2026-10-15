@@ -21,6 +21,10 @@ import {
   type QualityResponse,
   type RegressionBody,
   type RegressionResponse,
+  type ReportKind,
+  type ReportListItem,
+  type SavedReportItem,
+  type SavedReportView,
   type SampleInfo,
   type SavedAnalysisListItem,
 } from './api';
@@ -196,7 +200,10 @@ export function useSaveAnalysis() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: AnalysisBody) => api.post<AnalysisResponse>('/api/analyses', body),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['analyses'] }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['analyses'] });
+      void qc.invalidateQueries({ queryKey: ['reports'] });
+    },
   });
 }
 
@@ -297,6 +304,43 @@ export function useModelRunCode(jobId: string | null, enabled: boolean) {
     enabled: Boolean(jobId) && enabled,
     retry: shouldRetry,
     staleTime: Infinity,
+  });
+}
+
+/** Rapor merkezi: testler ve kaydedilmiş regresyon/lojistik/model raporları tek listede (yeniden eskiye). */
+export function useReports(datasetId: string | null) {
+  return useQuery({
+    queryKey: ['reports', datasetId] as const,
+    queryFn: () => api.get<{ reports: ReportListItem[] }>(`/api/reports?datasetId=${datasetId}`).then((r) => r.reports),
+    enabled: Boolean(datasetId),
+  });
+}
+
+export function useSavedReport(id: string | null) {
+  return useQuery({ queryKey: ['report', id] as const, queryFn: () => api.get<SavedReportView>(`/api/reports/${id}`), enabled: Boolean(id), retry: shouldRetry });
+}
+
+export function useSavedReportCode(id: string | null, enabled: boolean) {
+  return useQuery({ queryKey: ['report-code', id] as const, queryFn: () => api.get<CodeResponse>(`/api/reports/${id}/code`), enabled: Boolean(id) && enabled, retry: shouldRetry, staleTime: Infinity });
+}
+
+/** Sonucu rapor merkezine kaydeder (regresyon, lojistik regresyon ya da model karşılaştırma uç noktası). */
+export function useSaveToReports() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ url, body }: { url: string; body?: unknown }) => api.post<SavedReportItem>(url, body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['reports'] }),
+  });
+}
+
+export function useDeleteReport() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, kind }: { id: string; kind: ReportKind }) => api.del(kind === 'test' ? `/api/analyses/${id}` : `/api/reports/${id}`),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['reports'] });
+      void qc.invalidateQueries({ queryKey: ['analyses'] });
+    },
   });
 }
 

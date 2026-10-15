@@ -46,7 +46,7 @@ npm run render   # out/statadvisor-tanitim.mp4
 
 ## Veri nerede?
 
-`apps/api/.data/` (SQLite). `STATADVISOR_DATA` ile değiştirilir. Yedek ve silme için komutlara bakın. Ayrıntı: `docs/gizlilik.md`.
+`apps/api/.data/` (SQLite). `STATADVISOR_DATA` ile değiştirilir. Kod & Rapor Merkezi'ndeki kayıtlar (Karar Sihirbazı testleri ve “Rapor merkezine kaydet” ile saklanan regresyon, lojistik regresyon ve model karşılaştırma sonuçları) burada durur; sunucu yeniden başlasa da kalır, veri seti silinince onunla birlikte silinir. Yedek ve silme için komutlara bakın. Ayrıntı: `docs/gizlilik.md`.
 
 ## Sınırlamalar
 

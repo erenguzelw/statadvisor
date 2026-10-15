@@ -8,7 +8,7 @@ import { useActiveDataset } from '@/context/AppContext';
 import type { ColumnInfo, DatasetInfo, ModelRunBody, ModelRunJob } from '@/data/api';
 import { useCapabilities, useModelRun, useModelRunCode, useStartModelRun } from '@/data/hooks';
 import { columnTypeLabel } from '@/lib/variables';
-import { NoteList } from '../regression/shared';
+import { NoteList, SaveToReports } from '../regression/shared';
 import { AssociationPanel, ClassDetail } from './MlInsights';
 
 const nf = new Intl.NumberFormat('tr-TR');
@@ -162,6 +162,7 @@ function Results({ job }: { job: ModelRunJob }) {
 
       <Panel>
         <SectionHeader icon={FileCode2} title="Rapor ve Python (scikit-learn) kodu" level={3} description="Rapor; sonuçları, yorumları, sınıf bazında tabloları, ilişkileri, yöntemi ve denetim izini içerir. Betik, katman atamasını aynı tohumlu karıştırmayla yeniden üretir ve aynı karşılaştırmayı yapar; veri dosyasını betikle aynı klasöre koyun." />
+        <SaveToReports url={`/api/model-runs/${job.id}/save`} resetKey={job.id} />
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <LinkButton variant="tonal" icon={Eye} href={`/api/model-runs/${job.id}/report?format=html`} target="_blank" rel="noopener noreferrer">Raporu aç (HTML)</LinkButton>
           <LinkButton variant="primary" icon={Download} href={`/api/model-runs/${job.id}/report?format=docx`} download="model-karsilastirma-raporu.docx">Word (.docx)</LinkButton>

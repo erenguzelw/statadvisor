@@ -10,7 +10,7 @@ import type { ColumnInfo, DatasetInfo, LogisticBody, LogisticResponse } from '@/
 import { useLevels, useLogistic } from '@/data/hooks';
 import { useDebounced } from '@/lib/useDebounced';
 import { columnTypeLabel } from '@/lib/variables';
-import { n2, nf, NoteList, ReferenceSelect, ReportActions } from './shared';
+import { n2, nf, NoteList, ReferenceSelect, ReportActions, SaveToReports } from './shared';
 
 const collator = new Intl.Collator('tr', { numeric: true });
 /** Bağımlı değişken adayı: tam olarak iki farklı değeri olan, kimlik olmayan sütunlar. */
@@ -157,6 +157,7 @@ function Results({ data, body, datasetId }: { data: LogisticResponse; body: Logi
 
       <Panel>
         <SectionHeader icon={FileCode2} title="Python kodu ve rapor" level={3} description="Betik, ekrandaki sayıları statsmodels ile yeniden üretir (otomatik testle doğrulanır). Veri dosyasını betikle aynı klasöre koyun." />
+        <SaveToReports url={`/api/datasets/${datasetId}/logistic/save`} body={body} resetKey={`${datasetId}:${JSON.stringify(body)}`} />
         <ReportActions url={`/api/datasets/${datasetId}/logistic/report`} body={body} fileBase="lojistik-regresyon-raporu" />
         {data.code ? (
           <CodeBlock code={data.code.code} filename={data.code.filename} runtime={`Python · ${data.code.requirements.join(', ')}`} lineNumbers maxHeight="28rem" />
