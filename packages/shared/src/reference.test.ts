@@ -32,6 +32,10 @@ import {
   tukeyFences,
   welchAnova,
   wilcoxonSignedRank,
+  gamesHowell,
+  studentizedRangeQuantile,
+  studentizedRangeSurvival,
+  tukeyHsd,
   ENGINE,
   type AdjustMethod,
 } from './index.ts';
@@ -164,6 +168,37 @@ specs.logit = {
   tol: Object.fromEntries(
     ['b', 'se', 'z', 'p', 'ciLow', 'ciHigh', 'vif', 'n', 'logLik', 'logLikNull', 'lrChi2', 'lrP', 'mcFadden', 'coxSnell', 'nagelkerke', 'aic', 'bic', 'auc', 'hlChi2', 'hlP', 'tp', 'fp', 'tn', 'fn', 'probs'].map((k) => [k, olsTol]),
   ) as Record<string, [number, number]>,
+};
+
+// Studentize edilmiş aralık: SciPy'nin üst kuyruğu çok küçük değerlerde yalnızca mutlak ~10⁻¹³ duyarlıdır (ör. k = 2,
+// sd = 1000, q = 8: SciPy 2.011995e-8, kesin değer 2·t.sf(q/√2) = 2.011979e-8). Bu yüzden mutlak tolerans 10⁻¹²;
+// küçük p değerlerindeki göreli duyarlılık posthoc.test.ts'de kesin k = 2 formülüyle ayrıca sınanır.
+const dfIn = (df: number | null) => (df === null ? Infinity : df);
+specs.srange_sf = { run: (i) => ({ p: studentizedRangeSurvival(i.q, i.k, dfIn(i.df)) }), tol: { p: [1e-9, 1e-12] } };
+specs.srange_ppf = { run: (i) => ({ q: studentizedRangeQuantile(i.p, i.k, dfIn(i.df)) }), tol: { q: [1e-9, 1e-12] } };
+const phTol: [number, number] = [1e-9, 1e-12];
+specs.tukey_hsd = {
+  run: (i) => {
+    const r = tukeyHsd(i.groups);
+    return { diff: r.map((x) => x.diff), p: r.map((x) => x.p), ciLow: r.map((x) => x.ciLow), ciHigh: r.map((x) => x.ciHigh) };
+  },
+  tol: { diff: phTol, p: [1e-8, 1e-12], ciLow: phTol, ciHigh: phTol },
+};
+specs.games_howell = {
+  run: (i) => {
+    const r = gamesHowell(i.groups);
+    return {
+      diff: r.map((x) => x.diff),
+      se: r.map((x) => x.se),
+      t: r.map((x) => x.diff / x.se),
+      df: r.map((x) => x.df),
+      p: r.map((x) => x.p),
+      g: r.map((x) => x.hedgesG),
+      ciLow: r.map((x) => x.ciLow),
+      ciHigh: r.map((x) => x.ciHigh),
+    };
+  },
+  tol: { diff: phTol, se: phTol, t: phTol, df: phTol, p: [1e-8, 1e-12], g: phTol, ciLow: phTol, ciHigh: phTol },
 };
 
 export { specs, close, fixture };

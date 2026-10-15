@@ -5,7 +5,7 @@
 import { groupResiduals, levene, mean, shapiroWilk } from './assumptions.ts';
 import { extent } from './extent.ts';
 import { recommendTest,type AssumptionInput, type Design, type Goal, type Target, type WizardAnswers } from './decision.ts';
-import { boxStatsFor, describeGroups, scatterSample, interpretOutcome, runTest, type TestInput, type TestOutcome } from './inference.ts';
+import { boxStatsFor, describeGroups, scatterSample, interpretOutcome, pairText, runTest, type TestInput, type TestOutcome } from './inference.ts';
 import { histogram, meanSd, pText, shapeStats, skewness } from './stats.ts';
 import type { AssumptionTest, BoxStats, DecisionPath, ScatterSample, DistributionSample, GroupDescriptive, Interpretation } from './types.ts';
 
@@ -27,6 +27,8 @@ export interface AnalysisRequest {
    * (anket/ölçek verisinde yaygın; ±1.5 Tabachnick & Fidell, ±2 George & Mallery).
    */
   normality?: NormalityMethod;
+  /** Bağımsız gruplarda varyans yaklaşımı (bkz. AssumptionInput.variancePolicy); varsayılan welch. */
+  variance?: 'welch' | 'levene';
   /** Karşılaştırma (bağımsız gruplar): sonuç değişkeni ve grup değişkeni. */
   value?: NumericColumn;
   group?: TextColumn;
@@ -79,6 +81,10 @@ const REFERENCES: Record<string, string> = {
   kruskal: 'Kruskal, W. H., & Wallis, W. A. (1952). Use of ranks in one-criterion variance analysis. Journal of the American Statistical Association, 47(260), 583–621.',
   dunn: 'Dunn, O. J. (1964). Multiple comparisons using rank sums. Technometrics, 6(3), 241–252.',
   holm: 'Holm, S. (1979). A simple sequentially rejective multiple test procedure. Scandinavian Journal of Statistics, 6(2), 65–70.',
+  tukey: 'Tukey, J. W. (1949). Comparing individual means in the analysis of variance. Biometrics, 5(2), 99–114.',
+  kramer: 'Kramer, C. Y. (1956). Extension of multiple range tests to group means with unequal numbers of replications. Biometrics, 12(3), 307–310.',
+  gamesHowell: 'Games, P. A., & Howell, J. F. (1976). Pairwise multiple comparison procedures with unequal n’s and/or variances: A Monte Carlo study. Journal of Educational Statistics, 1(2), 113–125.',
+  piepho: 'Piepho, H.-P. (2004). An algorithm for a letter-based representation of all-pairwise comparisons. Journal of Computational and Graphical Statistics, 13(2), 456–466.',
   welch: 'Welch, B. L. (1951). On the comparison of several mean values: An alternative approach. Biometrika, 38(3–4), 330–336.',
   student: 'Student. (1908). The probable error of a mean. Biometrika, 6(1), 1–25.',
   mannwhitney: 'Mann, H. B., & Whitney, D. R. (1947). On a test of whether one of two random variables is stochastically larger than the other. The Annals of Mathematical Statistics, 18(1), 50–60.',
@@ -104,7 +110,11 @@ function referencesFor(o: TestOutcome, normality: NormalityMethod | null, usedLe
   if (t === 'Spearman sıra korelasyonu') out.push(REFERENCES.spearman!);
   if (t === 'Fisher kesin testi') out.push(REFERENCES.fisher!);
   if (o.postHoc?.method.startsWith('Dunn')) out.push(REFERENCES.dunn!);
-  if (o.postHoc) out.push(REFERENCES.holm!);
+  if (o.postHoc?.method.startsWith('Tukey')) out.push(REFERENCES.tukey!);
+  if (o.postHoc?.method.includes('Kramer')) out.push(REFERENCES.kramer!);
+  if (o.postHoc?.method.startsWith('Games')) out.push(REFERENCES.gamesHowell!);
+  if (o.postHoc?.adjustment === 'holm') out.push(REFERENCES.holm!);
+  if (o.postHoc) out.push(REFERENCES.piepho!);
   return [...new Set(out)];
 }
 
@@ -253,8 +263,8 @@ function apaSentence(o: TestOutcome, assumptions: AssumptionTest[]): string {
   if (o.postHoc) {
     parts.push(
       sig.length
-        ? `${o.postHoc.method} sonucunda ${sig.map((p) => `${p.a}–${p.b} (${pText(p.pAdj)})`).join(', ')} çiftleri arasındaki fark anlamlı bulunmuştur.`
-        : `${o.postHoc.method} sonucunda düzeltmeden sonra anlamlı çift bulunamamıştır.`,
+        ? `${o.postHoc.method} sonucunda ${sig.map(pairText).join(', ')} çiftleri arasındaki fark anlamlı bulunmuştur.`
+        : `${o.postHoc.method} sonucunda ${o.postHoc.adjustment === 'holm' ? 'düzeltmeden sonra ' : ''}anlamlı çift bulunamamıştır.`,
     );
   }
   return parts.join(' ');
@@ -380,7 +390,7 @@ export function analyze(req: AnalysisRequest): AnalysisResult {
     input.kind === 'groups' ? Math.min(...input.groups.map((g) => g.length)) : input.kind === 'paired' ? input.conditions[0]!.length : nTotal;
   const shapes = assumptions.flatMap((t) => (t.shape ? [Math.abs(t.shape.skewness), Math.abs(t.shape.kurtosis)] : []));
   const maxShape = shapes.length ? Math.max(...shapes) : undefined;
-  const assumptionInput: AssumptionInput = { normalP, varianceP, alpha, n: nTotal, minGroupN, normality, maxShape };
+  const assumptionInput: AssumptionInput = { normalP, varianceP, alpha, n: nTotal, minGroupN, normality, maxShape, variancePolicy: req.variance };
   const rec = recommendTest(answers, assumptionInput);
 
   let outcome: TestOutcome;

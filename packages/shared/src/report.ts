@@ -1,4 +1,5 @@
 import type { AnalysisResult } from './analysis.ts';
+import type { PostHocResult } from './inference.ts';
 import { boxPlotSvg, crosstabSvg, histogramSvg, scatterSvg } from './chart-svg.ts';
 import { formatP, pText } from './stats.ts';
 import type { AssumptionTest, BoxStats, DecisionPath, DistributionSample, GroupDescriptive, ScatterSample } from './types.ts';
@@ -23,6 +24,8 @@ export interface ReportData {
   /** Sonuç satırı, ör. "H(2) = 11.70, p = .003, ε² = 0.27 (geniş etki), N = 45". */
   resultLine: string;
   apaSummary: string;
+  /** Post-hoc karşılaştırmalar (varsa): ikili tablo ve anlamlılık harfleri. */
+  postHoc?: PostHocResult;
   references: string[];
   /** Veri hazırlama ve yöntem notları. */
   notes: string[];
@@ -48,6 +51,7 @@ export function reportFromResult(r: AnalysisResult, date: string, audit?: [strin
     decision: r.decision,
     resultLine: `${o.statisticText}, ${pText(o.p)}, ${o.effect.symbol} = ${o.effect.value.toFixed(2)} (${o.effect.magnitude} etki), N = ${o.n}`,
     apaSummary: r.apaSummary,
+    postHoc: o.postHoc,
     references: r.references,
     notes: r.notes,
     audit,
@@ -87,6 +91,30 @@ export function crosstabRows(t: { rowNames: string[]; colNames: string[]; table:
       return [name, ...counts.map((v) => `${v} (%${total ? Math.round((v / total) * 100) : 0})`), String(total)];
     }),
   };
+}
+
+/** Post-hoc tabloları: ikili karşılaştırmalar ve anlamlılık harfleri (HTML ve DOCX aynı satırları kullanır). */
+export function postHocTables(ph: PostHocResult): { title: string; header: string[]; rows: string[][] }[] {
+  const f2 = (v: number) => (Number.isFinite(v) ? v.toFixed(2) : '–');
+  const sig = (b: boolean) => (b ? 'Anlamlı' : 'Anlamlı değil');
+  const range = ph.pairs.some((x) => x.diff !== undefined);
+  const pairs = range
+    ? {
+        title: `İkili karşılaştırmalar: ${ph.method} (p değerleri aile bazında düzeltilmiştir; %95 eşzamanlı güven aralığı)`,
+        header: ['Çift', 'Fark', '%95 GA', 'p', 'Hedges g', 'Sonuç'],
+        rows: ph.pairs.map((x) => [`${x.a} – ${x.b}`, f2(x.diff!), `[${f2(x.ciLow!)}, ${f2(x.ciHigh!)}]`, formatP(x.pAdj, true), f2(x.hedgesG!), sig(x.significant)]),
+      }
+    : {
+        title: `İkili karşılaştırmalar: ${ph.method}`,
+        header: ['Çift', 'Ham p', 'Düzeltilmiş p', 'Sonuç'],
+        rows: ph.pairs.map((x) => [`${x.a} – ${x.b}`, formatP(x.p, true), formatP(x.pAdj, true), sig(x.significant)]),
+      };
+  const letters = {
+    title: `Anlamlılık harfleri (aynı harfi paylaşan gruplar arasındaki fark anlamlı değildir; ${ph.centerLabel.toLocaleLowerCase('tr')} büyükten küçüğe)`,
+    header: ['Grup', ph.centerLabel, 'Harf'],
+    rows: ph.letters.map((l) => [l.group, f2(l.center), l.letters]),
+  };
+  return [pairs, letters];
 }
 
 /** Rapordaki bir grafik: HTML ve DOCX aynı SVG'yi kullanır. */
@@ -147,6 +175,11 @@ export function buildReport(d: ReportData): string {
   const warnings = d.decision.warnings.map((w) => `<p class="warn">${esc(w)}</p>`).join('');
   const alts = d.decision.alternatives?.length ? `<p>Alternatif yöntemler:</p><ul>${d.decision.alternatives.map((a) => `<li><strong>${esc(a.test)}</strong>: ${esc(a.when)}</li>`).join('')}</ul>` : '';
   const notes = d.notes.length ? `<ul>${d.notes.map((n) => `<li>${esc(n)}</li>`).join('')}</ul>` : '';
+  const postHoc = d.postHoc
+    ? postHocTables(d.postHoc)
+        .map((t) => `<p class="muted">${esc(t.title)}</p>${table(t.header, t.rows)}`)
+        .join('')
+    : '';
   const audit = d.audit ? `<section data-section="audit"><h2>Denetim izi</h2>${table(['Öğe', 'Değer'], d.audit)}</section>` : '';
 
   const body = `<h1>${esc(d.title)}</h1>
@@ -154,7 +187,7 @@ export function buildReport(d: ReportData): string {
 <section data-section="desc"><h2>Tanımlayıcı istatistikler</h2>${desc}${figure('box')}${figure('scatter')}${crosstab}${figure('crosstab')}${notes}</section>
 <section data-section="assump"><h2>Varsayım testleri ve karar notları</h2>${assump}${figure('histogram')}
 <p>Önerilen test: <strong>${esc(d.decision.finalTest)}</strong>${d.decision.rerouteReason ? ` (${esc(d.decision.rerouteReason)})` : ''}.</p>${warnings}${alts}</section>
-<section data-section="result"><h2>Test sonucu</h2><p>${esc(d.resultLine)}</p></section>
+<section data-section="result"><h2>Test sonucu</h2><p>${esc(d.resultLine)}</p>${postHoc}</section>
 <section data-section="apa"><h2>APA 7 stilinde özet</h2><p>${esc(d.apaSummary)}</p></section>
 <section data-section="refs"><h2>Kaynakça</h2>${d.references.length ? `<ul>${d.references.map((r) => `<li>${esc(r)}</li>`).join('')}</ul>` : '<p class="muted">Kaynak yok.</p>'}</section>
 ${audit}

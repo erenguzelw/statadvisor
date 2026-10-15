@@ -29,3 +29,5 @@ export * from './stats.ts';
 export * from './tests.ts';
 export * from './types.ts';
 export * from './version.ts';
+export * from './studentized.ts';
+export * from './posthoc.ts';

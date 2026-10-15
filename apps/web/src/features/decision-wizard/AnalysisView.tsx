@@ -1,5 +1,5 @@
 import { Activity, Languages, ListChecks, Ruler, Table2 } from 'lucide-react';
-import type { AnalysisResult, GroupDescriptive, OutcomePair } from '@statadvisor/shared';
+import type { AnalysisResult, GroupDescriptive, OutcomePair, PostHocResult } from '@statadvisor/shared';
 import { ExpertiseToggle } from '@/components/layout/ExpertiseToggle';
 import { DataTable, Panel, SectionHeader, StatusChip, Tag, type Column } from '@/components/ui';
 import { ChartLegend, HistogramWithNormal } from '@/components/charts';
@@ -17,12 +17,57 @@ const descColumns: Column<GroupDescriptive>[] = [
   { key: 'kurt', header: 'Basıklık', numeric: true, align: 'right', cell: (d) => n2(d.kurtosis) },
 ];
 
-const pairColumns: Column<OutcomePair>[] = [
-  { key: 'pair', header: 'Çift', cell: (p) => <span className="font-medium whitespace-nowrap text-fg">{p.a} – {p.b}</span> },
+const pairCell: Column<OutcomePair> = { key: 'pair', header: 'Çift', cell: (p) => <span className="font-medium whitespace-nowrap text-fg">{p.a} – {p.b}</span> };
+const sigCell: Column<OutcomePair> = { key: 'sig', header: 'Sonuç', cell: (p) => <StatusChip status={p.significant ? 'info' : 'neutral'}>{p.significant ? 'Anlamlı' : 'Anlamsız'}</StatusChip> };
+
+/** Holm düzeltmeli yöntemler: ham ve düzeltilmiş p. */
+const holmColumns: Column<OutcomePair>[] = [
+  pairCell,
   { key: 'p', header: 'Ham p', numeric: true, align: 'right', cell: (p) => <PValue p={p.p} apa /> },
   { key: 'padj', header: 'Düzeltilmiş p', numeric: true, align: 'right', cell: (p) => <PValue p={p.pAdj} apa /> },
-  { key: 'sig', header: 'Sonuç', cell: (p) => <StatusChip status={p.significant ? 'info' : 'neutral'}>{p.significant ? 'Anlamlı' : 'Anlamsız'}</StatusChip> },
+  sigCell,
 ];
+
+/** Tukey / Games–Howell: fark, eşzamanlı güven aralığı, aile bazında p ve etki büyüklüğü. */
+const rangeColumns: Column<OutcomePair>[] = [
+  pairCell,
+  { key: 'diff', header: 'Fark', numeric: true, align: 'right', cell: (p) => n2(p.diff!) },
+  { key: 'ci', header: '%95 GA', numeric: true, align: 'right', cell: (p) => <span className="whitespace-nowrap">[{n2(p.ciLow!)}, {n2(p.ciHigh!)}]</span> },
+  { key: 'p', header: 'p', numeric: true, align: 'right', cell: (p) => <PValue p={p.pAdj} apa /> },
+  { key: 'g', header: 'Hedges g', numeric: true, align: 'right', cell: (p) => n2(p.hedgesG!) },
+  sigCell,
+];
+
+type LetterRow = PostHocResult['letters'][number];
+
+function PostHocPanel({ ph }: { ph: PostHocResult }) {
+  const range = ph.pairs.some((p) => p.diff !== undefined);
+  const letterColumns: Column<LetterRow>[] = [
+    { key: 'group', header: 'Grup', cell: (l) => <span className="font-medium text-fg">{l.group}</span> },
+    { key: 'center', header: ph.centerLabel, numeric: true, align: 'right', cell: (l) => n2(l.center) },
+    { key: 'letters', header: 'Harf', cell: (l) => <Tag tone="secondary">{l.letters}</Tag> },
+  ];
+  return (
+    <Panel>
+      <SectionHeader
+        icon={ListChecks}
+        title="Post-hoc karşılaştırmalar"
+        level={3}
+        description={
+          range
+            ? `${ph.method}. p değerleri aile bazında düzeltilmiştir (ayrıca Holm gerekmez); güven aralıkları eşzamanlıdır. Fark = ilk grubun ortalaması − ikincinin.`
+            : ph.method
+        }
+      />
+      <DataTable caption="Post-hoc karşılaştırmalar" columns={range ? rangeColumns : holmColumns} rows={ph.pairs} rowKey={(p) => `${p.a}|${p.b}`} density="compact" />
+      <div className="mt-5">
+        <h4 className="mb-1 text-body font-semibold text-fg">Anlamlılık harfleri</h4>
+        <p className="mb-2 text-caption text-fg-subtle">Aynı harfi paylaşan gruplar arasındaki fark anlamlı değildir. Gruplar {ph.centerLabel.toLocaleLowerCase('tr')} değerine göre büyükten küçüğe sıralıdır; tezlerde tablo ya da grafik üzerinde bu harfler gösterilir.</p>
+        <DataTable caption="Anlamlılık harfleri" columns={letterColumns} rows={ph.letters} rowKey={(l) => l.group} density="compact" />
+      </div>
+    </Panel>
+  );
+}
 
 export function AnalysisView({ result: r }: { result: AnalysisResult }) {
   const o = r.outcome;
@@ -100,12 +145,7 @@ export function AnalysisView({ result: r }: { result: AnalysisResult }) {
         <InterpretationCard result={r.interpretation} />
       </Panel>
 
-      {o.postHoc && (
-        <Panel>
-          <SectionHeader icon={ListChecks} title="Post-hoc karşılaştırmalar" level={3} description={o.postHoc.method} />
-          <DataTable caption="Post-hoc karşılaştırmalar" columns={pairColumns} rows={o.postHoc.pairs} rowKey={(p) => `${p.a}|${p.b}`} density="compact" />
-        </Panel>
-      )}
+      {o.postHoc && <PostHocPanel ph={o.postHoc} />}
     </>
   );
 }

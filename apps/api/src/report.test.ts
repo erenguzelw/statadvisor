@@ -23,6 +23,28 @@ async function analysis(overrides: Record<string, unknown> = {}) {
 }
 
 describe('rapor biçimleri', () => {
+  it('post-hoc: ikili karşılaştırma tablosu ve anlamlılık harfleri HTML ve Word raporunda yer alır', async () => {
+    let found: { id: string; result: { outcome: { postHoc?: { method: string; letters: { letters: string }[] } } } } | undefined;
+    for (const value of ['kan_basinci', 'biyobelirtec_x', 'yas']) {
+      const a = await analysis({ value });
+      if (a.result.outcome.postHoc) {
+        found = a;
+        break;
+      }
+    }
+    expect(found, 'klinik örnekte post-hoc üreten bir analiz bulunmalı').toBeDefined();
+    const ph = found!.result.outcome.postHoc!;
+    const html = (await app.inject({ url: `/api/analyses/${found!.id}/report` })).body;
+    expect(html).toContain('Anlamlılık harfleri');
+    expect(html).toContain(ph.method);
+    // Tukey / Games–Howell'de fark ve güven aralığı, Holm düzeltmeli yöntemlerde ham ve düzeltilmiş p
+    expect(html).toContain(/^(Tukey|Games)/.test(ph.method) ? '%95 GA' : 'Düzeltilmiş p');
+    const zip = await JSZip.loadAsync((await app.inject({ url: `/api/analyses/${found!.id}/report?format=docx` })).rawPayload);
+    const xml = await zip.file('word/document.xml')!.async('string');
+    expect(xml).toContain('Anlamlılık harfleri');
+    expect(xml).toContain(ph.letters[0]!.letters);
+  });
+
   it('HTML: bölümler, grafik, kaynakça ve denetim izi; betik yok', async () => {
     const a = await analysis();
     const res = await app.inject({ url: `/api/analyses/${a.id}/report` });
