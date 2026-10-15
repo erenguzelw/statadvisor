@@ -1,15 +1,16 @@
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Database, FileText, Grid3x3, Info, Languages, OctagonAlert, ShieldCheck, Table2, TriangleAlert } from 'lucide-react';
 import { formatP } from '@statadvisor/shared';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { Callout, CheckboxGroup, DataTable, MetricTile, Panel, SectionHeader, Select, StatusLine, Tag, type Column } from '@/components/ui';
-import { useActiveDataset } from '@/context/AppContext';
+import { Callout, CheckboxGroup, CodeBlock, DataTable, MetricTile, Panel, SectionHeader, Select, StatusLine, Tag, type Column } from '@/components/ui';
+import { useActiveDataset, useApp } from '@/context/AppContext';
 import type { ColumnInfo, DatasetInfo, FactorialBody, FactorialResponse } from '@/data/api';
 import { useFactorial } from '@/data/hooks';
 import { useDebounced } from '@/lib/useDebounced';
 import { columnTypeLabel } from '@/lib/variables';
-import { n2, nf, ReportActions } from '../regression/shared';
+import { n2, nf, ReportActions, SaveToReports } from '../regression/shared';
 
 /** Bağımlı değişken adayı: sayısal, kimlik olmayan sütunlar. */
 const dependentCandidates = (cols: ColumnInfo[]) => cols.filter((c) => c.numeric && c.type !== 'categorical' && !c.likelyId);
@@ -19,7 +20,14 @@ const factorCandidates = (cols: ColumnInfo[]) => cols.filter((c) => !c.likelyId 
 const pCell = (p: number, df: number) => (df > 0 && Number.isFinite(p) ? formatP(p, true) : '–');
 
 export function FactorialPage() {
-  const { dataset, loading, error } = useActiveDataset();
+  const { dataset, loading, error, datasets } = useActiveDataset();
+  const { setDatasetId } = useApp();
+  const [params] = useSearchParams();
+  // Adres satırından gelen veri seti: ?veri=<kimlik> (ve isteğe bağlı bagimli, faktor). Etkin veri setini değiştirir.
+  const wanted = params.get('veri');
+  useEffect(() => {
+    if (wanted && dataset?.id !== wanted && datasets.some((d) => d.id === wanted)) setDatasetId(wanted);
+  }, [wanted, dataset?.id, datasets, setDatasetId]);
   if (loading) return <p className="text-fg-muted">Yükleniyor…</p>;
   if (error) return <StatusLine status="danger">{error.message}</StatusLine>;
   if (!dataset) {
@@ -32,7 +40,8 @@ export function FactorialPage() {
       </>
     );
   }
-  return <Factorial key={dataset.id} dataset={dataset} />;
+  const preset = wanted === dataset.id ? { dependent: params.get('bagimli') ?? undefined, factors: params.getAll('faktor') } : undefined;
+  return <Factorial key={dataset.id} dataset={dataset} preset={preset} />;
 }
 
 type Row = string[];
@@ -111,6 +120,44 @@ function Results({ data, body, datasetId }: { data: FactorialResponse; body: Fac
         <DataTable caption="Hücre ortalamaları" columns={cellCols} rows={cellRows} rowKey={(row) => row.slice(0, r.factors.length).join('|')} density="compact" />
       </Panel>
 
+      {r.postHoc.map((ph) => {
+        const pcols: Column<Row>[] = ['Çift', 'Fark', `%${Math.round((1 - r.alpha) * 100)} GA`, 'p', 'Sonuç'].map((h, i) => ({
+          key: h,
+          header: h,
+          numeric: i > 0 && i < 4,
+          align: i > 0 && i < 4 ? 'right' : 'left',
+          cell: (row) => row[i],
+          cellClassName: (row) => (i === 4 && row[i] === 'Anlamlı' ? 'font-semibold text-secondary' : undefined),
+        }));
+        const prows: Row[] = ph.pairs.map((x) => [`${x.a} – ${x.b}`, n2(x.diff), `[${n2(x.ciLow)}, ${n2(x.ciHigh)}]`, formatP(x.p, true), x.p < r.alpha ? 'Anlamlı' : 'Anlamlı değil']);
+        return (
+          <Panel key={ph.factor}>
+            <SectionHeader icon={Table2} title={`İkili karşılaştırmalar: ${ph.factor} (Tukey HSD)`} level={3} description="Modelin hata kareler ortalamasıyla; p değerleri aile bazında düzeltilmiştir. Ortalamalar gözlenen marjinal ortalamalardır." />
+            <DataTable caption={`${ph.factor} ikili karşılaştırmalar`} columns={pcols} rows={prows} rowKey={(row) => row[0]!} density="compact" />
+          </Panel>
+        );
+      })}
+
+      {r.simpleEffects.length > 0 && (
+        <Panel>
+          <SectionHeader icon={Table2} title="Basit etkiler (anlamlı etkileşimin ardından)" level={3} description="Bir faktörün etkisi, diğer faktörün her düzeyinde ayrı sınanır. Düzeltilmiş p: aynı ailedeki düzey sayısına göre Bonferroni." />
+          <DataTable
+            caption="Basit etkiler"
+            columns={['Etkileşim', 'Etki', 'Koşul', 'F', 'p', 'Düzeltilmiş p'].map((h, i) => ({
+              key: h,
+              header: h,
+              numeric: i >= 3,
+              align: i >= 3 ? 'right' : 'left',
+              cell: (row: Row) => row[i],
+              cellClassName: (row: Row) => (i === 5 && (row[i]!.startsWith('<') || Number(row[i]) < r.alpha) ? 'font-semibold text-secondary' : undefined),
+            }))}
+            rows={r.simpleEffects.map((s) => [s.term, s.factor, `${s.at.factor} = ${s.at.level}`, `${n2(s.F)} (${s.df}, ${r.error.df})`, formatP(s.p, true), formatP(s.pAdj, true)])}
+            rowKey={(row) => `${row[0]}|${row[1]}|${row[2]}`}
+            density="compact"
+          />
+        </Panel>
+      )}
+
       <Panel>
         <SectionHeader icon={Languages} title="Nasıl okunur" level={3} />
         <ul className="flex list-disc flex-col gap-2 pl-5 text-body text-fg">
@@ -121,18 +168,20 @@ function Results({ data, body, datasetId }: { data: FactorialResponse; body: Fac
       </Panel>
 
       <Panel>
-        <SectionHeader icon={FileText} title="Rapor" level={3} description="Amaç, tasarım, betimleyici istatistikler, varsayım grafikleri, ANOVA tablosu, etkileşim grafikleri, yorum ve APA özeti." />
+        <SectionHeader icon={FileText} title="Python kodu ve rapor" level={3} description="Rapor: amaç, tasarım, betimleyici istatistikler, varsayım grafikleri, ANOVA tablosu, post-hoc, etkileşim grafikleri, yorum ve APA özeti. Betik aynı sayıları numpy ve scipy ile yeniden üretir; veri dosyasını betikle aynı klasöre koyun." />
+        <SaveToReports url={`/api/datasets/${datasetId}/factorial/save`} body={body} resetKey={`${datasetId}:${JSON.stringify(body)}`} />
         <ReportActions url={`/api/datasets/${datasetId}/factorial/report`} body={body} fileBase="faktoriyel-anova-raporu" />
+        <CodeBlock code={data.code.code} filename={data.code.filename} runtime={`Python · ${data.code.requirements.join(', ')}`} lineNumbers maxHeight="28rem" />
       </Panel>
     </>
   );
 }
 
-function Factorial({ dataset }: { dataset: DatasetInfo }) {
+function Factorial({ dataset, preset }: { dataset: DatasetInfo; preset?: { dependent?: string; factors: string[] } }) {
   const cols = dataset.columns;
   const deps = dependentCandidates(cols);
-  const [dependent, setDependent] = useState<string | undefined>(() => deps.find((c) => c.type === 'continuous')?.name ?? deps[0]?.name);
-  const [factors, setFactors] = useState<string[]>([]);
+  const [dependent, setDependent] = useState<string | undefined>(() => (preset?.dependent && deps.some((c) => c.name === preset.dependent) ? preset.dependent : (deps.find((c) => c.type === 'continuous')?.name ?? deps[0]?.name)));
+  const [factors, setFactors] = useState<string[]>(() => (preset?.factors ?? []).filter((f) => cols.some((c) => c.name === f)).slice(0, 4));
   const [alpha, setAlpha] = useState('0.05');
   const [ssType, setSsType] = useState<FactorialBody['ssType']>('auto');
 

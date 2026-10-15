@@ -45,6 +45,23 @@ const MIGRATIONS: string[] = [
      engine_json TEXT NOT NULL
    );
    CREATE INDEX saved_reports_dataset ON saved_reports(dataset_id, created_at DESC);`,
+  // Rapor merkezine faktöriyel ANOVA da kaydedilir: SQLite CHECK kısıtı değiştirilemediğinden tablo yeniden kurulur
+  `CREATE TABLE saved_reports_new (
+     id TEXT PRIMARY KEY,
+     dataset_id TEXT NOT NULL REFERENCES datasets(id) ON DELETE CASCADE,
+     kind TEXT NOT NULL CHECK (kind IN ('regression', 'logistic', 'model', 'factorial')),
+     created_at TEXT NOT NULL,
+     title TEXT NOT NULL,
+     detail TEXT NOT NULL,
+     spec_json TEXT NOT NULL,
+     result_json TEXT NOT NULL,
+     input_hash TEXT NOT NULL,
+     engine_json TEXT NOT NULL
+   );
+   INSERT INTO saved_reports_new SELECT id, dataset_id, kind, created_at, title, detail, spec_json, result_json, input_hash, engine_json FROM saved_reports;
+   DROP TABLE saved_reports;
+   ALTER TABLE saved_reports_new RENAME TO saved_reports;
+   CREATE INDEX saved_reports_dataset ON saved_reports(dataset_id, created_at DESC);`,
 ];
 
 export function openDb(path: string): DatabaseSync {

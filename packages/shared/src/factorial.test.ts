@@ -24,6 +24,27 @@ describe('fitFactorialAnova', () => {
     expect(r.error.ss).toBeCloseTo(1326.6667, 3);
   });
 
+  it('Tukey HSD ve basit etkiler scipy ile eşleşir', () => {
+    const fac = [
+      { name: 'a', values: DATA.map((d) => d[0]!) },
+      { name: 'b', values: DATA.map((d) => d[1]!) },
+    ];
+    const y = DATA.map((d) => Number(d[2]));
+    const all = fitFactorialAnova('y', y, fac, { alpha: 1 });
+    const pairs = all.postHoc.find((x) => x.factor === 'b')!.pairs;
+    expect(pairs[0]!.p).toBeCloseTo(0.0325, 4);
+    expect(pairs[1]!.p).toBeCloseTo(0.9799, 4);
+    expect(pairs[2]!.p).toBeCloseTo(0.0231, 4);
+    const se = all.postHoc[0]!.pairs[0]!.se;
+    expect(se).toBeCloseTo(Math.sqrt((1326.6667 / 12 / 2) * (2 / 6)), 3);
+    const simple = all.simpleEffects.filter((x) => x.factor === 'a');
+    expect(simple.map((x) => x.F.toFixed(3))).toEqual(['4.560', '5.610', '11.674']);
+    expect(simple[2]!.p).toBeCloseTo(0.0051, 4);
+    // %95 kritik değer: q(0.05; 3, 12) = 3.7729
+    const ci = fitFactorialAnova('y', y, fac).postHoc[0]!.pairs[0]!;
+    expect((ci.ciHigh - ci.diff) / ci.se).toBeCloseTo(3.7729, 3);
+  });
+
   it('boş hücre varsa Tip II kullanır ve serbestlik derecelerini korur', () => {
     // a=x,b=q hücresi boş
     const rows: [string, string, number][] = [['x', 'p', 1], ['x', 'p', 2], ['y', 'p', 3], ['y', 'p', 5], ['y', 'q', 6], ['y', 'q', 8], ['x', 'r', 2], ['x', 'r', 4], ['y', 'r', 7], ['y', 'r', 9]];
