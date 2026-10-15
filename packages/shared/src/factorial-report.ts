@@ -30,6 +30,12 @@ export function interpretFactorial(r: FactorialResult): string[] {
   }
   const inter = r.terms.filter((t) => t.factors.length > 1 && sig(t));
   if (inter.length) out.push(`Anlamlı etkileşim (${trList(inter.map((t) => t.name))}) bulunduğundan ilgili ana etkiler tek başına yorumlanmamalı; bir faktörün etkisi diğer faktörün düzeyine göre değişir. Basit etkiler (diğer faktörün her düzeyinde ayrı karşılaştırma) incelenmelidir.`);
+  for (const ph of r.postHoc) {
+    const sp = ph.pairs.filter((x) => x.p < r.alpha);
+    out.push(sp.length ? `${ph.factor} için Tukey HSD: anlamlı farklar ${sp.map((x) => `${x.a} – ${x.b} (fark = ${f2(x.diff)}, ${pText(x.p)})`).join('; ')}.` : `${ph.factor} için Tukey HSD ikili karşılaştırmalarında anlamlı fark bulunmadı.`);
+  }
+  const simpleSig = r.simpleEffects.filter((x) => x.pAdj < r.alpha);
+  if (r.simpleEffects.length) out.push(simpleSig.length ? `Basit etkiler (Bonferroni düzeltmeli): ${simpleSig.map((x) => `${x.factor}, ${x.at.factor} = ${x.at.level} düzeyinde anlamlı (F(${x.df}, ${r.error.df}) = ${f2(x.F)}, ${pText(x.pAdj)})`).join('; ')}.` : 'Basit etkilerin hiçbiri düzeltmeden sonra anlamlı kalmadı.');
   out.push(`Model toplam varyansın %${(r.r2 * 100).toFixed(1)}’ini açıklamaktadır (R² = ${f3(r.r2)}, düzeltilmiş R² = ${f3(r.adjR2)}).`);
   return out;
 }
@@ -93,6 +99,28 @@ export function buildFactorialDoc(r: FactorialResult, opts: { datasetName: strin
     },
     { type: 'p', muted: true, text: `R² = ${f3(r.r2)}; düzeltilmiş R² = ${f3(r.adjR2)}.` },
   );
+
+  const sigText = (p: number) => (p < r.alpha ? 'Anlamlı' : 'Anlamlı değil');
+  if (r.postHoc.length) {
+    blocks.push({ type: 'heading', text: 'İkili karşılaştırmalar (Tukey HSD)' });
+    for (const ph of r.postHoc) {
+      blocks.push({
+        type: 'table',
+        caption: `${ph.factor}: ikili farklar. Modelin hata kareler ortalaması (${f2(r.error.ms)}) ve hata sd (${r.error.df}) kullanıldı; p değerleri aile bazında düzeltilmiştir; %${Math.round((1 - r.alpha) * 100)} eşzamanlı güven aralığı. Ortalamalar gözlenen marjinal ortalamalardır (hücre büyüklükleri eşit değilse Tukey–Kramer).`,
+        header: ['Çift', 'Fark', `%${Math.round((1 - r.alpha) * 100)} GA`, 'p', 'Sonuç'],
+        rows: ph.pairs.map((x) => [`${x.a} – ${x.b}`, f2(x.diff), `[${f2(x.ciLow)}, ${f2(x.ciHigh)}]`, formatP(x.p, true), sigText(x.p)]),
+      });
+    }
+  }
+  if (r.simpleEffects.length) {
+    blocks.push({ type: 'heading', text: 'Basit etkiler (anlamlı etkileşimin ardından)' });
+    blocks.push({
+      type: 'table',
+      caption: 'Bir faktörün etkisi, diğer faktörün her düzeyinde ayrı ayrı sınanır; hata terimi modelin hata kareler ortalamasıdır (diğer faktörler üzerinden gözlenen ortalamalarla). Düzeltilmiş p: aynı ailedeki düzey sayısına göre Bonferroni.',
+      header: ['Etkileşim', 'Etki', 'Koşul', 'n', 'F', 'sd', 'p', 'Düzeltilmiş p', 'Sonuç'],
+      rows: r.simpleEffects.map((s) => [s.term, s.factor, `${s.at.factor} = ${s.at.level}`, String(s.n), f2(s.F), `${s.df}, ${r.error.df}`, formatP(s.p, true), formatP(s.pAdj, true), sigText(s.pAdj)]),
+    });
+  }
 
   // etkileşim grafikleri: her faktör çifti için, diğer faktörler üzerinden gözlenen ortalama
   if (r.factors.length >= 2) {

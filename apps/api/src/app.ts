@@ -53,6 +53,8 @@ import {
   regressionReportData,
   fitFactorialAnova,
   buildFactorialDoc,
+  generateFactorialCode,
+  type FactorialResult,
   interpretFactorial,
   coefficientRows,
   modelRows,
@@ -974,20 +976,33 @@ export function buildApp(opts: AppOptions): FastifyInstance {
     ['Referans doğrulama', `Tip III sonuçları statsmodels (Sum kodlaması) ile karşılaştırıldı; ${eng.engineName} ${eng.engine}, Node ${eng.node}`],
   ];
 
+  const factorialDoc = (row: DatasetRow, r: FactorialResult, date: string, audit: Audit): RenderedReport => {
+    const doc = buildFactorialDoc(r, { datasetName: row.name, date, audit });
+    return { html: renderReportHtml(doc), docx: () => buildDocxFromDoc(doc), fileBase: 'faktoriyel-anova-raporu' };
+  };
+
   app.post('/api/datasets/:id/factorial', async (req) => {
     const { id } = req.params as { id: string };
     const { row, spec, result } = runFactorial(id, req.body);
     const { residuals, ...summary } = result;
     void residuals;
-    return { datasetId: row.id, datasetName: row.name, spec, result: summary, interpretation: interpretFactorial(result), engine: engineInfo() };
+    const { csv } = parsed(id);
+    const code = generateFactorialCode(fileInfo(row, csv), spec, result);
+    return { datasetId: row.id, datasetName: row.name, spec, result: summary, interpretation: interpretFactorial(result), code, engine: engineInfo() };
   });
 
   app.post('/api/datasets/:id/factorial/report', async (req, reply) => {
     const { id } = req.params as { id: string };
     const { format } = FormatQuery.parse(req.query);
     const { row, spec, result } = runFactorial(id, req.body);
-    const doc = buildFactorialDoc(result, { datasetName: row.name, date: trDate(Date.now()), audit: factorialAudit(row, spec, engineInfo()) });
-    return sendReport(reply, format, { html: renderReportHtml(doc), docx: () => buildDocxFromDoc(doc), fileBase: 'faktoriyel-anova-raporu' });
+    return sendReport(reply, format, factorialDoc(row, result, trDate(Date.now()), factorialAudit(row, spec, engineInfo())));
+  });
+
+  app.post('/api/datasets/:id/factorial/save', async (req, reply) => {
+    const { row, spec, result } = runFactorial((req.params as { id: string }).id, req.body);
+    const sig = result.terms.filter((t) => t.p < result.alpha).length;
+    const { item, created } = saveReport('factorial', row, spec, { ...result, residuals: result.n <= 5000 ? result.residuals : [] }, `${spec.dependent} ← ${spec.factors.join(' × ')}`, `R² = ${dec3(result.r2)} · ${sig}/${result.terms.length} etki anlamlı · n = ${countText(result.n)}`);
+    return reply.status(created ? 201 : 200).send({ ...item, created });
   });
 
   /* ---------- İkili lojistik regresyon ---------- */
@@ -1179,7 +1194,7 @@ export function buildApp(opts: AppOptions): FastifyInstance {
   });
 
   /* ---------- Rapor merkezi: kaydedilmiş regresyon, lojistik regresyon ve model karşılaştırma sonuçları ---------- */
-  type SavedKind = 'regression' | 'logistic' | 'model';
+  type SavedKind = 'regression' | 'logistic' | 'model' | 'factorial';
   interface SavedReportRow {
     id: string;
     dataset_id: string;
@@ -1298,6 +1313,12 @@ export function buildApp(opts: AppOptions): FastifyInstance {
       const audit = [...head, ...logisticAudit(row, spec, result, eng)];
       return { kind: r.kind, row, eng, audit, spec, result, doc: () => logisticDoc(row, spec, result, date, audit) };
     }
+    if (r.kind === 'factorial') {
+      const spec = JSON.parse(r.spec_json) as z.infer<typeof FactorialBody>;
+      const result = JSON.parse(r.result_json) as FactorialResult;
+      const audit = [...head, ...factorialAudit(row, spec, eng)];
+      return { kind: r.kind, row, eng, audit, spec, result, doc: () => factorialDoc(row, result, date, audit) };
+    }
     const spec = JSON.parse(r.spec_json) as ModelCompareSpec;
     const result = JSON.parse(r.result_json) as CvResult;
     const audit = [...head, ...modelAudit(row, spec, result, eng)];
@@ -1321,6 +1342,13 @@ export function buildApp(opts: AppOptions): FastifyInstance {
       const highlights: Audit = [['Nagelkerke R²', dec3(x.nagelkerke)], [`LR χ²(${x.lrDf})`, `${x.lrChi2.toFixed(2)}, ${pText(x.lrP)}`], ['AUC', dec3(x.auc)], ['Doğru sınıflandırma', pctText(x.classification.accuracy)], ['Gözlem', countText(x.n)]];
       return { ...base, highlights, apaSummary: n.apaSummary, summary: n.interpretation, notes: n.notes, codeUnavailable: x.separation === 'complete' ? NO_LOGIT_CODE : null };
     }
+    if (o.kind === 'factorial') {
+      const x = o.result;
+      const sigTerms = x.terms.filter((t) => t.p < x.alpha);
+      const highlights: Audit = [['R²', dec3(x.r2)], [`Model F(${x.model.df}, ${x.error.df})`, `${x.model.F.toFixed(2)}, ${pText(x.model.p)}`], ['Anlamlı etkiler', sigTerms.length ? sigTerms.map((t) => t.name).join(', ') : 'yok'], ['Kareler toplamı', `Tip ${x.ssType}`], ['Gözlem', countText(x.n)]];
+      const notes = x.ssTypeSwitched ? [{ level: 'warning' as const, title: 'Boş hücre', text: `${x.emptyCells} hücrede gözlem yok; Tip III tanımsız olduğundan Tip II kullanıldı.` }] : [];
+      return { ...base, highlights, apaSummary: x.terms.map((t) => `${t.name}: F(${t.df}, ${x.error.df}) = ${t.F.toFixed(2)}, ${pText(t.p)}`).join('; '), summary: interpretFactorial(x), notes, codeUnavailable: null };
+    }
     const x = o.result;
     const interp = interpretComparison(x);
     const best = x.models.find((m) => m.id === interp.best?.id);
@@ -1338,6 +1366,7 @@ export function buildApp(opts: AppOptions): FastifyInstance {
       if (o.result.separation === 'complete') throw new ApiError(409, 'no_code', NO_LOGIT_CODE);
       return generateLogisticCode(file, o.spec, o.result);
     }
+    if (o.kind === 'factorial') return generateFactorialCode(file, o.spec, o.result);
     return generateModelCompareCode(file, o.spec, o.result);
   });
 

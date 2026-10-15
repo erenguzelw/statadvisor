@@ -34,3 +34,4 @@ export * from './studentized.ts';
 export * from './posthoc.ts';
 export * from './factorial.ts';
 export * from './factorial-report.ts';
+export * from './factorial-code.ts';

@@ -6,6 +6,7 @@
  */
 import { AnalysisError } from './analysis.ts';
 import { fSurvival, shapiroWilk } from './assumptions.ts';
+import { studentizedRangeQuantile, studentizedRangeSurvival } from './studentized.ts';
 
 export interface FactorInput {
   name: string;
@@ -45,6 +46,36 @@ export interface MarginalStat {
   sd: number;
 }
 
+export interface PostHocRow {
+  a: string;
+  b: string;
+  diff: number;
+  se: number;
+  p: number;
+  ciLow: number;
+  ciHigh: number;
+}
+
+/** Anlamlı ve 3+ düzeyli bir ana etki için Tukey HSD (modelin hata kareler ortalaması ve sd'siyle). */
+export interface FactorPostHoc {
+  factor: string;
+  pairs: PostHocRow[];
+}
+
+/** Anlamlı bir iki yönlü etkileşimin basit etkileri: bir faktörün etkisi, diğer faktörün her düzeyinde (modelin hata terimiyle). */
+export interface SimpleEffect {
+  term: string;
+  factor: string;
+  at: { factor: string; level: string };
+  n: number;
+  ss: number;
+  df: number;
+  F: number;
+  p: number;
+  /** Aynı (terim, faktör) ailesindeki düzey sayısına göre Bonferroni düzeltmeli p. */
+  pAdj: number;
+}
+
 export interface FactorialResult {
   dependent: string;
   factors: string[];
@@ -75,6 +106,10 @@ export interface FactorialResult {
   levene: { F: number; df1: number; df2: number; p: number } | null;
   /** Model kalıntılarının Shapiro-Wilk sonucu (3 ≤ n ≤ 5000). */
   residualNormality: { W: number; p: number; n: number } | null;
+  /** Anlamlı ve 3+ düzeyli ana etkiler için ikili karşılaştırmalar. */
+  postHoc: FactorPostHoc[];
+  /** Anlamlı iki yönlü etkileşimler için basit etkiler (diğer faktörler üzerinden gözlenen ortalamalarla). */
+  simpleEffects: SimpleEffect[];
   residuals: number[];
 }
 
@@ -250,6 +285,54 @@ export function fitFactorialAnova(dependent: string, y: (number | null)[], facto
     const sw = shapiroWilk(full.resid);
     residualNormality = { W: sw.W, p: sw.p, n };
   }
+  // post-hoc: anlamlı, 3+ düzeyli ana etkiler (Tukey HSD / Tukey-Kramer, model MSE)
+  const postHoc: FactorPostHoc[] = [];
+  names.forEach((f) => {
+    const term = terms.find((t) => t.factors.length === 1 && t.factors[0] === f);
+    const lv = levels[f]!;
+    if (!term || !(term.p < alpha) || lv.length < 3) return;
+    const ms = marginals.filter((m) => m.factor === f);
+    const crit = studentizedRangeQuantile(alpha, lv.length, dfe);
+    const pairs: PostHocRow[] = [];
+    for (let a = 0; a < lv.length; a++) {
+      for (let b = a + 1; b < lv.length; b++) {
+        const diff = ms[a]!.mean - ms[b]!.mean;
+        const se = Math.sqrt((mse / 2) * (1 / ms[a]!.n + 1 / ms[b]!.n));
+        pairs.push({ a: lv[a]!, b: lv[b]!, diff, se, p: studentizedRangeSurvival(Math.abs(diff) / se, lv.length, dfe), ciLow: diff - crit * se, ciHigh: diff + crit * se });
+      }
+    }
+    postHoc.push({ factor: f, pairs });
+  });
+  // basit etkiler: anlamlı iki yönlü etkileşimler
+  const simpleEffects: SimpleEffect[] = [];
+  for (const t of terms) {
+    if (t.factors.length !== 2 || !(t.p < alpha)) continue;
+    for (const [fx, fy] of [[t.factors[0]!, t.factors[1]!], [t.factors[1]!, t.factors[0]!]] as const) {
+      const jx = names.indexOf(fx);
+      const jy = names.indexOf(fy);
+      const Lx = levels[fx]!.length;
+      const Ly = levels[fy]!.length;
+      const raw: Omit<SimpleEffect, 'pAdj'>[] = [];
+      for (let ly = 0; ly < Ly; ly++) {
+        const rowsIn = yv.map((_, r) => r).filter((r) => codes[jy]![r] === ly);
+        if (!rowsIn.length) continue;
+        const slice = mean(rowsIn.map((r) => yv[r]!));
+        let ss = 0;
+        let present = 0;
+        for (let lx = 0; lx < Lx; lx++) {
+          const v = rowsIn.filter((r) => codes[jx]![r] === lx).map((r) => yv[r]!);
+          if (!v.length) continue;
+          present++;
+          ss += v.length * (mean(v) - slice) ** 2;
+        }
+        const df = present - 1;
+        if (df < 1) continue;
+        const F = ss / df / mse;
+        raw.push({ term: t.name, factor: fx, at: { factor: fy, level: levels[fy]![ly]! }, n: rowsIn.length, ss, df, F, p: fSurvival(F, df, dfe) });
+      }
+      for (const e of raw) simpleEffects.push({ ...e, pAdj: Math.min(1, e.p * raw.length) });
+    }
+  }
   return {
     dependent,
     factors: names,
@@ -275,6 +358,8 @@ export function fitFactorialAnova(dependent: string, y: (number | null)[], facto
     balanced: Math.min(...ns) === Math.max(...ns) && cells.length === totalCells,
     levene,
     residualNormality,
+    postHoc,
+    simpleEffects,
     residuals: full.resid,
   };
 }

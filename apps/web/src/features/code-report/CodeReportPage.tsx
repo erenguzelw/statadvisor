@@ -27,10 +27,10 @@ const SECTION_LABELS: Record<string, string> = {
   refs: 'Kaynakça',
 };
 
-const KIND_LABEL: Record<ReportKind, string> = { test: 'Test', regression: 'Regresyon', logistic: 'Lojistik', model: 'Model karşılaştırma' };
-const KIND_TONE: Record<ReportKind, TagTone> = { test: 'neutral', regression: 'primary', logistic: 'secondary', model: 'tertiary' };
-const KIND_ORDER: ReportKind[] = ['test', 'regression', 'logistic', 'model'];
-const FILE_BASE: Record<Exclude<ReportKind, 'test'>, string> = { regression: 'regresyon-raporu', logistic: 'lojistik-regresyon-raporu', model: 'model-karsilastirma-raporu' };
+const KIND_LABEL: Record<ReportKind, string> = { test: 'Test', regression: 'Regresyon', logistic: 'Lojistik', model: 'Model karşılaştırma', factorial: 'Faktöriyel ANOVA' };
+const KIND_TONE: Record<ReportKind, TagTone> = { test: 'neutral', regression: 'primary', logistic: 'secondary', model: 'tertiary', factorial: 'primary' };
+const KIND_ORDER: ReportKind[] = ['test', 'regression', 'logistic', 'model', 'factorial'];
+const FILE_BASE: Record<Exclude<ReportKind, 'test'>, string> = { regression: 'regresyon-raporu', logistic: 'lojistik-regresyon-raporu', model: 'model-karsilastirma-raporu', factorial: 'faktoriyel-anova-raporu' };
 const when = (iso: string) => new Date(iso).toLocaleString('tr-TR', { dateStyle: 'short', timeStyle: 'short' });
 const ctaClass = 'rounded-control bg-primary-strong px-4 py-2 font-semibold text-on-primary-strong';
 

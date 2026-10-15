@@ -243,7 +243,7 @@ export interface ModelRunJob {
 export type QualityResponse = DatasetQuality;
 
 /** Rapor merkezindeki kayıt türleri: Karar Sihirbazı testi ya da kaydedilmiş regresyon/lojistik/model raporu. */
-export type ReportKind = 'test' | 'regression' | 'logistic' | 'model';
+export type ReportKind = 'test' | 'regression' | 'logistic' | 'model' | 'factorial';
 
 export interface ReportListItem {
   id: string;
@@ -286,4 +286,5 @@ export interface FactorialResponse {
   spec: FactorialBody;
   result: Omit<FactorialResult, 'residuals'>;
   interpretation: string[];
+  code: GeneratedCode;
 }
