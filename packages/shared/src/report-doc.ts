@@ -11,7 +11,9 @@ export type DocBlock =
   | { type: 'note'; level: DocNoteLevel; title: string; text: string }
   | { type: 'table'; caption?: string; header: string[]; rows: string[][] }
   /** Ad–değer çiftleri (iki sütunlu tablo). */
-  | { type: 'kv'; caption?: string; rows: [string, string][] };
+  | { type: 'kv'; caption?: string; rows: [string, string][] }
+  /** Grafik: HTML'de satır içi SVG, Word'de PNG olarak gömülür. */
+  | { type: 'figure'; caption: string; title: string; svg: string };
 
 export interface ReportDoc {
   title: string;
@@ -29,7 +31,7 @@ h1{font-size:1.6rem;margin-bottom:.25rem}h2{font-size:1.15rem;margin-top:2rem;bo
 table{border-collapse:collapse;width:100%;margin:.5rem 0 .25rem;font-size:.9rem}th,td{border:1px solid #bbb;padding:.3rem .5rem;text-align:left}
 th{background:#f2f2f2}td.n{text-align:right;font-variant-numeric:tabular-nums}.muted{color:#555;font-size:.9rem}
 .warn{background:#fff7e0;border-left:4px solid #c98a00;padding:.5rem .8rem;margin:.4rem 0}.bad{background:#fde8e8;border-left-color:#b91c1c}.info{background:#eef3fb;border-left-color:#3b6fb5}
-li{margin:.3rem 0}.cap{color:#555;font-size:.9rem;margin:.75rem 0 0}@media print{body{margin:0}table,.warn{break-inside:avoid}}`;
+figure{margin:1rem 0}svg{max-width:100%}li{margin:.3rem 0}.cap{color:#555;font-size:.9rem;margin:.75rem 0 0}@media print{body{margin:0}table,.warn{break-inside:avoid}}`;
 
 function table(header: string[], rows: string[][]): string {
   return `<table><thead><tr>${header.map((h) => `<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${rows.map((r) => `<tr>${r.map((c, i) => `<td${i > 0 ? ' class="n"' : ''}>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
@@ -48,6 +50,8 @@ export function renderReportHtml(doc: ReportDoc): string {
         return `<p class="warn ${b.level === 'danger' ? 'bad' : b.level === 'info' ? 'info' : ''}"><strong>${esc(b.title)}.</strong> ${esc(b.text)}</p>`;
       case 'table':
         return `${b.caption ? `<p class="cap">${esc(b.caption)}</p>` : ''}${table(b.header, b.rows)}`;
+      case 'figure':
+        return `<figure><figcaption class="muted">${esc(b.caption)}</figcaption>${b.svg}</figure>`;
       case 'kv':
         return `${b.caption ? `<p class="cap">${esc(b.caption)}</p>` : ''}${table(['Öğe', 'Değer'], b.rows)}`;
     }

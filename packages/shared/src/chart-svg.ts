@@ -1,7 +1,9 @@
 /**
  * Raporlar için bağımsız (kütüphanesiz) SVG grafikler. Çıktı belirleyicidir: aynı veri aynı metni üretir.
  */
+import { mean, normalQuantile, quantile } from './assumptions.ts';
 import { extent } from './extent.ts';
+import { histogram, skewness } from './stats.ts';
 import type { BoxStats, DistributionSample, ScatterSample } from './types.ts';
 
 const W = 520;
@@ -139,4 +141,129 @@ export function scatterSvg(s: ScatterSample, title: string): string {
     : '';
   const cut = (t: string) => (t.length > 40 ? `${t.slice(0, 39)}…` : t);
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${esc(title)}"><title>${esc(title)}</title>${grid}${dots}${line}<text x="${n2((left + W - pad.right) / 2)}" y="${H - 4}" text-anchor="middle" font-size="11" fill="#222">${esc(cut(s.xName))}</text><text transform="rotate(-90)" x="${-n2((H - bottom + pad.top) / 2)}" y="12" text-anchor="middle" font-size="11" fill="#222">${esc(cut(s.yName))}</text></svg>`;
+}
+
+/** İki SVG'yi yan yana tek SVG'de birleştirir (her biri W × H'lik kendi görünüm kutusunda). */
+function sideBySide(a: string, b: string, title: string): string {
+  if (!a || !b) return a || b;
+  const place = (svg: string, x: number) => svg.replace('width="100%"', `x="${x}" y="0" width="${W}" height="${H}"`);
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W * 2 + 16} ${H}" width="100%" role="img" aria-label="${esc(title)}"><title>${esc(title)}</title>${place(a, 0)}${place(b, W + 16)}</svg>`;
+}
+
+/** Normal olasılık (Q-Q) grafiği: gözlenen sıralı değerler ile kuramsal normal kantiller; çizgi Q1–Q3 noktalarından geçer. */
+export function qqPlotSvg(values: number[], title: string): string {
+  const v = values.filter(Number.isFinite).sort((a, b) => a - b);
+  const n = v.length;
+  if (n < 3) return '';
+  const theo = (i: number) => normalQuantile((i + 0.5) / n);
+  const maxPoints = 300;
+  const idx = n <= maxPoints ? v.map((_, i) => i) : Array.from({ length: maxPoints }, (_, k) => Math.round((k * (n - 1)) / (maxPoints - 1)));
+  const pts = idx.map((i) => [theo(i), v[i]!] as const);
+  const xs = extent(pts.map((p) => p[0]));
+  const ys = extent(pts.map((p) => p[1]));
+  const yp = (ys.hi - ys.lo || 1) * 0.05;
+  const y0 = ys.lo - yp;
+  const y1 = ys.hi + yp;
+  const x0 = xs.lo - 0.2;
+  const x1 = xs.hi + 0.2;
+  const left = 52;
+  const bottom = 40;
+  const sx = (t: number) => left + ((t - x0) / (x1 - x0)) * (W - left - pad.right);
+  const sy = (t: number) => H - bottom - ((t - y0) / (y1 - y0)) * (H - pad.top - bottom);
+  const grid = [0, 1, 2, 3, 4]
+    .map((i) => {
+      const yv = y0 + ((y1 - y0) * i) / 4;
+      const xv = x0 + ((x1 - x0) * i) / 4;
+      return `<line x1="${left}" x2="${W - pad.right}" y1="${n2(sy(yv))}" y2="${n2(sy(yv))}" stroke="#ddd" stroke-dasharray="3 4"/><text x="${left - 6}" y="${n2(sy(yv) + 3)}" text-anchor="end" font-size="10" fill="#555">${tick(yv)}</text><text x="${n2(sx(xv))}" y="${H - bottom + 14}" text-anchor="middle" font-size="10" fill="#555">${n2(xv)}</text>`;
+    })
+    .join('');
+  const q = (p: number) => quantile(v, p);
+  const zq1 = normalQuantile(0.25);
+  const zq3 = normalQuantile(0.75);
+  const slope = (q(0.75) - q(0.25)) / (zq3 - zq1);
+  const icpt = q(0.25) - slope * zq1;
+  const line = Number.isFinite(slope) && slope > 0 ? `<line x1="${n2(sx(x0))}" y1="${n2(sy(icpt + slope * x0))}" x2="${n2(sx(x1))}" y2="${n2(sy(icpt + slope * x1))}" stroke="#d98a00" stroke-width="2" stroke-dasharray="6 4"/>` : '';
+  const dots = pts.map(([a, b]) => `<circle cx="${n2(sx(a))}" cy="${n2(sy(b))}" r="2.4" fill="#6b6fe0" fill-opacity="0.55"/>`).join('');
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${esc(title)}"><title>${esc(title)}</title>${grid}${line}${dots}<text x="${n2((left + W - pad.right) / 2)}" y="${H - 4}" text-anchor="middle" font-size="11" fill="#222">Kuramsal normal kantil (z)</text><text transform="rotate(-90)" x="${-n2((H - bottom + pad.top) / 2)}" y="12" text-anchor="middle" font-size="11" fill="#222">Gözlenen değer</text></svg>`;
+}
+
+/** Bir değişken için sol: histogram + kuramsal normal eğri, sağ: normal Q-Q grafiği. */
+export function normalityPanelSvg(values: number[], name: string): string {
+  const v = values.filter(Number.isFinite);
+  if (v.length < 5) return '';
+  const m = mean(v);
+  const sdv = Math.sqrt(v.reduce((s, x) => s + (x - m) ** 2, 0) / (v.length - 1));
+  if (!(sdv > 0)) return '';
+  const { lo, hi } = extent(v);
+  const k = Math.min(30, Math.max(6, Math.ceil(Math.log2(v.length) + 1)));
+  const width = (hi - lo) / k || 1;
+  const dist: DistributionSample = { bins: histogram(v, k, lo, width), mean: m, sd: sdv, skewness: Number(skewness(v).toFixed(2)), n: v.length };
+  const title = `${name}: histogram ve normal Q-Q grafiği`;
+  return sideBySide(histogramSvg(dist, `${name} histogramı`), qqPlotSvg(v, `${name} normal Q-Q grafiği`), title);
+}
+
+export interface BarItem {
+  label: string;
+  value: number;
+  /** Verilirse çubuğun ucunda ± hata çizgisi çizilir (ör. çapraz doğrulama standart sapması). */
+  err?: number;
+  text?: string;
+}
+
+/** Yatay çubuk grafiği; isteğe bağlı dikey referans çizgisi (ör. taban doğruluğu). Değerler 0'dan başlar. */
+export function barsSvg(items: BarItem[], title: string, opts: { max?: number; baseline?: { value: number; label: string } } = {}): string {
+  if (!items.length) return '';
+  const rowH = 28;
+  const labelW = 150;
+  const right = 70;
+  const top = 18;
+  const h = top + items.length * rowH + 14;
+  const max = opts.max ?? (Math.max(...items.map((i) => i.value + (i.err ?? 0)), opts.baseline?.value ?? 0) * 1.05 || 1);
+  const sx = (v: number) => labelW + (v / max) * (W - labelW - right);
+  const rows = items
+    .map((it, i) => {
+      const y = top + i * rowH;
+      const c = COLORS[i % COLORS.length]!;
+      const err = it.err && it.err > 0 ? `<line x1="${n2(sx(Math.max(0, it.value - it.err)))}" x2="${n2(sx(it.value + it.err))}" y1="${y + 9}" y2="${y + 9}" stroke="#222"/><line x1="${n2(sx(it.value + it.err))}" x2="${n2(sx(it.value + it.err))}" y1="${y + 5}" y2="${y + 13}" stroke="#222"/>` : '';
+      const label = it.label.length > 24 ? `${it.label.slice(0, 23)}…` : it.label;
+      const end = sx(it.value + (it.err ?? 0)) + 6;
+      return `<text x="${labelW - 8}" y="${y + 13}" text-anchor="end" font-size="11" fill="#222">${esc(label)}</text><rect x="${labelW}" y="${y}" width="${n2(Math.max(0, sx(it.value) - labelW))}" height="18" fill="${c}" fill-opacity="0.75"/>${err}<text x="${n2(end)}" y="${y + 13}" font-size="10" fill="#333">${esc(it.text ?? n2(it.value))}</text>`;
+    })
+    .join('');
+  const b = opts.baseline;
+  const base = b ? `<line x1="${n2(sx(b.value))}" x2="${n2(sx(b.value))}" y1="${top - 6}" y2="${h - 12}" stroke="#d98a00" stroke-width="2" stroke-dasharray="6 4"/><text x="${n2(sx(b.value))}" y="${top - 8}" text-anchor="middle" font-size="10" fill="#9a6700">${esc(b.label)}</text>` : '';
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${h}" width="100%" role="img" aria-label="${esc(title)}"><title>${esc(title)}</title><line x1="${labelW}" x2="${labelW}" y1="${top - 4}" y2="${h - 12}" stroke="#999"/>${rows}${base}</svg>`;
+}
+
+/** Etkileşim grafiği: x ekseninde bir faktörün düzeyleri, her çizgi diğer faktörün bir düzeyinin ortalamaları. */
+export function interactionSvg(xLevels: string[], series: { name: string; values: (number | null)[] }[], xName: string, yName: string, title: string): string {
+  const all = series.flatMap((s) => s.values).filter((v): v is number => v !== null && Number.isFinite(v));
+  if (!all.length || xLevels.length < 2) return '';
+  const { lo, hi } = extent(all);
+  const span = hi - lo || 1;
+  const y0 = lo - span * 0.1;
+  const y1 = hi + span * 0.1;
+  const left = 52;
+  const bottom = 40;
+  const legendW = 110;
+  const sx = (i: number) => left + 20 + (i / (xLevels.length - 1)) * (W - left - legendW - 40);
+  const sy = (v: number) => H - bottom - ((v - y0) / (y1 - y0)) * (H - pad.top - bottom);
+  const grid = [0, 1, 2, 3, 4]
+    .map((i) => {
+      const v = y0 + ((y1 - y0) * i) / 4;
+      return `<line x1="${left}" x2="${W - legendW}" y1="${n2(sy(v))}" y2="${n2(sy(v))}" stroke="#ddd" stroke-dasharray="3 4"/><text x="${left - 6}" y="${n2(sy(v) + 3)}" text-anchor="end" font-size="10" fill="#555">${tick(v)}</text>`;
+    })
+    .join('');
+  const xt = xLevels.map((l, i) => `<text x="${n2(sx(i))}" y="${H - bottom + 14}" text-anchor="middle" font-size="10" fill="#333">${esc(l.length > 12 ? `${l.slice(0, 11)}…` : l)}</text>`).join('');
+  const lines = series
+    .map((s, k) => {
+      const c = COLORS[k % COLORS.length]!;
+      const pts = s.values.map((v, i) => (v === null || !Number.isFinite(v) ? null : ([sx(i), sy(v)] as const)));
+      const path = pts.filter((p) => p).map((p, i) => `${i === 0 ? 'M' : 'L'}${n2(p![0])} ${n2(p![1])}`).join(' ');
+      const dots = pts.map((p) => (p ? `<circle cx="${n2(p[0])}" cy="${n2(p[1])}" r="3.5" fill="${c}"/>` : '')).join('');
+      const lg = `<line x1="${W - legendW + 8}" x2="${W - legendW + 24}" y1="${pad.top + 8 + k * 16}" y2="${pad.top + 8 + k * 16}" stroke="${c}" stroke-width="2"/><text x="${W - legendW + 28}" y="${pad.top + 12 + k * 16}" font-size="10" fill="#333">${esc(s.name.length > 10 ? `${s.name.slice(0, 9)}…` : s.name)}</text>`;
+      return `<path d="${path}" fill="none" stroke="${c}" stroke-width="2"/>${dots}${lg}`;
+    })
+    .join('');
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${esc(title)}"><title>${esc(title)}</title>${grid}${lines}${xt}<text x="${n2((left + W - legendW) / 2)}" y="${H - 4}" text-anchor="middle" font-size="11" fill="#222">${esc(xName)}</text><text transform="rotate(-90)" x="${-n2((H - bottom + pad.top) / 2)}" y="12" text-anchor="middle" font-size="10" fill="#222">${esc(`${yName} (ortalama)`.slice(0, 40))}</text></svg>`;
 }

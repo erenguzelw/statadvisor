@@ -13,6 +13,8 @@ import {
   type ColumnType,
   type DatasetDetail,
   type DatasetInfo,
+  type FactorialBody,
+  type FactorialResponse,
   type LevelsResponse,
   type LogisticBody,
   type ModelRunBody,
@@ -264,6 +266,17 @@ export function useRegression(datasetId: string | null, body: RegressionBody | n
   return useQuery({
     queryKey: ['regression', datasetId, body] as const,
     queryFn: () => api.post<RegressionResponse>(`/api/datasets/${datasetId}/regression`, body),
+    enabled: Boolean(datasetId && body),
+    retry: shouldRetry,
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** Faktöriyel ANOVA: gövde geçerliyse modeli kurar (sunucuda hesaplanır, kaydedilmez). */
+export function useFactorial(datasetId: string | null, body: FactorialBody | null) {
+  return useQuery({
+    queryKey: ['factorial', datasetId, body] as const,
+    queryFn: () => api.post<FactorialResponse>(`/api/datasets/${datasetId}/factorial`, body),
     enabled: Boolean(datasetId && body),
     retry: shouldRetry,
     placeholderData: keepPreviousData,

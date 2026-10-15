@@ -1,4 +1,4 @@
-import type { CvResult, MlInterpretation, ModelCompareSpec, ModelId, AnalysisResult, AnalysisSpec, CleanRule, DatasetQuality, GeneratedCode, LogisticResult, LogisticSpec, RegressionNarrative, RegressionNote, RegressionResult, RegressionSpec } from '@statadvisor/shared';
+import type { FactorialResult, CvResult, MlInterpretation, ModelCompareSpec, ModelId, AnalysisResult, AnalysisSpec, CleanRule, DatasetQuality, GeneratedCode, LogisticResult, LogisticSpec, RegressionNarrative, RegressionNote, RegressionResult, RegressionSpec } from '@statadvisor/shared';
 
 /** Sunucuya gönderilen analiz isteği. */
 export type AnalysisBody = AnalysisSpec & { datasetId: string };
@@ -122,7 +122,7 @@ export interface DatasetInfo {
   operations: DatasetOperations | null;
   duplicate?: boolean;
   /** Yükleme sırasında CSV'ye dönüştürülen özgün biçim. */
-  convertedFrom?: 'xlsx';
+  convertedFrom?: 'xlsx' | 'sav';
 }
 
 export interface DatasetDetail extends DatasetInfo {
@@ -271,4 +271,19 @@ export interface SavedReportView extends ReportListItem {
   notes: RegressionNote[];
   /** Kod üretilemiyorsa nedeni (ör. lojistik regresyonda tam ayrışma). */
   codeUnavailable: string | null;
+}
+
+/** Faktöriyel ANOVA isteği ve yanıtı (kalıntılar istemciye gönderilmez). */
+export interface FactorialBody {
+  dependent: string;
+  factors: string[];
+  alpha: number;
+  ssType: 'auto' | 'II' | 'III';
+}
+export interface FactorialResponse {
+  datasetId: string;
+  datasetName: string;
+  spec: FactorialBody;
+  result: Omit<FactorialResult, 'residuals'>;
+  interpretation: string[];
 }

@@ -5,6 +5,7 @@ import { DataSection } from '@/components/layout/DataSection';
 import { DatasetsPage } from '@/features/datasets/DatasetsPage';
 import { DecisionWizardPage } from '@/features/decision-wizard/DecisionWizardPage';
 import { RegressionPage } from '@/features/regression/RegressionPage';
+import { FactorialPage } from '@/features/factorial/FactorialPage';
 import { LogisticPage } from '@/features/regression/LogisticPage';
 import { ModelComparisonPage } from '@/features/model-comparison/ModelComparisonPage';
 import { DataQualityPage } from '@/features/data-quality/DataQualityPage';
@@ -40,6 +41,7 @@ export const router = createBrowserRouter([
       },
       { path: 'karar-sihirbazi', element: <DecisionWizardPage /> },
       { path: 'regresyon', element: <RegressionPage /> },
+      { path: 'faktoriyel-anova', element: <FactorialPage /> },
       { path: 'lojistik-regresyon', element: <LogisticPage /> },
       { path: 'model-karsilastirma', element: <ModelComparisonPage /> },
       { path: 'veri-kalitesi', element: <Navigate to="/veri/kalite" replace /> },
