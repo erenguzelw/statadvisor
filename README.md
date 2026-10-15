@@ -1,12 +1,26 @@
 # StatAdvisor AI
 
-Akıllı hipotez testi ve model seçim danışmanı. Verinizi (Excel .xlsx ya da CSV) yükleyin; uygulama veri kalitesini denetler, doğru istatistiksel testi önerir, hesaplar; doğrusal ve lojistik regresyon kurar, sınıflandırma modellerini çapraz doğrulamayla karşılaştırır; Python kodunu ve raporu (HTML, PDF, DOCX) üretir. **Her şey bu bilgisayarda çalışır; veriniz dışarı gönderilmez.**
+Veri analizi asistanı. Verinizi (Excel `.xlsx`, SPSS `.sav` ya da CSV) yükleyin; uygulama veri kalitesini denetler, varsayımlara bakıp **doğru istatistiksel testi önerir** (nedenini açıklar), hesaplar ve sade bir dille yorumlar. Doğrusal ve lojistik regresyon kurar, faktöriyel ANOVA yapar, sınıflandırma modellerini çapraz doğrulamayla karşılaştırır; ekrandaki sayıları birebir yeniden üreten **Python kodunu** ve raporu (HTML, PDF, DOCX) üretir. **Her şey bu bilgisayarda çalışır; veriniz dışarı gönderilmez.**
+
+Proje önce yalnızca bir "hipotez testi danışmanı" olarak başladı; kullanıcıların sonraki ihtiyaçlarıyla (regresyon, model karşılaştırma, çok faktörlü tasarımlar) tam bir analiz asistanına dönüştü.
+
+## Neler yapar?
+
+| Alan | İçerik |
+|---|---|
+| **Veri** | CSV / Excel (.xlsx) / SPSS (.sav) yükleme; sütun türü tanıma, veri kalitesi denetimi, temizleme, ölçek puanı, yanıt taraması. SPSS'te değer etiketleri (ör. 1 → Kadın), kullanıcı eksikleri ve tarihler çözülür. |
+| **Karar Sihirbazı** | Amaç, tasarım ve sütun seçimine göre test önerisi; normallik ve varyans eşitliği veriden hesaplanır; öneri değişirse nedeni yazılır. Önerinin alternatifleri "Bunu çalıştır" ile denenebilir. |
+| **Testler** | Student/Welch t, Mann-Whitney U, tek yönlü ve Welch ANOVA (Tukey HSD / Games–Howell), Kruskal-Wallis (Dunn), eşleştirilmiş t, Wilcoxon, işaret testi, tekrarlı ölçümler ANOVA, Friedman, Pearson, Spearman, Kendall tau-b, ki-kare, Fisher kesin testi, McNemar, Cochran Q. |
+| **Regresyon** | Doğrusal ve ikili lojistik regresyon: katsayılar, güven aralıkları, tanılar (VIF, Cook, Durbin–Watson…), APA özeti. |
+| **Faktöriyel ANOVA** | 1–4 faktör, Tip III kareler toplamı (boş hücre varsa Tip II), Levene ve kalıntı normalliği, Tukey HSD, basit etkiler, etkileşim grafikleri. Menüde gizlidir; `/faktoriyel-anova` adresinden açılır. |
+| **Model karşılaştırma** | Taban, lojistik regresyon, karar ağacı, k-NN, SVM, rastgele orman, gradyan artırma; tabakalı çapraz doğrulama. Rapor: amaç, betimleyici istatistikler, sınıfa göre dağılım, aykırı değer ve normallik grafikleri, model grafikleri. |
+| **Kod ve rapor** | Her analizin Python karşılığı (çıktısı ekrandakiyle birebir aynıdır, testle doğrulanır) ve HTML / DOCX / PDF raporu; Kod & Rapor Merkezi'nde saklanır. |
 
 ## Gereksinimler
 
 - Node.js 24 veya üstü (geliştirme Node 26'da yapıldı; `node:sqlite` ve doğrudan TypeScript çalıştırma gerekir)
 - PDF raporu için (isteğe bağlı): `npx playwright install chromium`
-- Python yalnızca referans doğrulama için gerekir (`tools/reference/README.md`)
+- Python yalnızca referans doğrulama ve üretilen kodun testleri için gerekir (`tools/reference/README.md`); yoksa bu testler atlanır
 
 ## Çalıştırma
 
@@ -50,9 +64,13 @@ npm run render   # out/statadvisor-tanitim.mp4
 
 ## Sınırlamalar
 
+- Desteklenmeyen girdiler: eski Excel (.xls), `.zsav` (zlib sıkıştırmalı SPSS) ve 255 karakterden uzun SPSS metin değişkenleri; `.sas7bdat` okunmaz.
 - Model karşılaştırmada hiper-parametre ayarı yoktur (scikit-learn varsayılanları). Ağaç, orman ve gradyan artırma rastgelelik içerdiğinden scikit-learn'den birkaç binde ayrışabilir. SVM 15 bin eğitim gözleminin, k-NN ise yaklaşık 3·10¹⁰ uzaklık hesabının üzerinde atlanır (süre gözlem sayısının karesiyle büyür).
 - Regresyonda dayanıklı (HC) standart hata ve Firth/ceza lojistik regresyonu yoktur; bunlar gerektiğinde uyarı verilir.
 - ANOVA sonrası post-hoc: Welch ANOVA'dan sonra Games–Howell, klasik ANOVA'dan sonra Tukey HSD (Tukey–Kramer); Karar Sihirbazı varsayılan olarak Welch'i seçer, “Levene anlamsızsa klasik test” seçeneği SPSS alışkanlığına uyar. Tekrarlı ölçümlü ANOVA'da Greenhouse-Geisser düzeltmesi yok.
 - R kodu üretilmez; yalnızca doğrulanabilen Python kodu üretilir.
-- Regresyon ve model karşılaştırma raporları (HTML/DOCX/PDF) grafik içermez; grafikler arayüzdedir.
+- Faktöriyel ANOVA'da boş hücre varsa Tip III tanımsız olduğundan Tip II hesaplanır ve raporda uyarılır; sonuçlar SPSS'in Tip III çıktısından farklı olabilir. Post-hoc yalnızca ana etkiler için (Tukey) ve anlamlı iki yönlü etkileşimlerin basit etkileri içindir.
+- Kategorik karşılaştırmada eşleşmiş tasarım (McNemar, Cochran Q) yalnızca ikili (2 değerli) sütunları destekler.
+- Alternatif olarak önerilen Permütasyon ANOVA ve Doğrusal karma model henüz çalıştırılamaz; çok değişkenli yöntemler (MANOVA, faktör analizi, diskriminant analizi) yoktur.
+- Model karşılaştırma ve faktöriyel ANOVA raporları grafik içerir; doğrusal ve lojistik regresyon raporları grafik içermez (grafikler arayüzdedir).
 - Kaynakça künyeleri yayın öncesi doğrulanmalıdır; bağımsız bir istatistikçi incelemesi önerilir.
