@@ -1,4 +1,4 @@
-# StatAdvisor AI: Uygulama Planı
+# StatAdvisor: Uygulama Planı
 
 Bu plan, mevcut durumdan (örnek veriyle çalışan, hesapları tarayıcıda yapan arayüz) gerçek veriyle çalışan yerel uygulamaya geçişi tanımlar. Kaynaklar: `docs/risk_firsat_raporu.md` (açık kalan bulgular) ve `docs/gereksinimler.md` (genel yapı).
 

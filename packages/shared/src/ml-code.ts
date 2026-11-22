@@ -43,7 +43,7 @@ export function generateModelCompareCode(file: DatasetFile, spec: ModelCompareSp
   const ran = r.models.filter((m) => !m.skipped).map((m) => m.id);
   const numCat = spec.numericCategorical;
   const lines: string[] = [
-    '# StatAdvisor AI tarafından üretildi. Veri dosyası betikle aynı klasörde olmalıdır.',
+    '# StatAdvisor tarafından üretildi. Veri dosyası betikle aynı klasörde olmalıdır.',
     '',
     'import numpy as np',
     'import pandas as pd',

@@ -183,7 +183,7 @@ export function buildReport(d: ReportData): string {
   const audit = d.audit ? `<section data-section="audit"><h2>Denetim izi</h2>${table(['Öğe', 'Değer'], d.audit)}</section>` : '';
 
   const body = `<h1>${esc(d.title)}</h1>
-<p class="muted">${esc(d.datasetName)} · ${esc(d.date)} · StatAdvisor AI</p>
+<p class="muted">${esc(d.datasetName)} · ${esc(d.date)} · StatAdvisor</p>
 <section data-section="desc"><h2>Tanımlayıcı istatistikler</h2>${desc}${figure('box')}${figure('scatter')}${crosstab}${figure('crosstab')}${notes}</section>
 <section data-section="assump"><h2>Varsayım testleri ve karar notları</h2>${assump}${figure('histogram')}
 <p>Önerilen test: <strong>${esc(d.decision.finalTest)}</strong>${d.decision.rerouteReason ? ` (${esc(d.decision.rerouteReason)})` : ''}.</p>${warnings}${alts}</section>

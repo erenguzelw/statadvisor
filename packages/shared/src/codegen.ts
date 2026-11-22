@@ -216,7 +216,7 @@ export function generateAnalysisCode(file: DatasetFile, spec: AnalysisSpec, r: A
   const normBlock = (label: string, arr: string) => (byShape ? skewKurtBlock(label, arr) : shapiroBlock(label, arr));
 
   const head = (): string[] => [
-    '# StatAdvisor AI tarafından üretildi. Veri dosyası betikle aynı klasörde olmalıdır.',
+    '# StatAdvisor tarafından üretildi. Veri dosyası betikle aynı klasörde olmalıdır.',
     '',
     ...[...imports].sort((a, b) => (a.startsWith('import') === b.startsWith('import') ? a.localeCompare(b) : a.startsWith('import') ? -1 : 1)),
     '',
@@ -505,7 +505,7 @@ export interface CleaningCodeOptions {
 /** Veri temizleme kodu: kullanıcının seçtiği kurallar (eksik işaretle / satır sil) ve isteğe bağlı doldurma. Sonucu temizlenmis.csv dosyasına yazar. */
 export function generateCleaningCode(file: DatasetFile, opts: CleaningCodeOptions): GeneratedCode {
   const imports = ['import numpy as np', 'import pandas as pd'];
-  const L: string[] = ['# StatAdvisor AI tarafından üretildi. Veri dosyası betikle aynı klasörde olmalıdır.', ''];
+  const L: string[] = ['# StatAdvisor tarafından üretildi. Veri dosyası betikle aynı klasörde olmalıdır.', ''];
   if (opts.impute === 'knn') {
     imports.push('from sklearn.impute import KNNImputer', 'from sklearn.preprocessing import StandardScaler');
   }
@@ -584,7 +584,7 @@ export function generateCleaningCode(file: DatasetFile, opts: CleaningCodeOption
 
 /** Ölçek puanı kodu: ters maddeleri çevirir, toplam/ortalama puanı ve Cronbach alfayı hesaplar; olcekli.csv'ye yazar. */
 export function generateScalesCode(file: DatasetFile, defs: ScaleDef[], results: ScaleResult[]): GeneratedCode {
-  const L: string[] = ['# StatAdvisor AI tarafından üretildi. Veri dosyası betikle aynı klasörde olmalıdır.', ''];
+  const L: string[] = ['# StatAdvisor tarafından üretildi. Veri dosyası betikle aynı klasörde olmalıdır.', ''];
   L.push('import numpy as np', 'import pandas as pd', 'from scipy import stats', '', naBlock, '', readCsvLine(file), '');
   L.push('# Ölçekler: alt boyutlar araştırmacı tarafından tanımlanmıştır (ters maddeler: min + max - x)');
   L.push('SKALALAR = [');
@@ -630,7 +630,7 @@ export function generateScalesCode(file: DatasetFile, defs: ScaleDef[], results:
 /** Anket yanıt taraması kodu: düz çizgi yanıtlar ve Mahalanobis D²; işaretli satırlar çıkarılıp taranmis.csv'ye yazılır. */
 export function generateScreeningCode(file: DatasetFile, opts: ScreenOptions, r: ScreenResult): GeneratedCode {
   const alpha = opts.mahalanobisAlpha ?? 0.001;
-  const L: string[] = ['# StatAdvisor AI tarafından üretildi. Veri dosyası betikle aynı klasörde olmalıdır.', ''];
+  const L: string[] = ['# StatAdvisor tarafından üretildi. Veri dosyası betikle aynı klasörde olmalıdır.', ''];
   L.push('import numpy as np', 'import pandas as pd', 'from scipy import stats', '', naBlock, '', readCsvLine(file), '');
   L.push(`MADDELER = ${pyList(opts.items)}`, 'for s in MADDELER:', '    df[s] = pd.to_numeric(df[s], errors="coerce")', 'tam = df[MADDELER].dropna()  # yalnızca tüm maddeleri yanıtlayanlar taranır', 'isaretli = set()');
   if (opts.straightLine) {

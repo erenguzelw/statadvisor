@@ -1,7 +1,7 @@
 {
   "name": "statadvisor-video",
   "private": true,
-  "description": "StatAdvisor AI için 60 saniyelik Remotion tanıtım videosu",
+  "description": "StatAdvisor için 60 saniyelik Remotion tanıtım videosu",
   "scripts": {
     "studio": "remotion studio src/index.ts",
     "render": "remotion render src/index.ts Tanitim out/statadvisor-tanitim.mp4",

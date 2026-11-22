@@ -150,7 +150,7 @@ export function buildFactorialDoc(r: FactorialResult, opts: { datasetName: strin
   if (opts.audit) blocks.push({ type: 'heading', text: 'Denetim izi' }, { type: 'kv', rows: opts.audit });
   return {
     title: 'Faktöriyel ANOVA raporu',
-    subtitle: `${opts.datasetName} · ${opts.date} · StatAdvisor AI`,
+    subtitle: `${opts.datasetName} · ${opts.date} · StatAdvisor`,
     blocks,
     footer: 'Bu rapor bir karar destek aracı tarafından üretilmiştir; yöntem seçiminin ve yorumun sorumluluğu araştırmacıya aittir.',
   };

@@ -169,7 +169,7 @@ export function generateLogisticCode(file: DatasetFile, spec: LogisticSpec, r: L
   const refs = Object.fromEntries(r.categories.map((c) => [c.name, c.reference]));
   const dictLit = (m: Record<string, string[] | string>) => `{${Object.entries(m).map(([k, v]) => `${py(k)}: ${Array.isArray(v) ? pyList(v) : py(v)}`).join(', ')}}`;
   const lines: string[] = [
-    '# StatAdvisor AI tarafından üretildi. Veri dosyası betikle aynı klasörde olmalıdır.',
+    '# StatAdvisor tarafından üretildi. Veri dosyası betikle aynı klasörde olmalıdır.',
     '',
     'import numpy as np',
     'import pandas as pd',
