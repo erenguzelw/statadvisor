@@ -187,7 +187,7 @@ function Regression({ dataset }: { dataset: DatasetInfo }) {
   return (
     <>
       <PageHeader
-        context={<span className="font-mono">{dataset.name}</span>}
+        context={<span className="font-mono">{t(dataset.name)}</span>}
         title={t('Doğrusal Regresyon')}
         description={t('Sayısal bir sonucu (bağımlı değişken) bir ya da birkaç yordayıcıyla açıklayan en küçük kareler modeli. Katsayılar, güven aralıkları, tanılar, APA özeti ve Python kodu birlikte gelir.')}
       />

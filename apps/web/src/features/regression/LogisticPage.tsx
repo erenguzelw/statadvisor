@@ -207,7 +207,7 @@ function Logistic({ dataset }: { dataset: DatasetInfo }) {
   return (
     <>
       <PageHeader
-        context={<span className="font-mono">{dataset.name}</span>}
+        context={<span className="font-mono">{t(dataset.name)}</span>}
         title={t('Lojistik Regresyon')}
         description={t('İkili bir sonucun (evet/hayır, 0/1) olasılığını bir ya da birkaç yordayıcıyla açıklayan model. Olasılık oranları, ayırt etme gücü (AUC), kalibrasyon, uyarılar, APA özeti ve Python kodu birlikte gelir.')}
       />

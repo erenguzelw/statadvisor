@@ -349,7 +349,7 @@ function Quality({ dataset, created, onCreated }: { dataset: DatasetInfo; create
     <>
       <PageHeader
         features={[t('Özellik 08')]}
-        context={<span className="font-mono">{dataset.name}</span>}
+        context={<span className="font-mono">{t(dataset.name)}</span>}
         title={t('Veri Kalitesi, Aykırı ve Eksik Değerler')}
         description={t('Önce taranır, sonra siz karar verirsiniz: sorunlu hücreler işaretlenir ama hiçbir hücre ya da satır kendiliğinden silinmez. Ham veri değişmez; işlem yeni bir veri sürümü üretir. Tarama kural tabanlıdır ve verinin doğruluğunu garanti etmez.')}
         actions={
@@ -370,7 +370,7 @@ function Quality({ dataset, created, onCreated }: { dataset: DatasetInfo; create
           }
           className="mb-6"
         >
-          <span className="font-semibold">{created.name}</span>: {nf.format(created.rows)} {t('satır.')}{created.operations && <span className="mt-1 block text-body text-fg-muted">{created.operations.log.map((l) => t(l)).join(' ')}</span>}
+          <span className="font-semibold">{t(created.name)}</span>: {nf.format(created.rows)} {t('satır.')}{created.operations && <span className="mt-1 block text-body text-fg-muted">{created.operations.log.map((l) => t(l)).join(' ')}</span>}
         </Callout>
       )}
 

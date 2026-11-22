@@ -125,7 +125,7 @@ function Wizard({ dataset }: { dataset: DatasetInfo }) {
     <>
       <PageHeader
         features={['Özellik 01–03']}
-        context={<span className="font-mono">{dataset.name}</span>}
+        context={<span className="font-mono">{t(dataset.name)}</span>}
         title={t('Hipotez Testi ve Model Danışmanı')}
         description={t('Sorularınızı yanıtlayın ve sütunları seçin; kural motoru varsayım testlerinin sonucuna göre uygun testi önerir, çalıştırır ve sonucu sade bir dille anlatır.')}
         actions={
@@ -218,7 +218,7 @@ function Wizard({ dataset }: { dataset: DatasetInfo }) {
                 </Callout>
               )}
               <p className="flex flex-wrap items-center gap-2 text-caption text-fg-subtle">
-                <Tag>{result.outcome.test}</Tag> {t('hesaplandı:')} {result.variables.join(' · ')}
+                <Tag>{t(result.outcome.test)}</Tag> {t('hesaplandı:')} {result.variables.join(' · ')}
               </p>
               <AnalysisView result={result} onRunAlternative={(test) => setForced({ key: baseKey, test })} />
             </div>

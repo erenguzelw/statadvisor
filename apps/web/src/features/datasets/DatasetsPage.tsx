@@ -253,7 +253,7 @@ export function DatasetsPage() {
       {active && (
         <Panel className="mt-6">
           <SectionHeader
-            title={t('Etkin veri seti: {name}', { name: active.name })}
+            title={t('Etkin veri seti: {name}', { name: t(active.name) })}
             description={t('{rows} satır, {cols} sütun. Türler otomatik çıkarıldı; analiz sayfalarında sütun seçerken kullanılır.', { rows: nf.format(active.rows), cols: active.columns.length })}
           />
           {active.operations && (

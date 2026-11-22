@@ -74,7 +74,7 @@ export function ScreenPanel({ datasetId, columns }: { datasetId: string; columns
           {run.error && <StatusLine status="danger">{t(run.error.message)}</StatusLine>}
           {apply.error && <StatusLine status="danger">{t(apply.error.message)}</StatusLine>}
           {code.error && <StatusLine status="danger">{t(code.error.message)}</StatusLine>}
-          {apply.data && <StatusLine status="success">“{apply.data.name}{t('” oluşturuldu ve etkin veri seti yapıldı (')}{nf.format(apply.data.rows)} {t('satır).')}</StatusLine>}
+          {apply.data && <StatusLine status="success">“{t(apply.data.name)}{t('” oluşturuldu ve etkin veri seti yapıldı (')}{nf.format(apply.data.rows)} {t('satır).')}</StatusLine>}
           {r && (
             <div className="rounded-card border border-line/30 bg-surface-lowest p-3 text-body text-fg">
               <p>

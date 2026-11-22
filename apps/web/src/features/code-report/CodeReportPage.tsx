@@ -46,7 +46,7 @@ export function CodeReportPage() {
   const head = (
     <PageHeader
       features={[t('Özellik 04 & 09')]}
-      context={dataset && <span className="font-mono">{dataset.name}</span>}
+      context={dataset && <span className="font-mono">{t(dataset.name)}</span>}
       title={t('Kod Üretimi ve Otomatik Raporlama Merkezi')}
       description={t('Kaydedilmiş testlerin, regresyonların ve model karşılaştırmalarının Python karşılığı ve raporu. Betik çalıştırıldığında aşağıdaki beklenen çıktıyı üretir.')}
     />

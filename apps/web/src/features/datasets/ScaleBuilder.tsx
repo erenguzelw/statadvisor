@@ -208,7 +208,7 @@ export function ScaleBuilder({ datasetId, columns }: { datasetId: string; column
             {create.data && (
               <div className="rounded-card border border-line/30 bg-surface-lowest p-3">
                 <StatusLine status="success">
-                  “{create.data.name}{t('” oluşturuldu ve etkin veri seti yapıldı. Yeni ölçek sütunları “Karar Sihirbazı”nda sürekli değişken olarak seçilebilir.')}</StatusLine>
+                  “{t(create.data.name)}{t('” oluşturuldu ve etkin veri seti yapıldı. Yeni ölçek sütunları “Karar Sihirbazı”nda sürekli değişken olarak seçilebilir.')}</StatusLine>
                 <ul className="mt-2 flex flex-col gap-1 text-body text-fg">
                   {create.data.scaleResults.map((r) => (
                     <li key={r.name}>
