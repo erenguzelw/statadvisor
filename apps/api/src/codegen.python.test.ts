@@ -208,6 +208,7 @@ suite('üretilen Python kodu, ekrandaki sonucu birebir yeniden üretir', () => {
     const out = execFileSync(PY, [code.filename], { cwd: work, encoding: 'utf8', env: { ...process.env, PYTHONIOENCODING: 'utf-8' }, timeout: 90_000 });
     expect(out.trim().split(/\r?\n/)).toEqual(code.expectedOutput);
     expect(code.expectedOutput[0]).toMatch(/alfa: 0\.\d{4} n_alfa: \d+/);
+    expect(code.expectedOutput.filter((l: string) => l.startsWith('Madde ['))).toHaveLength(7); // 4 + 3 madde
     const { analysis } = await verify(child.id, cmp({ value: 'A_puan', group: 'cinsiyet' }));
     expect(['Welch t-testi', 'Mann-Whitney U testi']).toContain(analysis.outcome.test);
     const bad = await app.inject({ method: 'POST', url: `/api/datasets/${id}/scales`, payload: { scales: [{ ...scales[0], max: 3 }] } });

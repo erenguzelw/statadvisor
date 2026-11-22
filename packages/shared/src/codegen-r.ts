@@ -4,7 +4,7 @@
  * Yalnızca temel R (stats) kullanılır; ek paket gerekmez. Bu eşitlik, R bulunan ortamda otomatik testle doğrulanır.
  */
 import type { AnalysisResult } from './analysis.ts';
-import { expectedLines, fmt, type AnalysisSpec, type DatasetFile, type GeneratedCode } from './codegen.ts';
+import { expectedLines, fmt, itemStatLines, type AnalysisSpec, type DatasetFile, type GeneratedCode } from './codegen.ts';
 import type { ScaleDef, ScaleResult } from './scales.ts';
 import type { ScreenOptions, ScreenResult } from './screening.ts';
 
@@ -467,6 +467,15 @@ export function generateScalesCodeR(file: DatasetFile, defs: ScaleDef[], results
     '  ort <- if (any(!is.na(puan))) mean(puan, na.rm = TRUE) else NaN',
     '  yaz("Olcek [", sk$ad, "] alfa: ", f(alfa, 4), " n_alfa: ", nrow(tam))',
     '  yaz("Olcek [", sk$ad, "] ortalama: ", f(ort, 4), " gecerli: ", sum(!is.na(puan)))',
+    '  if (nrow(tam) >= 3) {  # madde analizi: düzeltilmiş madde-toplam r ve madde silinirse alfa',
+    '    for (s in sk$maddeler) {',
+    '      kalan <- tam[, setdiff(sk$maddeler, s), drop = FALSE]',
+    '      geri <- rowSums(kalan)',
+    '      r_md <- if (sd(tam[[s]]) > 0 && sd(geri) > 0) cor(tam[[s]], geri) else NaN',
+    '      a_sil <- if (ncol(kalan) >= 2 && var(geri) > 0) ncol(kalan) / (ncol(kalan) - 1) * (1 - sum(sapply(kalan, var)) / var(geri)) else NaN',
+    '      yaz("Madde [", sk$ad, "] [", s, "] ort: ", f(mean(tam[[s]]), 4), " ss: ", f(sd(tam[[s]]), 4), " r_md: ", f(r_md, 4), " alfa_silinirse: ", f(a_sil, 4))',
+    '    }',
+    '  }',
     '  v <- puan[!is.na(puan)]',
     '  if (length(v) >= 4 && sd(v) > 0) {  # puanın normalliği',
     '    u <- if (length(v) > 5000) sort(v)[floor((0:4999) * length(v) / 5000) + 1] else v',
@@ -480,6 +489,7 @@ export function generateScalesCodeR(file: DatasetFile, defs: ScaleDef[], results
   const expected = results.flatMap((r) => [
     `Olcek [${r.name}] alfa: ${r.alpha === null ? 'nan' : fmt(r.alpha, 4)} n_alfa: ${r.nAlpha}`,
     `Olcek [${r.name}] ortalama: ${r.mean === null ? 'nan' : fmt(r.mean, 4)} gecerli: ${r.nValid}`,
+    ...itemStatLines(r),
     ...(r.skewness !== null && r.shapiroP !== null
       ? [`Olcek [${r.name}] carpiklik: ${fmt(r.skewness, 3)} basiklik: ${fmt(r.kurtosis ?? NaN, 3)} Shapiro-Wilk W: ${fmt(r.shapiroW!, 3)} p: ${fmt(r.shapiroP, 6)}`]
       : []),

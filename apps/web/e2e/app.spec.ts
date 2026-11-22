@@ -187,6 +187,10 @@ test('anket: düz çizgi ve Mahalanobis taraması, taranmış sürüm, ölçek p
   for (const m of ['m1', 'm2', 'm3', 'm4']) await box.getByRole('checkbox', { name: m, exact: true }).check();
   await page.getByRole('button', { name: 'Puanları hesapla' }).click();
   await expect(page.getByText(/Puanın normalliği: çarpıklık/)).toBeVisible();
+  const items = page.getByRole('region', { name: '“Toplam” madde analizi' });
+  await expect(items.getByRole('columnheader', { name: 'Düzeltilmiş madde-toplam r' })).toBeVisible();
+  await expect(items.getByRole('columnheader', { name: 'Madde silinirse α' })).toBeVisible();
+  await expect(items.getByRole('row')).toHaveCount(5); // başlık + 4 madde
 
   await page.goto('/karar-sihirbazi');
   await page.getByLabel('Sonuç sütunu (sayısal)').selectOption('Toplam');

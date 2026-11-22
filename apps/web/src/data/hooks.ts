@@ -2,7 +2,7 @@
  * Veri katmanı. Sayfalar sunucuya yalnızca bu kancalarla erişir.
  */
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { CleanRule } from '@statadvisor/shared';
+import type { CleanRule, ItemStat } from '@statadvisor/shared';
 import { getModelReport } from './mocks/models';
 import {
   api,
@@ -135,6 +135,7 @@ export interface ScaleResultInfo {
   name: string;
   alpha: number | null;
   nAlpha: number;
+  itemStats: ItemStat[];
   nValid: number;
   mean: number | null;
   skewness: number | null;

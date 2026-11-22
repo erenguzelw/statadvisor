@@ -582,7 +582,13 @@ export function generateCleaningCode(file: DatasetFile, opts: CleaningCodeOption
   return { filename: 'temizle.py', code, expectedOutput: [], requirements: requirementsOf(code) };
 }
 
-/** Ölçek puanı kodu: ters maddeleri çevirir, toplam/ortalama puanı ve Cronbach alfayı hesaplar; olcekli.csv'ye yazar. */
+/** Madde analizi satırları (Python ve R betiklerinin beklenen çıktısı aynıdır). */
+export function itemStatLines(r: ScaleResult): string[] {
+  const n = (x: number | null) => (x === null ? 'nan' : fmt(x, 4));
+  return r.itemStats.map((s) => `Madde [${r.name}] [${s.item}] ort: ${fmt(s.mean, 4)} ss: ${fmt(s.sd, 4)} r_md: ${n(s.itemTotalR)} alfa_silinirse: ${n(s.alphaIfDeleted)}`);
+}
+
+/** Ölçek puanı kodu: ters maddeleri çevirir, toplam/ortalama puanı, Cronbach alfayı ve madde analizini hesaplar; olcekli.csv'ye yazar. */
 export function generateScalesCode(file: DatasetFile, defs: ScaleDef[], results: ScaleResult[]): GeneratedCode {
   const L: string[] = ['# StatAdvisor tarafından üretildi. Veri dosyası betikle aynı klasörde olmalıdır.', ''];
   L.push('import numpy as np', 'import pandas as pd', 'from scipy import stats', '', naBlock, '', readCsvLine(file), '');
@@ -608,6 +614,14 @@ export function generateScalesCode(file: DatasetFile, defs: ScaleDef[], results:
     '    ort = puan.mean() if puan.notna().any() else float("nan")',
     '    print(f"Olcek [{sk[\'ad\']}] alfa: {alfa:.4f} n_alfa: {len(tam)}")',
     '    print(f"Olcek [{sk[\'ad\']}] ortalama: {ort:.4f} gecerli: {int(puan.notna().sum())}")',
+    '    if len(tam) >= 3:  # madde analizi: düzeltilmiş madde-toplam r ve madde silinirse alfa',
+    '        for s in sk["maddeler"]:',
+    '            kalan = tam.drop(columns=s)',
+    '            geri = kalan.sum(axis=1)',
+    '            r_md = np.corrcoef(tam[s], geri)[0, 1] if tam[s].std() > 0 and geri.std() > 0 else float("nan")',
+    '            kv = geri.var(ddof=1)',
+    '            a_sil = kalan.shape[1] / (kalan.shape[1] - 1) * (1 - kalan.var(ddof=1).sum() / kv) if kalan.shape[1] >= 2 and kv > 0 else float("nan")',
+    '            print(f"Madde [{sk[\'ad\']}] [{s}] ort: {tam[s].mean():.4f} ss: {tam[s].std(ddof=1):.4f} r_md: {r_md:.4f} alfa_silinirse: {a_sil:.4f}")',
     '    v = puan.dropna().to_numpy(dtype=float)',
     '    if len(v) >= 4 and v.std() > 0:  # puanın normalliği',
     '        u = np.sort(v)[np.floor(np.arange(5000) * len(v) / 5000).astype(int)] if len(v) > 5000 else v',
@@ -619,6 +633,7 @@ export function generateScalesCode(file: DatasetFile, defs: ScaleDef[], results:
   const expected = results.flatMap((r) => [
     `Olcek [${r.name}] alfa: ${r.alpha === null ? 'nan' : fmt(r.alpha, 4)} n_alfa: ${r.nAlpha}`,
     `Olcek [${r.name}] ortalama: ${r.mean === null ? 'nan' : fmt(r.mean, 4)} gecerli: ${r.nValid}`,
+    ...itemStatLines(r),
     ...(r.skewness !== null && r.shapiroP !== null
       ? [`Olcek [${r.name}] carpiklik: ${fmt(r.skewness, 3)} basiklik: ${fmt(r.kurtosis ?? NaN, 3)} Shapiro-Wilk W: ${fmt(r.shapiroW!, 3)} p: ${fmt(r.shapiroP, 6)}`]
       : []),

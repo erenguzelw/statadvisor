@@ -20,12 +20,29 @@ export interface ScaleDef {
   minValidShare: number;
 }
 
+/** Madde analizi (SPSS “Item-Total Statistics” karşılığı); tüm maddeleri yanıtlayan satırlarda, ters maddeler çevrilmiş halde. */
+export interface ItemStat {
+  item: string;
+  reversed: boolean;
+  mean: number;
+  sd: number;
+  /** Düzeltilmiş madde-toplam korelasyonu: madde ile kendisi hariç kalan maddelerin toplamı arasındaki Pearson r. */
+  itemTotalR: number | null;
+  /** Bu madde çıkarılırsa Cronbach alfa (en az 2 madde kalmalı). */
+  alphaIfDeleted: number | null;
+}
+
+/** Düzeltilmiş madde-toplam korelasyonu bu eşiğin altındaysa madde zayıf sayılır (Nunnally ve Bernstein, 1994). */
+export const ITEM_TOTAL_MIN = 0.3;
+
 export interface ScaleResult {
   name: string;
   values: (number | null)[];
   /** Cronbach alfa (tüm maddeleri yanıtlayan satırlarda); hesaplanamazsa null. */
   alpha: number | null;
   nAlpha: number;
+  /** Madde analizi; alfa için yeterli satır yoksa boş. */
+  itemStats: ItemStat[];
   nValid: number;
   mean: number | null;
   /** Puanın normalliği: düzeltilmiş çarpıklık/basıklık ve Shapiro-Wilk (en fazla 5000 gözlem; fazlası eşit aralıklı alt örnek). */
@@ -42,6 +59,56 @@ const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFin
 function variance(xs: number[]): number {
   const m = xs.reduce((s, x) => s + x, 0) / xs.length;
   return xs.reduce((s, x) => s + (x - m) ** 2, 0) / (xs.length - 1);
+}
+
+/** Cronbach alfa: verilen sütunlar (en az 2) üzerinden; toplam puanın varyansı 0 ise null. */
+function cronbach(rows: number[][], cols: number[]): number | null {
+  const k = cols.length;
+  if (k < 2) return null;
+  const totalVar = variance(rows.map((r) => cols.reduce((s, j) => s + r[j]!, 0)));
+  if (!(totalVar > 0)) return null;
+  const itemVar = cols.reduce((s, j) => s + variance(rows.map((r) => r[j]!)), 0);
+  return (k / (k - 1)) * (1 - itemVar / totalVar);
+}
+
+function pearson(x: number[], y: number[]): number | null {
+  const n = x.length;
+  const mx = x.reduce((s, v) => s + v, 0) / n;
+  const my = y.reduce((s, v) => s + v, 0) / n;
+  let sxy = 0;
+  let sxx = 0;
+  let syy = 0;
+  for (let i = 0; i < n; i++) {
+    sxy += (x[i]! - mx) * (y[i]! - my);
+    sxx += (x[i]! - mx) ** 2;
+    syy += (y[i]! - my) ** 2;
+  }
+  return sxx > 0 && syy > 0 ? sxy / Math.sqrt(sxx * syy) : null;
+}
+
+/** Madde analizi ve okunabilir uyarılar: negatif ya da düşük düzeltilmiş madde-toplam korelasyonu, alfayı belirgin artıran madde. */
+function itemAnalysis(items: string[], reversed: boolean[], complete: number[][], alpha: number | null): { stats: ItemStat[]; notes: string[] } {
+  const stats: ItemStat[] = [];
+  const notes: string[] = [];
+  if (complete.length < 3) return { stats, notes };
+  const all = items.map((_, j) => j);
+  items.forEach((item, j) => {
+    const col = complete.map((r) => r[j]!);
+    const others = all.filter((q) => q !== j);
+    const rest = complete.map((r) => others.reduce((s, q) => s + r[q]!, 0));
+    const itemTotalR = pearson(col, rest);
+    const alphaIfDeleted = cronbach(complete, others);
+    stats.push({ item, reversed: reversed[j]!, mean: col.reduce((s, x) => s + x, 0) / col.length, sd: Math.sqrt(variance(col)), itemTotalR, alphaIfDeleted });
+    if (itemTotalR !== null && itemTotalR < 0) {
+      notes.push(`“${item}”: düzeltilmiş madde-toplam korelasyonu negatif (r = ${itemTotalR.toFixed(2)}); madde ters kodlanması gereken bir madde olabilir.`);
+    } else if (itemTotalR !== null && itemTotalR < ITEM_TOTAL_MIN) {
+      notes.push(`“${item}”: düzeltilmiş madde-toplam korelasyonu düşük (r = ${itemTotalR.toFixed(2)} < .30); madde ölçeğin geri kalanıyla aynı yapıyı ölçmüyor olabilir.`);
+    }
+    if (alpha !== null && alphaIfDeleted !== null && alphaIfDeleted - alpha >= 0.01) {
+      notes.push(`“${item}” çıkarılırsa Cronbach alfa ${alpha.toFixed(2)} → ${alphaIfDeleted.toFixed(2)} olur.`);
+    }
+  });
+  return { stats, notes };
 }
 
 /** Alfa değeri için sözel yorum (George & Mallery eşikleri). */
@@ -99,13 +166,12 @@ export function computeScales(columns: QualityColumn[], defs: ScaleDef[]): Scale
     let alpha: number | null = null;
     const notes: string[] = [];
     if (complete.length >= 3) {
-      const totalVar = variance(complete.map((r) => r.reduce((s, x) => s + x, 0)));
-      if (totalVar > 0) {
-        const itemVar = items.reduce((s, _, j) => s + variance(complete.map((r) => r[j]!)), 0);
-        alpha = (k / (k - 1)) * (1 - itemVar / totalVar);
-      } else notes.push('Toplam puanın varyansı 0; alfa hesaplanamadı.');
+      alpha = cronbach(complete, items.map((_, j) => j));
+      if (alpha === null) notes.push('Toplam puanın varyansı 0; alfa hesaplanamadı.');
     } else notes.push('Alfa için tüm maddeleri yanıtlayan en az 3 satır gerekir.');
     if (alpha !== null && alpha < 0.7) notes.push(`Cronbach alfa ${alpha.toFixed(2)} (${alphaLabel(alpha)}): maddeler tek bir yapıyı tutarlı ölçmüyor olabilir; ters maddeleri ve madde seçimini kontrol edin.`);
+    const analysis = itemAnalysis(items, flip, complete, alpha);
+    notes.push(...analysis.notes);
     const present = values.filter(isNum);
     let skewness: number | null = null;
     let kurtosis: number | null = null;
@@ -124,6 +190,6 @@ export function computeScales(columns: QualityColumn[], defs: ScaleDef[]): Scale
       }
     }
     if (present.length < rows) notes.push(`${rows - present.length} satırda yeterli yanıt olmadığı için puan eksik bırakıldı.`);
-    return { name, values, alpha, nAlpha: complete.length, nValid: present.length, mean: present.length ? present.reduce((s, x) => s + x, 0) / present.length : null, skewness, kurtosis, shapiroW, shapiroP, notes };
+    return { name, values, alpha, nAlpha: complete.length, itemStats: analysis.stats, nValid: present.length, mean: present.length ? present.reduce((s, x) => s + x, 0) / present.length : null, skewness, kurtosis, shapiroW, shapiroP, notes };
   });
 }

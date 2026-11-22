@@ -308,6 +308,7 @@ suite('üretilen R kodu, ekrandaki sonucu birebir yeniden üretir', () => {
     ];
     const code = await runOtherCode(id, 'scales-code', { scales });
     expect(code.expectedOutput[0]).toMatch(/alfa: 0\.\d{4} n_alfa: \d+/);
+    expect(code.expectedOutput.filter((l: string) => l.startsWith('Madde ['))).toHaveLength(7); // 4 + 3 madde
   });
 
   it('anket taraması: düz çizgi ve Mahalanobis R ile eşleşir', { timeout: T }, async () => {

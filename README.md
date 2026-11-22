@@ -6,7 +6,7 @@
 
 ## English
 
-A local, privacy-first **survey data analysis assistant**. Upload your data (Excel `.xlsx`, SPSS `.sav` or CSV); the app checks data quality, tests the assumptions, **recommends the right statistical test (and explains why)**, runs it and interprets the result in plain language. It also fits linear and logistic regression, builds Likert scale scores with Cronbach's alpha, screens careless responses, and generates **reproducible Python and R code** whose output matches the on-screen numbers line by line, plus HTML / PDF / DOCX reports. **Everything runs on your computer; your data never leaves it.**
+A local, privacy-first **survey data analysis assistant**. Upload your data (Excel `.xlsx`, SPSS `.sav` or CSV); the app checks data quality, tests the assumptions, **recommends the right statistical test (and explains why)**, runs it and interprets the result in plain language. It also fits linear and logistic regression, builds Likert scale scores with Cronbach's alpha and an item analysis that flags weak or miscoded items, screens careless responses, and generates **reproducible Python and R code** whose output matches the on-screen numbers line by line, plus HTML / PDF / DOCX reports. **Everything runs on your computer; your data never leaves it.**
 
 The interface and all generated interpretations, reports and code comments are available in **English and Turkish** (toggle in the top bar).
 
@@ -20,7 +20,7 @@ The interface and all generated interpretations, reports and code comments are a
 
 | Area | What it does |
 |---|---|
-| **Data** | CSV / Excel / SPSS import with value labels; column-type inference, data-quality audit, cleaning with an audit trail, scale scores (reverse items, Cronbach's α), straight-lining and Mahalanobis response screening. |
+| **Data** | CSV / Excel / SPSS import with value labels; column-type inference, data-quality audit, cleaning with an audit trail, scale scores (reverse items, Cronbach's α, item analysis: corrected item-total r and α if item deleted), straight-lining and Mahalanobis response screening. |
 | **Decision Wizard** | Recommends a test from your goal, design and variables; normality and equal variances are computed from the data, and the reason is shown whenever the recommendation changes (e.g. Student t → Welch → Mann-Whitney). Alternatives can be run with one click. |
 | **Tests** | Student/Welch t, Mann-Whitney U, one-way and Welch ANOVA (Tukey HSD / Games–Howell), Kruskal-Wallis (Dunn), paired t, Wilcoxon, sign test, repeated-measures ANOVA, Friedman, Pearson, Spearman, Kendall tau-b, chi-square, Fisher exact, McNemar, Cochran Q. |
 | **Regression** | Linear and binary logistic regression with confidence intervals, diagnostics (VIF, Cook, Durbin–Watson, Hosmer–Lemeshow, AUC) and an APA summary. |
@@ -63,7 +63,7 @@ The ML "model comparison" and factorial ANOVA pages are hidden from the menu (th
 
 ## Türkçe
 
-Anket verileri için **yerel çalışan** bir veri analizi asistanı. Verinizi (Excel `.xlsx`, SPSS `.sav` ya da CSV) yükleyin; uygulama veri kalitesini denetler, varsayımlara bakıp **doğru istatistiksel testi önerir** (nedenini açıklar), hesaplar ve sade bir dille yorumlar. Doğrusal ve lojistik regresyon kurar, Likert ölçek puanı ve Cronbach alfa hesaplar, dikkatsiz yanıtları tarar; ekrandaki sayıları birebir yeniden üreten **Python ve R kodunu** ve raporu (HTML, PDF, DOCX) üretir. **Her şey bu bilgisayarda çalışır; veriniz dışarı gönderilmez.** Arayüz, yorumlar, raporlar ve kod açıklamaları **Türkçe ve İngilizce** olarak sunulur (üst çubuktaki TR/EN düğmesi).
+Anket verileri için **yerel çalışan** bir veri analizi asistanı. Verinizi (Excel `.xlsx`, SPSS `.sav` ya da CSV) yükleyin; uygulama veri kalitesini denetler, varsayımlara bakıp **doğru istatistiksel testi önerir** (nedenini açıklar), hesaplar ve sade bir dille yorumlar. Doğrusal ve lojistik regresyon kurar, Likert ölçek puanı ve Cronbach alfa hesaplar, madde analiziyle zayıf ya da yanlış kodlanmış maddeleri işaretler, dikkatsiz yanıtları tarar; ekrandaki sayıları birebir yeniden üreten **Python ve R kodunu** ve raporu (HTML, PDF, DOCX) üretir. **Her şey bu bilgisayarda çalışır; veriniz dışarı gönderilmez.** Arayüz, yorumlar, raporlar ve kod açıklamaları **Türkçe ve İngilizce** olarak sunulur (üst çubuktaki TR/EN düğmesi).
 
 Proje önce yalnızca bir "hipotez testi danışmanı" olarak başladı; sonra anket analizine odaklanan bir analiz asistanına dönüştü.
 
@@ -71,7 +71,7 @@ Proje önce yalnızca bir "hipotez testi danışmanı" olarak başladı; sonra a
 
 | Alan | İçerik |
 |---|---|
-| **Veri** | CSV / Excel (.xlsx) / SPSS (.sav) yükleme; sütun türü tanıma, veri kalitesi denetimi, temizleme, ölçek puanı, yanıt taraması. SPSS'te değer etiketleri (ör. 1 → Kadın), kullanıcı eksikleri ve tarihler çözülür. |
+| **Veri** | CSV / Excel (.xlsx) / SPSS (.sav) yükleme; sütun türü tanıma, veri kalitesi denetimi, temizleme, ölçek puanı (ters madde, Cronbach alfa, madde analizi: düzeltilmiş madde-toplam r ve madde silinirse alfa), yanıt taraması. SPSS'te değer etiketleri (ör. 1 → Kadın), kullanıcı eksikleri ve tarihler çözülür. |
 | **Karar Sihirbazı** | Amaç, tasarım ve sütun seçimine göre test önerisi; normallik ve varyans eşitliği veriden hesaplanır; öneri değişirse nedeni yazılır. Önerinin alternatifleri "Bunu çalıştır" ile denenebilir. |
 | **Testler** | Student/Welch t, Mann-Whitney U, tek yönlü ve Welch ANOVA (Tukey HSD / Games–Howell), Kruskal-Wallis (Dunn), eşleştirilmiş t, Wilcoxon, işaret testi, tekrarlı ölçümler ANOVA, Friedman, Pearson, Spearman, Kendall tau-b, ki-kare, Fisher kesin testi, McNemar, Cochran Q. |
 | **Regresyon** | Doğrusal ve ikili lojistik regresyon: katsayılar, güven aralıkları, tanılar (VIF, Cook, Durbin–Watson…), APA özeti. |

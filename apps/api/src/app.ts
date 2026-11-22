@@ -16,6 +16,7 @@ import {
   buildReport,
   cleanColumns,
   computeScales,
+  ITEM_TOTAL_MIN,
   groupLossOf,
   KNN_MAX_ROWS,
   lossLevel,
@@ -472,8 +473,14 @@ export function buildApp(opts: AppOptions): FastifyInstance {
     const buf = Buffer.from(columnsToCsv([...base, ...added]), 'utf8');
     const operations = {
       scales: body.scales,
-      results: results.map((r) => ({ name: r.name, alpha: r.alpha, nAlpha: r.nAlpha, nValid: r.nValid, mean: r.mean, skewness: r.skewness, kurtosis: r.kurtosis, shapiroW: r.shapiroW, shapiroP: r.shapiroP, notes: r.notes })),
-      log: results.map((r) => `Ölçek “${r.name}”: ${r.nValid} geçerli puan, alfa ${r.alpha === null ? 'hesaplanamadı' : r.alpha.toFixed(3)}.`),
+      results: results.map((r) => ({ name: r.name, alpha: r.alpha, nAlpha: r.nAlpha, itemStats: r.itemStats, nValid: r.nValid, mean: r.mean, skewness: r.skewness, kurtosis: r.kurtosis, shapiroW: r.shapiroW, shapiroP: r.shapiroP, notes: r.notes })),
+      log: results.flatMap((r) => {
+        const weak = r.itemStats.filter((s) => s.itemTotalR !== null && s.itemTotalR < ITEM_TOTAL_MIN).map((s) => s.item);
+        return [
+          `Ölçek “${r.name}”: ${r.nValid} geçerli puan, alfa ${r.alpha === null ? 'hesaplanamadı' : r.alpha.toFixed(3)}.`,
+          ...(weak.length ? [`Ölçek “${r.name}”: düzeltilmiş madde-toplam r < .30 olan maddeler: ${weak.join(', ')}.`] : []),
+        ];
+      }),
     };
     const { dataset, created } = ingest(buf, `${row.name.replace(/\.csv$/i, '')} (ölçekli).csv`, { parentId: row.id, operations });
     return reply.status(created ? 201 : 200).send({ ...dataset, duplicate: !created, scaleResults: operations.results });

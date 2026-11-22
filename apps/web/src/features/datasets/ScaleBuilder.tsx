@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { Layers, Plus, Trash2 } from 'lucide-react';
-import { Button, Panel, SectionHeader, StatusLine } from '@/components/ui';
+import { ITEM_TOTAL_MIN, type ItemStat } from '@statadvisor/shared';
+import { Button, DataTable, Panel, SectionHeader, StatusLine, Tag, type Column } from '@/components/ui';
 import { useApp } from '@/context/AppContext';
 import type { ColumnInfo } from '@/data/api';
-import { useCreateScales, useScalesCode, type CodeLang, type ScaleRequest } from '@/data/hooks';
+import { useCreateScales, useScalesCode, type CodeLang, type ScaleRequest, type ScaleResultInfo } from '@/data/hooks';
 import { tc, tl, useI18n } from '@/i18n';
 
 interface Draft {
@@ -28,6 +29,54 @@ function alphaLabel(a: number | null) {
   if (a >= 0.6) return tl('şüpheli');
   if (a >= 0.5) return tl('zayıf');
   return tl('kabul edilemez');
+}
+
+const num = (x: number | null, d = 2) => (x === null ? '–' : x.toFixed(d));
+
+/** Madde analizi tablosu (SPSS “Item-Total Statistics”): zayıf maddeler ve alfayı artıracak çıkarımlar vurgulanır. */
+function ItemTable({ result }: { result: ScaleResultInfo }) {
+  const { t } = useI18n();
+  if (!result.itemStats.length) return null;
+  const weak = (s: ItemStat) => s.itemTotalR !== null && s.itemTotalR < ITEM_TOTAL_MIN;
+  const raises = (s: ItemStat) => result.alpha !== null && s.alphaIfDeleted !== null && s.alphaIfDeleted > result.alpha;
+  const columns: Column<ItemStat>[] = [
+    {
+      key: 'item',
+      header: t('Madde'),
+      cell: (s) => (
+        <span className="inline-flex items-center gap-2">
+          <span className="truncate" title={s.item}>{s.item}</span>
+          {s.reversed && <Tag>{t('ters')}</Tag>}
+        </span>
+      ),
+    },
+    { key: 'mean', header: t('Ortalama'), numeric: true, align: 'right', cell: (s) => num(s.mean) },
+    { key: 'sd', header: t('SS'), numeric: true, align: 'right', cell: (s) => num(s.sd) },
+    {
+      key: 'r',
+      header: t('Düzeltilmiş madde-toplam r'),
+      numeric: true,
+      align: 'right',
+      cell: (s) => num(s.itemTotalR),
+      cellClassName: (s) => (weak(s) ? 'text-danger font-semibold' : undefined),
+    },
+    {
+      key: 'aid',
+      header: t('Madde silinirse α'),
+      numeric: true,
+      align: 'right',
+      cell: (s) => num(s.alphaIfDeleted),
+      cellClassName: (s) => (raises(s) ? 'text-warning font-semibold' : undefined),
+    },
+  ];
+  return (
+    <div className="mt-2">
+      <DataTable caption={tl('“{name}” madde analizi', { name: result.name })} columns={columns} rows={result.itemStats} rowKey={(s) => s.item} density="compact" isRowHighlighted={(s) => weak(s)} />
+      <p className="mt-1 text-caption text-fg-muted">
+        {t('Tüm maddeleri yanıtlayan')} {result.nAlpha} {t('satır; ters maddeler çevrilmiş halde. Düzeltilmiş madde-toplam r .30’un altındaysa madde zayıf sayılır (kırmızı); “madde silinirse α” mevcut alfadan yüksekse madde ölçeği zayıflatıyor olabilir (turuncu).')}
+      </p>
+    </div>
+  );
 }
 
 function toRequest(d: Draft): ScaleRequest | string {
@@ -169,7 +218,7 @@ export function ScaleBuilder({ datasetId, columns }: { datasetId: string; column
                         <span className="block text-caption text-fg-muted">
                           {t('Puanın normalliği: çarpıklık')}{' '}<span className="font-mono">{r.skewness.toFixed(2)}</span>{t(', basıklık')}{' '}
                           <span className="font-mono">{r.kurtosis.toFixed(2)}</span> —{' '}
-                          {Math.abs(r.skewness) <= 1.5 && Math.abs(r.kurtosis) <= 1.5 ? 'normal kabul edilir (±1.5)' : Math.abs(r.skewness) <= 2 && Math.abs(r.kurtosis) <= 2 ? t('±1.5 dışında, ±2 içinde') : t('normal kabul edilmez (±2 dışında)')}
+                          {Math.abs(r.skewness) <= 1.5 && Math.abs(r.kurtosis) <= 1.5 ? t('normal kabul edilir (±1.5)') :Math.abs(r.skewness) <= 2 && Math.abs(r.kurtosis) <= 2 ? t('±1.5 dışında, ±2 içinde') : t('normal kabul edilmez (±2 dışında)')}
                           {r.shapiroP !== null && (
                             <>
                               {t('; Shapiro-Wilk')}{' '}<span className="font-mono">W = {r.shapiroW!.toFixed(3)}, p {r.shapiroP < 0.001 ? '< .001' : '= ' + r.shapiroP.toFixed(3)}</span>
@@ -180,6 +229,7 @@ export function ScaleBuilder({ datasetId, columns }: { datasetId: string; column
                       {r.notes.map((line) => (
                         <span key={line} className="block text-caption text-warning">{t(line)}</span>
                       ))}
+                      <ItemTable result={r} />
                     </li>
                   ))}
                 </ul>
