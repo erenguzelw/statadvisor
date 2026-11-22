@@ -12,6 +12,7 @@ import '@fontsource/jetbrains-mono/500.css';
 import '@fontsource/jetbrains-mono/600.css';
 import './styles/index.css';
 import { AppProvider } from '@/context/AppContext';
+import { I18nProvider } from '@/i18n';
 import { router } from './routes';
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity, retry: 1 } } });
@@ -19,9 +20,11 @@ const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: In
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <AppProvider>
-        <RouterProvider router={router} />
-      </AppProvider>
+      <I18nProvider>
+        <AppProvider>
+          <RouterProvider router={router} />
+        </AppProvider>
+      </I18nProvider>
     </QueryClientProvider>
   </StrictMode>,
 );

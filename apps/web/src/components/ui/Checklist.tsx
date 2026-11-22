@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { Check } from 'lucide-react';
+import { useT } from '@/i18n';
 
 export interface ChecklistItem {
   id: string;
@@ -8,11 +9,12 @@ export interface ChecklistItem {
 }
 
 export function Checklist({ items }: { items: ChecklistItem[] }) {
+  const t = useT();
   return (
     <ul className="divide-y divide-line/30">
       {items.map((item) => (
         <li key={item.id} className="flex items-start gap-3 py-2.5">
-          <Check size={16} className="mt-0.5 shrink-0 text-secondary" aria-label="Tamamlandı" />
+          <Check size={16} className="mt-0.5 shrink-0 text-secondary" aria-label={t('Tamamlandı')} />
           <span className="flex-1 text-body text-fg">{item.label}</span>
           {item.meta && <span className="shrink-0 text-caption whitespace-nowrap text-fg-subtle">{item.meta}</span>}
         </li>

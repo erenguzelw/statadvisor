@@ -12,7 +12,7 @@ const app = buildApp({ dataDir, webDir });
 // Yalnızca bu bilgisayardan erişilir: dış ağa açılmaz.
 app
   .listen({ host: '127.0.0.1', port })
-  .then(() => console.log(`StatAdvisor AI hazır: http://127.0.0.1:${port}  (veri klasörü: ${dataDir})`))
+  .then(() => console.log(`StatAdvisor hazır: http://127.0.0.1:${port}  (veri klasörü: ${dataDir})`))
   .catch((e) => {
     console.error(e);
     process.exit(1);

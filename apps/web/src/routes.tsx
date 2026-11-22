@@ -9,18 +9,20 @@ import { FactorialPage } from '@/features/factorial/FactorialPage';
 import { LogisticPage } from '@/features/regression/LogisticPage';
 import { ModelComparisonPage } from '@/features/model-comparison/ModelComparisonPage';
 import { DataQualityPage } from '@/features/data-quality/DataQualityPage';
+import { useT } from '@/i18n';
 import { CodeReportPage } from '@/features/code-report/CodeReportPage';
 
 // Bileşen kataloğu yalnızca geliştirme sırasında paketlenir.
 const ComponentCatalog = import.meta.env.DEV ? lazy(() => import('@/features/catalog/ComponentCatalog')) : null;
 
 function NotFound() {
+  const t = useT();
   return (
     <div className="flex flex-col items-start gap-3 py-16">
-      <h1 className="text-title font-bold">Bu sayfa bulunamadı</h1>
-      <p className="text-fg-muted">Adres yanlış yazılmış ya da sayfa kaldırılmış olabilir.</p>
+      <h1 className="text-title font-bold">{t('Bu sayfa bulunamadı')}</h1>
+      <p className="text-fg-muted">{t('Adres yanlış yazılmış ya da sayfa kaldırılmış olabilir.')}</p>
       <Link to="/" className="text-secondary underline underline-offset-4">
-        Karar Sihirbazı’na dön
+        {t('Karar Sihirbazı’na dön')}
       </Link>
     </div>
   );

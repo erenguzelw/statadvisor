@@ -48,6 +48,13 @@ import {
   narrateLogistic,
   type LogisticSpec,
   generateAnalysisCode,
+  generateAnalysisCodeR,
+  translateHtml,
+  generateScalesCodeR,
+  generateCleaningCodeR,
+  generateLogisticCodeR,
+  generateRegressionCodeR,
+  generateScreeningCodeR,
   generateRegressionCode,
   narrateRegression,
   regressionReportData,
@@ -80,7 +87,7 @@ import { isOle, isZip, xlsxToCsv } from './xlsx.ts';
 import { isSav, isZsav, savToCsv } from './sav.ts';
 import { openDb } from './db.ts';
 import { buildProfile, describeColumns, effectiveColumns, ProfileBody } from './profile.ts';
-import { buildDocx, buildDocxFromDoc, buildRegressionDocx } from './docx.ts';
+import { buildDocx, buildDocxFromDoc, buildRegressionDocx, setDocLang } from './docx.ts';
 import { PdfUnavailableError, pdfAvailable, renderPdf } from './pdf.ts';
 
 export interface AppOptions {
@@ -501,7 +508,8 @@ export function buildApp(opts: AppOptions): FastifyInstance {
   });
   app.post('/api/datasets/:id/screen-code', async (req) => {
     const { body, row, csv, result } = screen((req.params as { id: string }).id, req.body);
-    return generateScreeningCode(fileInfo(row, csv), body, result);
+    const gen = (req.query as { lang?: string }).lang === 'r' ? generateScreeningCodeR : generateScreeningCode;
+    return gen(fileInfo(row, csv), body, result);
   });
 
   /** Ölçek tanımının Python karşılığı (sonuçlar sunucuda yeniden hesaplanır). */
@@ -510,7 +518,8 @@ export function buildApp(opts: AppOptions): FastifyInstance {
     const body = ScaleBody.parse(req.body ?? {});
     const { row, csv } = parsed(id);
     const results = computeScales(qcols(csv), body.scales as ScaleDef[]);
-    return generateScalesCode(fileInfo(row, csv), body.scales as ScaleDef[], results);
+    const gen = (req.query as { lang?: string }).lang === 'r' ? generateScalesCodeR : generateScalesCode;
+    return gen(fileInfo(row, csv), body.scales as ScaleDef[], results);
   });
 
   app.get('/api/datasets', async () => {
@@ -576,7 +585,8 @@ export function buildApp(opts: AppOptions): FastifyInstance {
       const c = eff.find((x) => x.name === r.column)!;
       if (c.validRange || c.validCategories?.length) validity[c.name] = { numeric: c.numeric, range: c.validRange, categories: c.validCategories };
     }
-    return generateCleaningCode(fileInfo(row, csv), {
+    const genClean = (req.query as { lang?: string }).lang === 'r' ? generateCleaningCodeR : generateCleaningCode;
+    return genClean(fileInfo(row, csv), {
       numericColumns: eff.filter((c) => c.numeric).map((c) => c.name),
       continuousColumns: eff.filter((c) => !c.skip && isContinuous(c)).map((c) => c.name),
       modeColumns: eff.filter((c) => !c.skip && !isContinuous(c)).map((c) => c.name),
@@ -753,8 +763,9 @@ export function buildApp(opts: AppOptions): FastifyInstance {
         audit.splice(1, 0, ['Veri sürümü', 'Ham veri (değiştirilmemiş)']);
       }
     }
+    const lang = reportLang(req.query);
     const data = reportFromResult(a.result, date, audit);
-    const html = buildReport(data);
+    const html = translateHtml(lang, buildReport(data));
     if (format === 'html') {
       reply.header('Content-Type', 'text/html; charset=utf-8');
       reply.header('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; img-src data:");
@@ -763,6 +774,7 @@ export function buildApp(opts: AppOptions): FastifyInstance {
     if (format === 'docx') {
       reply.header('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
       reply.header('Content-Disposition', 'attachment; filename="rapor.docx"');
+      setDocLang(lang);
       return buildDocx(data);
     }
     reply.header('Content-Type', 'application/pdf');
@@ -774,6 +786,8 @@ export function buildApp(opts: AppOptions): FastifyInstance {
   app.get('/api/capabilities', async () => ({ pdf: await pdfAvailable(), docx: true, html: true }));
 
   /* ---------- Rapor yardımcıları (regresyon, lojistik regresyon, model karşılaştırma) ---------- */
+  /** Rapor dili: ?lang=en İngilizce, aksi halde Türkçe. */
+  const reportLang = (q: unknown): 'tr' | 'en' => ((q as { lang?: string } | undefined)?.lang === 'en' ? 'en' : 'tr');
   const FormatQuery = z.object({ format: z.enum(['html', 'pdf', 'docx']).default('html') });
   type ReportFormat = z.infer<typeof FormatQuery>['format'];
   type EngineInfo = ReturnType<typeof engineInfo>;
@@ -786,19 +800,22 @@ export function buildApp(opts: AppOptions): FastifyInstance {
 
   /** Raporu istenen biçimde gönderir: HTML tarayıcıda açılır, Word ve PDF indirilir. */
   async function sendReport(reply: FastifyReply, format: ReportFormat, doc: RenderedReport) {
+    const lang = reportLang(reply.request.query);
+    const html = translateHtml(lang, doc.html);
     if (format === 'html') {
       reply.header('Content-Type', 'text/html; charset=utf-8');
       reply.header('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; img-src data:");
-      return doc.html;
+      return html;
     }
     if (format === 'docx') {
       reply.header('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
       reply.header('Content-Disposition', `attachment; filename="${doc.fileBase}.docx"`);
+      setDocLang(lang);
       return doc.docx();
     }
     reply.header('Content-Type', 'application/pdf');
     reply.header('Content-Disposition', `attachment; filename="${doc.fileBase}.pdf"`);
-    return renderPdf(doc.html);
+    return renderPdf(html);
   }
 
   const datasetAudit = (row: DatasetRow): [string, string] => ['Veri seti', `${row.name} (SHA-256 ${row.sha256.slice(0, 16)}…, ${row.rows} satır)`];
@@ -918,6 +935,7 @@ export function buildApp(opts: AppOptions): FastifyInstance {
     const { row, csv, spec, result } = runRegression(id, req.body);
     const narrative = narrateRegression(result, spec.dependent);
     const code = generateRegressionCode(fileInfo(row, csv), spec, result);
+    const codeR = generateRegressionCodeR(fileInfo(row, csv), spec, result);
     // Kalıntı grafiği için en çok ~2000 nokta (eşit aralıklı)
     const step = Math.max(1, Math.ceil(result.n / 2000));
     const plot = { fitted: [] as number[], residuals: [] as number[], step };
@@ -927,7 +945,7 @@ export function buildApp(opts: AppOptions): FastifyInstance {
     }
     const { fitted, residuals, cooks, leverage, usedRows, ...summary } = result;
     void fitted; void residuals; void cooks; void leverage; void usedRows;
-    return { datasetId: row.id, datasetName: row.name, spec, result: summary, narrative, model: modelRows(result), coefficients: coefficientRows(result), plot, code, engine: engineInfo() };
+    return { datasetId: row.id, datasetName: row.name, spec, result: summary, narrative, model: modelRows(result), coefficients: coefficientRows(result), plot, code, codeR, engine: engineInfo() };
   });
 
   /** Regresyon raporu: html | pdf | docx (aynı gövdeyle model yeniden hesaplanır). */
@@ -1053,6 +1071,7 @@ export function buildApp(opts: AppOptions): FastifyInstance {
     const narrative = narrateLogistic(result, spec.dependent);
     // Tam ayrışmada statsmodels da hata verir; katsayılar anlamsız olduğu için kod üretilmez.
     const code = result.separation === 'complete' ? null : generateLogisticCode(fileInfo(row, csv), spec, result);
+    const codeR = result.separation === 'complete' ? null : generateLogisticCodeR(fileInfo(row, csv), spec, result);
     const { probs, usedRows, ...summary } = result;
     void probs; void usedRows;
     return {
@@ -1066,6 +1085,7 @@ export function buildApp(opts: AppOptions): FastifyInstance {
       classification: classificationRows(result),
       hosmerLemeshow: hosmerLemeshowRows(result),
       code,
+      codeR,
       engine: engineInfo(),
     };
   });
@@ -1365,10 +1385,11 @@ export function buildApp(opts: AppOptions): FastifyInstance {
     const o = openSaved(r);
     const { row, csv } = parsed(r.dataset_id);
     const file = fileInfo(row, csv);
-    if (o.kind === 'regression') return generateRegressionCode(file, o.spec, o.result);
+    const isR = (req.query as { lang?: string }).lang === 'r';
+    if (o.kind === 'regression') return (isR ? generateRegressionCodeR : generateRegressionCode)(file, o.spec, o.result);
     if (o.kind === 'logistic') {
       if (o.result.separation === 'complete') throw new ApiError(409, 'no_code', NO_LOGIT_CODE);
-      return generateLogisticCode(file, o.spec, o.result);
+      return (isR ? generateLogisticCodeR : generateLogisticCode)(file, o.spec, o.result);
     }
     if (o.kind === 'factorial') return generateFactorialCode(file, o.spec, o.result);
     return generateModelCompareCode(file, o.spec, o.result);
@@ -1386,11 +1407,13 @@ export function buildApp(opts: AppOptions): FastifyInstance {
     return reply.status(204).send();
   });
 
-  /** Analizin Python karşılığı; betik, beklenen çıktıyla birebir aynı satırları yazdırır. */
+  /** Analizin Python (varsayılan) ya da R (?lang=r) karşılığı; betik, beklenen çıktıyla birebir aynı satırları yazdırır. */
   app.get('/api/analyses/:id/code', async (req) => {
     const a = analysisJson(getAnalysis((req.params as { id: string }).id));
     const { row, csv } = parsed(a.datasetId);
-    return generateAnalysisCode(fileInfo(row, csv), a.request as AnalysisSpec, a.result);
+    const lang = (req.query as { lang?: string }).lang;
+    const gen = lang === 'r' ? generateAnalysisCodeR : generateAnalysisCode;
+    return gen(fileInfo(row, csv), a.request as AnalysisSpec, a.result);
   });
 
   if (opts.webDir && existsSync(join(opts.webDir, 'index.html'))) {

@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Highlight, type PrismTheme } from 'prism-react-renderer';
 import { FileCode2 } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import { useI18n } from '@/i18n';
 import { CopyButton } from './CopyButton';
 
 const theme: PrismTheme = {
@@ -41,6 +42,7 @@ export function CodeBlock({
   maxHeight,
   className,
 }: CodeBlockProps) {
+  const { t } = useI18n();
   // prism-react-renderer R içermiyor; R ve bash düz metin olarak gösterilir.
   const prismLang = language === 'python' ? 'python' : 'text';
   return (
@@ -60,7 +62,7 @@ export function CodeBlock({
         {runtime && <span className="text-caption text-fg-subtle">{runtime}</span>}
         <span className="ml-auto flex items-center gap-2">
           {actions}
-          <CopyButton text={code} label="Kodu kopyala" />
+          <CopyButton text={code} label={t('Kodu kopyala')} />
         </span>
       </figcaption>
       <Highlight code={code.trimEnd()} language={prismLang} theme={theme}>

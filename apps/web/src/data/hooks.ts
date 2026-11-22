@@ -179,11 +179,11 @@ export function useApplyScreen(datasetId: string) {
 }
 
 export function useScreenCode(datasetId: string) {
-  return useMutation({ mutationFn: (body: ScreenRequest) => api.post<CodeResponse>(`/api/datasets/${datasetId}/screen-code`, body) });
+  return useMutation({ mutationFn: ({ body, lang = 'python' }: { body: ScreenRequest; lang?: CodeLang }) => api.post<CodeResponse>(`/api/datasets/${datasetId}/screen-code${lang === 'r' ? '?lang=r' : ''}`, body) });
 }
 
 export function useScalesCode(datasetId: string) {
-  return useMutation({ mutationFn: (scales: ScaleRequest[]) => api.post<CodeResponse>(`/api/datasets/${datasetId}/scales-code`, { scales }) });
+  return useMutation({ mutationFn: ({ scales, lang = 'python' }: { scales: ScaleRequest[]; lang?: CodeLang }) => api.post<CodeResponse>(`/api/datasets/${datasetId}/scales-code${lang === 'r' ? '?lang=r' : ''}`, { scales }) });
 }
 
 /** Kaydetmeden önizleme: istek tamamsa çalışır, aynı istek için önbellekten döner. */
@@ -226,8 +226,10 @@ export function useAnalyses(datasetId: string | null) {
   });
 }
 
-export function useAnalysisCode(id: string | null) {
-  return useQuery({ queryKey: keys.code(id), queryFn: () => api.get<CodeResponse>(`/api/analyses/${id}/code`), enabled: Boolean(id), retry: shouldRetry });
+export type CodeLang = 'python' | 'r';
+
+export function useAnalysisCode(id: string | null, lang: CodeLang = 'python') {
+  return useQuery({ queryKey: [...keys.code(id), lang] as const, queryFn: () => api.get<CodeResponse>(`/api/analyses/${id}/code${lang === 'r' ? '?lang=r' : ''}`), enabled: Boolean(id), retry: shouldRetry });
 }
 
 export interface QualityParams {
@@ -333,8 +335,8 @@ export function useSavedReport(id: string | null) {
   return useQuery({ queryKey: ['report', id] as const, queryFn: () => api.get<SavedReportView>(`/api/reports/${id}`), enabled: Boolean(id), retry: shouldRetry });
 }
 
-export function useSavedReportCode(id: string | null, enabled: boolean) {
-  return useQuery({ queryKey: ['report-code', id] as const, queryFn: () => api.get<CodeResponse>(`/api/reports/${id}/code`), enabled: Boolean(id) && enabled, retry: shouldRetry, staleTime: Infinity });
+export function useSavedReportCode(id: string | null, enabled: boolean, lang: CodeLang = 'python') {
+  return useQuery({ queryKey: ['report-code', id, lang] as const, queryFn: () => api.get<CodeResponse>(`/api/reports/${id}/code${lang === 'r' ? '?lang=r' : ''}`), enabled: Boolean(id) && enabled, retry: shouldRetry, staleTime: Infinity });
 }
 
 /** Sonucu rapor merkezine kaydeder (regresyon, lojistik regresyon ya da model karşılaştırma uç noktası). */
@@ -357,10 +359,10 @@ export function useDeleteReport() {
   });
 }
 
-export function useCleaningCode(datasetId: string | null, p: { rules: CleanRule[]; impute: string }) {
+export function useCleaningCode(datasetId: string | null, p: { rules: CleanRule[]; impute: string; lang?: CodeLang }) {
   return useQuery({
     queryKey: keys.cleaningCode(datasetId, p),
-    queryFn: () => api.get<CodeResponse>(`/api/datasets/${datasetId}/cleaning-code${qs({ rulesJson: JSON.stringify(p.rules), impute: p.impute })}`),
+    queryFn: () => api.get<CodeResponse>(`/api/datasets/${datasetId}/cleaning-code${qs({ rulesJson: JSON.stringify(p.rules), impute: p.impute, ...(p.lang === 'r' ? { lang: 'r' } : {}) })}`),
     enabled: Boolean(datasetId),
     retry: shouldRetry,
     placeholderData: keepPreviousData,

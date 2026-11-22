@@ -1,16 +1,18 @@
 import { NavLink, Outlet } from 'react-router-dom';
+import { useT } from '@/i18n';
 import { cn } from '@/lib/cn';
 
 const tabs = [
-  { to: '/veri', label: 'Veri setleri', end: true },
+  { to: '/veri', label: 'Veri Setleri', end: true },
   { to: '/veri/kalite', label: 'Kalite & aykırılık', end: false },
 ];
 
 /** “Veri Setleri” bölümü: veri yönetimi ve veri kalitesi aynı menü öğesinin alt sekmeleridir. */
 export function DataSection() {
+  const t = useT();
   return (
     <>
-      <nav aria-label="Veri bölümleri" className="mb-6 border-b border-line">
+      <nav aria-label={t('Veri bölümleri')} className="mb-6 border-b border-line">
         <ul className="-mb-px flex gap-1">
           {tabs.map(({ to, label, end }) => (
             <li key={to}>
@@ -24,7 +26,7 @@ export function DataSection() {
                   )
                 }
               >
-                {label}
+                {t(label)}
               </NavLink>
             </li>
           ))}

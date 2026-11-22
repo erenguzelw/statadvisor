@@ -2,6 +2,7 @@ import { useId } from 'react';
 import { scaleLinear } from 'd3-scale';
 import { line } from 'd3-shape';
 import type { RocPoint } from '@statadvisor/shared';
+import { useI18n } from '@/i18n';
 
 export interface RocSeries {
   id: string;
@@ -17,13 +18,14 @@ const H = 240;
 const pad = { top: 12, right: 12, bottom: 28, left: 32 };
 
 export function RocCurve({ series }: { series: RocSeries[] }) {
+  const { t } = useI18n();
   const titleId = useId();
   const x = scaleLinear().domain([0, 1]).range([pad.left, W - pad.right]);
   const y = scaleLinear().domain([0, 1]).range([H - pad.bottom, pad.top]);
   const path = line<RocPoint>()
     .x((d) => x(d.fpr))
     .y((d) => y(d.tpr));
-  const summary = `ROC eğrisi: ${series.map((s) => `${s.label} AUC ${s.auc.toFixed(2)}`).join(', ')}`;
+  const summary = t('ROC eğrisi: {v1}', { v1: series.map((s) => `${s.label} AUC ${s.auc.toFixed(2)}`).join(', ') });
 
   return (
     <div>
@@ -51,8 +53,7 @@ export function RocCurve({ series }: { series: RocSeries[] }) {
           />
         ))}
         <text x={x(1)} y={H - 10} dx={-24} textAnchor="end" fontSize={10} fill="var(--color-fg-subtle)" fontFamily="var(--font-sans)">
-          Yanlış pozitif oranı
-        </text>
+          {t('Yanlış pozitif oranı')}</text>
       </svg>
       <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-caption text-fg-muted">
         {series.map((s) => (

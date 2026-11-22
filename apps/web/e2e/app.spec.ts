@@ -251,7 +251,7 @@ test('sihirbaz: soruları ve sütunları değiştirince farklı test çalışır
 
   await page.getByRole('radio', { name: 'Bir sonucu tahmin etmek' }).check();
   await expect(page.getByText('Hipotez testi uygulanmıyor')).toBeVisible();
-  await expect(page.getByRole('link', { name: /Model Karşılaştırma sayfasına gidin/ })).toBeVisible();
+  await expect(page.getByRole('link', { name: /Doğrusal Regresyon sayfasına gidin/ })).toBeVisible();
 });
 
 test('sihirbaz: geçersiz seçim anlaşılır hata verir', async ({ page, request }) => {
@@ -377,7 +377,7 @@ test('veri kalitesi: varsayılan olarak hiçbir şey seçili değildir; uç değ
   await expect(create).toBeEnabled();
   await page.getByRole('radio', { name: 'Sonrası (önizleme)' }).check();
   await expect(page.getByText(/Dallanan yol uyarısı/)).toBeVisible();
-  await expect(page.getByText(/Temizleme kodu \(Python\)/)).toBeVisible();
+  await expect(page.getByText(/Temizleme kodu/)).toBeVisible();
 
   await create.click();
   await expect(page.getByText('Temizlenmiş sürüm oluşturuldu ve etkin veri seti yapıldı')).toBeVisible();
@@ -476,4 +476,26 @@ test('mobil menü açılır, gezinir ve kapanır', async ({ page, request }) => 
   await dialog.getByRole('link', { name: 'Veri Setleri' }).click();
   await expect(dialog).toBeHidden();
   await expect(page.getByRole('heading', { level: 1, name: 'Veri Setleri' })).toBeVisible();
+});
+
+test('dil seçici: İngilizceye geçince arayüz, yorum ve kod yorumları İngilizce olur; tercih saklanır', async ({ page, request }) => {
+  await loadSample(request, 'klinik');
+  await page.goto('/karar-sihirbazi');
+  await page.getByRole('radio', { name: 'EN', exact: true }).check();
+  await expect(page.getByRole('heading', { name: 'Hypothesis Test and Model Advisor' })).toBeVisible();
+  await expect(page.getByText(/significant difference (was found )?between the groups/).first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole('link', { name: 'Linear Regression' })).toBeVisible();
+  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+
+  // Tercih sayfa yenilenince korunur
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Hypothesis Test and Model Advisor' })).toBeVisible();
+
+  // Kaydedilen test: R kodu ve İngilizce yorum satırları
+  await page.getByRole('button', { name: 'Save and generate code/report' }).click();
+  await expect(page).toHaveURL(/\/kod-rapor\?analiz=/);
+  await page.getByRole('radio', { name: 'R', exact: true }).check();
+  await expect(page.getByText('analiz.R', { exact: true })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText(/values the app treats as missing/)).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Download the script (.R)' })).toBeVisible();
 });

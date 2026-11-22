@@ -2,7 +2,9 @@ import { useId } from 'react';
 import { Bell, ChevronsUpDown, FolderOpen, Menu, SquareTerminal } from 'lucide-react';
 import { IconButton } from '@/components/ui';
 import { useActiveDataset, useApp } from '@/context/AppContext';
+import { useT } from '@/i18n';
 import { ExpertiseToggle } from './ExpertiseToggle';
+import { LanguageToggle } from './LanguageToggle';
 
 function Logo() {
   return (
@@ -14,13 +16,14 @@ function Logo() {
 }
 
 function DatasetPicker() {
+  const t = useT();
   const id = useId();
   const { setDatasetId } = useApp();
   const { dataset, datasets, loading } = useActiveDataset();
   return (
     <div className="relative flex min-w-0 items-center">
       <label htmlFor={id} className="sr-only">
-        Veri seti
+        {t('Veri seti')}
       </label>
       <FolderOpen size={16} className="pointer-events-none absolute left-3 text-secondary" aria-hidden />
       <select
@@ -30,10 +33,10 @@ function DatasetPicker() {
         onChange={(e) => setDatasetId(e.target.value)}
         className="h-10 max-w-72 min-w-0 appearance-none truncate rounded-card border border-line/40 bg-surface-low pr-8 pl-9 font-mono text-data text-fg hover:border-line-strong"
       >
-        {datasets.length === 0 && <option value="">{loading ? 'Yükleniyor…' : 'Veri seti yok'}</option>}
+        {datasets.length === 0 && <option value="">{loading ? t('Yükleniyor…') : t('Veri seti yok')}</option>}
         {datasets.map((d) => (
           <option key={d.id} value={d.id}>
-            {d.name}
+            {t(d.name)}
           </option>
         ))}
       </select>
@@ -43,25 +46,27 @@ function DatasetPicker() {
 }
 
 export function TopBar({ onOpenMenu }: { onOpenMenu: () => void }) {
+  const t = useT();
   return (
     <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-line/20 bg-canvas/90 px-4 py-3 backdrop-blur md:px-8">
-      <IconButton icon={Menu} label="Menüyü aç" onClick={onOpenMenu} className="lg:hidden" />
+      <IconButton icon={Menu} label={t('Menüyü aç')} onClick={onOpenMenu} className="lg:hidden" />
       <a href="/" className="flex shrink-0 items-center gap-2.5">
         <Logo />
-        <span className="hidden font-display text-heading font-bold tracking-tight sm:inline">StatAdvisor AI</span>
+        <span className="hidden font-display text-heading font-bold tracking-tight sm:inline">StatAdvisor</span>
       </a>
       <span className="hidden h-6 w-px bg-line/50 xl:block" aria-hidden />
       <div className="hidden min-w-0 xl:block">
         <DatasetPicker />
       </div>
       <div className="ml-auto flex items-center gap-1 sm:gap-2">
+        <LanguageToggle />
         <ExpertiseToggle className="hidden sm:inline-flex" />
-        <IconButton icon={Bell} label="Bildirimler" badge />
-        <IconButton icon={SquareTerminal} label="Konsol" className="hidden sm:inline-flex" />
+        <IconButton icon={Bell} label={t('Bildirimler')} badge />
+        <IconButton icon={SquareTerminal} label={t('Konsol')} className="hidden sm:inline-flex" />
         <span
           className="ml-1 inline-flex size-9 items-center justify-center rounded-full bg-gradient-to-br from-primary-strong to-secondary-strong text-caption font-semibold text-white"
           role="img"
-          aria-label="Profil: Eren Güzel"
+          aria-label="Eren Güzel"
         >
           EG
         </span>

@@ -1,3 +1,4 @@
+import { tl } from '@/i18n';
 /** Tarayıcıda metin içeriğini dosya olarak indirir. */
 export function downloadText(fileName: string, content: string, type = 'text/plain') {
   const url = URL.createObjectURL(new Blob([content], { type: `${type};charset=utf-8` }));
@@ -14,7 +15,7 @@ export function toNotebook(code: string, title: string) {
   return JSON.stringify(
     {
       cells: [
-        { cell_type: 'markdown', metadata: {}, source: lines(`# ${title}\nStatAdvisor AI tarafından üretildi.`) },
+        { cell_type: 'markdown', metadata: {}, source: lines(`# ${title}\nStatAdvisor tarafından üretildi.`) },
         { cell_type: 'code', metadata: {}, execution_count: null, outputs: [], source: lines(code) },
       ],
       metadata: { kernelspec: { display_name: 'Python 3', language: 'python', name: 'python3' }, language_info: { name: 'python' } },
@@ -38,7 +39,7 @@ export function openHtml(content: string) {
 export async function fetchReport(url: string, body: unknown, fileName: string | null) {
   const res = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
   if (!res.ok) {
-    let message = `Rapor üretilemedi (${res.status}).`;
+    let message = tl('Rapor üretilemedi ({status}).', { status: res.status });
     try {
       message = ((await res.json()) as { error?: { message?: string } }).error?.message ?? message;
     } catch {

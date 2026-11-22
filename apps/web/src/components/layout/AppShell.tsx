@@ -2,10 +2,12 @@ import { useEffect, useRef, useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { X } from 'lucide-react';
 import { IconButton } from '@/components/ui';
+import { useT } from '@/i18n';
 import { Sidebar } from './Sidebar';
 import { MobileControls, TopBar } from './TopBar';
 
 export function AppShell() {
+  const t = useT();
   const [menuOpen, setMenuOpen] = useState(false);
   const { pathname } = useLocation();
   const mainRef = useRef<HTMLElement>(null);
@@ -30,7 +32,7 @@ export function AppShell() {
         href="#main"
         className="sr-only z-50 rounded-control bg-primary-strong px-3 py-2 text-on-primary-strong focus:not-sr-only focus:fixed focus:top-2 focus:left-2"
       >
-        İçeriğe geç
+        {t('İçeriğe geç')}
       </a>
 
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-72 lg:block">
@@ -38,16 +40,16 @@ export function AppShell() {
       </aside>
 
       {menuOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label="Ana menü">
+        <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label={t('Ana menü')}>
           <button
             type="button"
-            aria-label="Menüyü kapat"
+            aria-label={t('Menüyü kapat')}
             className="absolute inset-0 bg-black/60"
             onClick={() => setMenuOpen(false)}
           />
           <div className="relative h-full w-72 max-w-[85vw] shadow-3">
             <Sidebar onNavigate={() => setMenuOpen(false)} />
-            <IconButton icon={X} label="Menüyü kapat" onClick={() => setMenuOpen(false)} className="absolute top-3 right-3" autoFocus />
+            <IconButton icon={X} label={t('Menüyü kapat')} onClick={() => setMenuOpen(false)} className="absolute top-3 right-3" autoFocus />
           </div>
         </div>
       )}

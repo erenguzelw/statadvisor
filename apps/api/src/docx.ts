@@ -1,11 +1,19 @@
 import { AlignmentType, Document, HeadingLevel, ImageRun, Packer, Paragraph, Table, TableCell, TableRow, TextRun, WidthType } from 'docx';
 import { crosstabRows, LINEAR_COEFFICIENT_NOTE, type ReportDoc, type RegressionReportData, descriptiveTables, formatP, postHocTables, reportFigures, type ReportData, type ReportFigure } from '@statadvisor/shared';
 import { svgToPng } from './raster.ts';
+import { translate, type Lang } from '@statadvisor/shared';
+
+let docLang: Lang = 'tr';
+/** Sonraki .docx üretimi için dil; metinler yazılırken çevrilir. */
+export const setDocLang = (l: Lang) => {
+  docLang = l;
+};
+const tr = (s: string) => translate(docLang, s);
 
 const para = (text: string, opts: { bold?: boolean; italics?: boolean; size?: number; spacingAfter?: number } = {}) =>
-  new Paragraph({ spacing: { after: opts.spacingAfter ?? 120 }, children: [new TextRun({ text, bold: opts.bold, italics: opts.italics, size: opts.size })] });
+  new Paragraph({ spacing: { after: opts.spacingAfter ?? 120 }, children: [new TextRun({ text: tr(text), bold: opts.bold, italics: opts.italics, size: opts.size })] });
 
-const heading = (text: string) => new Paragraph({ heading: HeadingLevel.HEADING_2, spacing: { before: 280, after: 120 }, children: [new TextRun({ text })] });
+const heading = (text: string) => new Paragraph({ heading: HeadingLevel.HEADING_2, spacing: { before: 280, after: 120 }, children: [new TextRun({ text: tr(text) })] });
 
 function table(header: string[], rows: string[][]): Table {
   const cell = (text: string, head = false, right = false) =>
@@ -13,7 +21,7 @@ function table(header: string[], rows: string[][]): Table {
       width: { size: 100 / header.length, type: WidthType.PERCENTAGE },
       margins: { top: 60, bottom: 60, left: 100, right: 100 },
       shading: head ? { fill: 'EDEDED' } : undefined,
-      children: [new Paragraph({ alignment: right ? AlignmentType.RIGHT : AlignmentType.LEFT, children: [new TextRun({ text, bold: head, size: 20 })] })],
+      children: [new Paragraph({ alignment: right ? AlignmentType.RIGHT : AlignmentType.LEFT, children: [new TextRun({ text: tr(text), bold: head, size: 20 })] })],
     });
   return new Table({
     width: { size: 100, type: WidthType.PERCENTAGE },
@@ -49,8 +57,8 @@ export async function buildDocx(d: ReportData): Promise<Buffer> {
   const figures = reportFigures(d);
   const figs = (section: ReportFigure['section']) => figures.filter((f) => f.section === section).flatMap(figure);
   const children: (Paragraph | Table)[] = [
-    new Paragraph({ heading: HeadingLevel.TITLE, children: [new TextRun({ text: d.title })] }),
-    para(`${d.datasetName} · ${d.date} · StatAdvisor AI`, { italics: true, size: 20 }),
+    new Paragraph({ heading: HeadingLevel.TITLE, children: [new TextRun({ text: tr(d.title) })] }),
+    para(`${d.datasetName} · ${d.date} · StatAdvisor`, { italics: true, size: 20 }),
 
     heading('Tanımlayıcı istatistikler'),
     ...descriptiveTables(d.descriptives).flatMap((t) => [para(t.title, { italics: true, size: 20, spacingAfter: 60 }), table(t.header, t.rows), para('', { spacingAfter: 60 })]),
@@ -63,9 +71,9 @@ export async function buildDocx(d: ReportData): Promise<Buffer> {
       ? [table(['Test', 'Uygulandığı veri', 'İstatistik', 'p', 'Sonuç'], d.assumptions.map((x) => [x.name, x.subject, x.statistic, x.shape ? `sınır ±${x.shape.limit}` : formatP(x.p, true), x.passed ? 'Sağlandı' : 'İhlal edildi']))]
       : [para('Bu test türü için ayrı bir varsayım testi uygulanmadı.', { italics: true })]),
     ...figs('assump'),
-    para(`Önerilen test: ${d.decision.finalTest}${d.decision.rerouteReason ? ` (${d.decision.rerouteReason})` : ''}.`, { bold: true, spacingAfter: 80 }),
-    ...d.decision.warnings.map((w) => para(`• ${w}`, { size: 20 })),
-    ...(d.decision.alternatives ?? []).map((a) => para(`Alternatif: ${a.test}. ${a.when}`, { size: 20 })),
+    para(`${tr('Önerilen test: ')}${tr(d.decision.finalTest)}${d.decision.rerouteReason ? ` (${tr(d.decision.rerouteReason)})` : ''}.`, { bold: true, spacingAfter: 80 }),
+    ...d.decision.warnings.map((w) => para(`• ${tr(w)}`, { size: 20 })),
+    ...(d.decision.alternatives ?? []).map((a) => para(`${tr('Alternatif')}: ${tr(a.test)}. ${tr(a.when)}`, { size: 20 })),
 
     heading('Test sonucu'),
     para(d.resultLine),
@@ -81,7 +89,7 @@ export async function buildDocx(d: ReportData): Promise<Buffer> {
   children.push(para('Bu rapor bir karar destek aracı tarafından üretilmiştir; yöntem seçiminin ve yorumun sorumluluğu araştırmacıya aittir.', { italics: true, size: 18 }));
 
   const doc = new Document({
-    creator: 'StatAdvisor AI',
+    creator: 'StatAdvisor',
     title: d.title,
     styles: { default: { document: { run: { font: 'Calibri', size: 22 } } } },
     sections: [{ children }],
@@ -92,8 +100,8 @@ export async function buildDocx(d: ReportData): Promise<Buffer> {
 /** Regresyon raporu: model özeti, katsayı tablosu, uyarılar, yorum, APA özeti ve kaynakça. */
 export async function buildRegressionDocx(d: RegressionReportData): Promise<Buffer> {
   const children: (Paragraph | Table)[] = [
-    new Paragraph({ heading: HeadingLevel.TITLE, children: [new TextRun({ text: d.title })] }),
-    para(`${d.datasetName} · ${d.date} · StatAdvisor AI`, { italics: true, size: 20 }),
+    new Paragraph({ heading: HeadingLevel.TITLE, children: [new TextRun({ text: tr(d.title) })] }),
+    para(`${d.datasetName} · ${d.date} · StatAdvisor`, { italics: true, size: 20 }),
     para(`Bağımlı değişken: ${d.dependent}. Yordayıcılar: ${d.predictors.join(', ')}.`),
     heading('Model özeti'),
     table(['Ölçüt', 'Değer'], d.model),
@@ -112,13 +120,13 @@ export async function buildRegressionDocx(d: RegressionReportData): Promise<Buff
   ];
   if (d.audit) children.push(heading('Denetim izi'), table(['Öğe', 'Değer'], d.audit));
   children.push(para('Bu rapor bir karar destek aracı tarafından üretilmiştir; yöntem seçiminin ve yorumun sorumluluğu araştırmacıya aittir.', { italics: true, size: 18 }));
-  const doc = new Document({ creator: 'StatAdvisor AI', title: d.title, styles: { default: { document: { run: { font: 'Calibri', size: 22 } } } }, sections: [{ children }] });
+  const doc = new Document({ creator: 'StatAdvisor', title: d.title, styles: { default: { document: { run: { font: 'Calibri', size: 22 } } } }, sections: [{ children }] });
   return Buffer.from(await Packer.toBuffer(doc));
 }
 
 /** Blok tabanlı genel rapor belgesinden Word dosyası üretir. */
 export async function buildDocxFromDoc(d: ReportDoc): Promise<Buffer> {
-  const children: (Paragraph | Table)[] = [new Paragraph({ heading: HeadingLevel.TITLE, children: [new TextRun({ text: d.title })] }), para(d.subtitle, { italics: true, size: 20 })];
+  const children: (Paragraph | Table)[] = [new Paragraph({ heading: HeadingLevel.TITLE, children: [new TextRun({ text: tr(d.title) })] }), para(d.subtitle, { italics: true, size: 20 })];
   for (const b of d.blocks) {
     switch (b.type) {
       case 'heading':
@@ -147,6 +155,6 @@ export async function buildDocxFromDoc(d: ReportDoc): Promise<Buffer> {
     }
   }
   if (d.footer) children.push(para(d.footer, { italics: true, size: 18 }));
-  const doc = new Document({ creator: 'StatAdvisor AI', title: d.title, styles: { default: { document: { run: { font: 'Calibri', size: 22 } } } }, sections: [{ children }] });
+  const doc = new Document({ creator: 'StatAdvisor', title: d.title, styles: { default: { document: { run: { font: 'Calibri', size: 22 } } } }, sections: [{ children }] });
   return Buffer.from(await Packer.toBuffer(doc));
 }

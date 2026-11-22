@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { useI18n } from '@/i18n';
 import { cn } from '@/lib/cn';
 
 export interface PageHeaderProps {
@@ -14,6 +15,7 @@ export interface PageHeaderProps {
 }
 
 export function PageHeader({ features, context, title, description, actions, aside, className }: PageHeaderProps) {
+  const { t } = useI18n();
   return (
     <header className={cn('mb-8 flex flex-col gap-6 border-b border-line/20 pb-6 xl:flex-row xl:items-end xl:justify-between', className)}>
       <div className="min-w-0 max-w-3xl">
@@ -21,7 +23,7 @@ export function PageHeader({ features, context, title, description, actions, asi
           <p className="mb-3 flex flex-wrap items-center gap-2 text-caption text-fg-subtle">
             {features?.map((f) => (
               <span key={f} className="rounded-control bg-primary-strong/15 px-2 py-0.5 font-medium text-primary ring-1 ring-primary-strong/40">
-                {f}
+                {t(f)}
               </span>
             ))}
             {context && <span>{context}</span>}
