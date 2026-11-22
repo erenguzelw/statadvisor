@@ -1,6 +1,7 @@
 import { useId } from 'react';
 import { scaleBand, scaleLinear } from 'd3-scale';
 import { extent, type BoxStats } from '@statadvisor/shared';
+import { useI18n } from '@/i18n';
 
 const W = 420;
 const H = 230;
@@ -17,6 +18,7 @@ export interface BoxPlotGroupProps {
 /** Tukey kutu grafiği: bıyıklar sınırlar içindeki en uç gözlemlerdir; sınır dışı gözlemler tek tek işaretlenir. */
 export function BoxPlotGroup({ boxes, summary, unit }: BoxPlotGroupProps) {
   const titleId = useId();
+  const { t } = useI18n();
   const all = boxes.flatMap((b) => [b.whiskerLow, b.whiskerHigh, ...b.outliers]);
   const { lo, hi } = extent(all);
   const span = hi - lo || 1;
@@ -73,7 +75,7 @@ export function BoxPlotGroup({ boxes, summary, unit }: BoxPlotGroupProps) {
               {b.group} (n={b.n})
             </text>
             <text x={cx} y={H - 3} textAnchor="middle" fontSize={10} fill="var(--color-fg-subtle)" fontFamily="var(--font-sans)">
-              {b.outliers.length ? `${b.outliers.length} sınır dışı` : 'sınır dışı yok'}
+              {b.outliers.length ? t('{n} sınır dışı', { n: b.outliers.length }) : t('sınır dışı yok')}
             </text>
           </g>
         );

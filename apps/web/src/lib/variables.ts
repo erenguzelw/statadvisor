@@ -65,10 +65,10 @@ export function buildBody(datasetId: string, cols: ColumnInfo[], a: Answers, p: 
 }
 
 /** İstek tamamlanmadığında kullanıcıya gösterilecek eksik adımın açıklaması. */
-export function missingHint(a: Answers): string {
-  if (a.goal === 'predict') return 'Tahmin ve modelleme için Doğrusal Regresyon, Lojistik Regresyon ya da Model Karşılaştırma sayfalarını kullanın.';
-  if (a.goal === 'relate') return a.target === 'categorical' ? 'İki farklı kategorik sütun seçin.' : 'İki farklı sayısal sütun seçin.';
-  if (a.design === 'paired') return a.target === 'categorical' ? 'Karşılaştırılacak en az iki ikili (2 değerli, ör. evet/hayır) sütun seçin.' : 'Karşılaştırılacak en az iki sütun (koşul) seçin.';
-  if (a.target === 'categorical') return 'Bir grup sütunu ve bir sonuç sütunu seçin (farklı sütunlar).';
-  return 'Bir sonuç sütunu ve bir grup sütunu seçin (farklı sütunlar).';
+export function missingHint(a: Answers, t: (tr: string) => string = (s) => s): string {
+  if (a.goal === 'predict') return t('Yordama ve modelleme için Doğrusal Regresyon ya da Lojistik Regresyon sayfalarını kullanın.');
+  if (a.goal === 'relate') return a.target === 'categorical' ? t('İki farklı kategorik sütun seçin.') : t('İki farklı sayısal sütun seçin.');
+  if (a.design === 'paired') return a.target === 'categorical' ? t('Karşılaştırılacak en az iki ikili (2 değerli, ör. evet/hayır) sütun seçin.') : t('Karşılaştırılacak en az iki sütun (koşul) seçin.');
+  if (a.target === 'categorical') return t('Bir grup sütunu ve bir sonuç sütunu seçin (farklı sütunlar).');
+  return t('Bir sonuç sütunu ve bir grup sütunu seçin (farklı sütunlar).');
 }

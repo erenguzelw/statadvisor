@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import type { LucideIcon } from 'lucide-react';
+import { useI18n } from '@/i18n';
 import { cn } from '@/lib/cn';
 
 export interface SectionHeaderProps {
@@ -14,6 +15,7 @@ export interface SectionHeaderProps {
 }
 
 export function SectionHeader({ title, description, icon: Icon, feature, actions, level = 2, className }: SectionHeaderProps) {
+  const { t } = useI18n();
   const H = level === 2 ? 'h2' : 'h3';
   return (
     <header className={cn('mb-4 flex flex-wrap items-start justify-between gap-3', className)}>
@@ -32,7 +34,7 @@ export function SectionHeader({ title, description, icon: Icon, feature, actions
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           {feature && (
             <span className="rounded-control border border-line px-2 py-0.5 text-caption whitespace-nowrap text-fg-subtle">
-              {feature}
+              {t(feature)}
             </span>
           )}
           {actions}

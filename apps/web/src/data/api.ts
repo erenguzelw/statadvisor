@@ -196,6 +196,7 @@ export interface RegressionResponse {
   /** Kalıntı grafiği için (eşit aralıklı seçilmiş) noktalar. */
   plot: { fitted: number[]; residuals: number[]; step: number };
   code: GeneratedCode;
+  codeR: GeneratedCode;
 }
 
 export interface LogisticBody extends RegressionBody {
@@ -215,6 +216,7 @@ export interface LogisticResponse {
   hosmerLemeshow: { header: string[]; rows: string[][] } | null;
   /** Tam ayrışmada üretilmez. */
   code: GeneratedCode | null;
+  codeR: GeneratedCode | null;
 }
 
 /** Gerçek veride model karşılaştırma isteği. */

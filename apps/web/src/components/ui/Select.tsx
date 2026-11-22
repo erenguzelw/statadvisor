@@ -1,5 +1,6 @@
 import { useId, type ReactNode } from 'react';
 import { ChevronsUpDown } from 'lucide-react';
+import { useT } from '@/i18n';
 import { cn } from '@/lib/cn';
 
 export interface SelectOption {
@@ -20,8 +21,9 @@ export interface SelectProps {
 }
 
 /** Yerel <select> üzerine kurulu, etiketli seçim kutusu (klavye ve ekran okuyucu desteği hazır). */
-export function Select({ label, value, onChange, options, placeholder = 'Seçin…', hint, disabled, className }: SelectProps) {
+export function Select({ label, value, onChange, options, placeholder, hint, disabled, className }: SelectProps) {
   const id = useId();
+  const t = useT();
   return (
     <div className={cn('flex min-w-0 flex-col gap-1.5', className)}>
       <label htmlFor={id} className="text-caption font-medium text-fg-subtle">
@@ -37,7 +39,7 @@ export function Select({ label, value, onChange, options, placeholder = 'Seçin�
         >
           {(value === undefined || value === '') && (
             <option value="" disabled>
-              {placeholder}
+              {placeholder ?? t('Seçin…')}
             </option>
           )}
           {options.map((o) => (

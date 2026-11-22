@@ -13,7 +13,7 @@ export const isZip = (buf: Buffer) => buf.length > 4 && buf.readUInt32LE(0) === 
 /** Eski ikili Excel (.xls) ve diğer OLE belgeleri. */
 export const isOle = (buf: Buffer) => buf.length > 8 && buf.readUInt32BE(0) === 0xd0cf11e0 && buf.readUInt32BE(4) === 0xa1b11ae1;
 
-function unzip(buf: Buffer): Map<string, () => Buffer> {
+export function unzip(buf: Buffer): Map<string, () => Buffer> {
   let eocd = -1;
   for (let i = buf.length - 22; i >= Math.max(0, buf.length - 22 - 0xffff); i--) {
     if (buf.readUInt32LE(i) === 0x06054b50) {

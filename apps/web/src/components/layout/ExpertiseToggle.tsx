@@ -1,5 +1,6 @@
 import { SegmentedControl } from '@/components/ui';
 import { useApp } from '@/context/AppContext';
+import { useT } from '@/i18n';
 import type { Expertise } from '@statadvisor/shared';
 
 const options: { value: Expertise; label: string }[] = [
@@ -9,10 +10,11 @@ const options: { value: Expertise; label: string }[] = [
 
 export function ExpertiseToggle({ className }: { className?: string }) {
   const { expertise, setExpertise } = useApp();
+  const t = useT();
   return (
     <SegmentedControl
-      label="Anlatım seviyesi"
-      options={options}
+      label={t('Anlatım seviyesi')}
+      options={options.map((o) => ({ ...o, label: t(o.label) }))}
       value={expertise}
       onChange={setExpertise}
       className={className}
