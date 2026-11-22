@@ -1,0 +1,9 @@
+# Referans vakaları ve üretilen Python kodunun doğrulama testleri için ortam (Python 3.12).
+numpy==2.5.4
+pandas==3.0.6
+scipy==1.18.1
+statsmodels==0.15.0
+scikit-posthocs==0.17.1
+scikit-learn==1.9.1
+openpyxl==3.1.5
+pingouin==0.7.0

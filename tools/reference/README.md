@@ -8,7 +8,7 @@ okuyup TypeScript uygulamasının sonuçlarını referansla karşılaştırır (
 
 ```bash
 py -m venv tools/reference/.venv
-tools/reference/.venv/Scripts/python.exe -m pip install numpy scipy pandas statsmodels scikit-posthocs scikit-learn pingouin
+tools/reference/.venv/Scripts/python.exe -m pip install -r tools/reference/requirements.txt
 tools/reference/.venv/Scripts/python.exe tools/reference/generate.py
 ```
 
