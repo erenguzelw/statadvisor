@@ -89,7 +89,7 @@ export function generateRegressionCodeR(file: DatasetFile, spec: RegressionSpec,
 export function generateLogisticCodeR(file: DatasetFile, spec: LogisticSpec, r: LogisticResult): GeneratedCode {
   const alpha = spec.alpha ?? 0.05;
   const numDep = (spec.numericCategorical ?? []).includes(spec.dependent);
-  const L: string[] = [...HEAD, naBlockR, `ALPHA <- ${alpha}`, '', helpersR, '', VIF_FN, '', readCsvLineR(file), '', `BAGIMLI <- ${rs(spec.dependent)}`, `OLAY <- ${rs(r.eventLevel)}  # 1 olarak kodlanan düzey (referans: ${r.referenceLevel})`];
+  const L: string[] = [...HEAD, naBlockR, `ALPHA <- ${alpha}`, '', helpersR, '', VIF_FN, '', readCsvLineR(file), '', `BAGIMLI <- ${rs(spec.dependent)}`, `OLAY <- ${rs(r.eventLevel)}  # 1 olarak kodlanan düzey (referans: ${rs(r.referenceLevel)})`];
   L.push(...designBlock(spec, r, numDep));
   L.push(
     'd <- d[complete.cases(d), ]  # eksik değeri olan satırlar çıkarılır (liste bazlı silme)',

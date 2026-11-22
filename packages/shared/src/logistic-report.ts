@@ -184,7 +184,7 @@ export function generateLogisticCode(file: DatasetFile, spec: LogisticSpec, r: L
     readCsvLine(file),
     '',
     `BAGIMLI = ${py(spec.dependent)}`,
-    `OLAY = ${py(r.eventLevel)}  # 1 olarak kodlanan düzey (referans: ${r.referenceLevel})`,
+    `OLAY = ${py(r.eventLevel)}  # 1 olarak kodlanan düzey (referans: ${py(r.referenceLevel)})`,
     `SAYISAL = ${pyList(spec.numeric)}`,
     `KATEGORIK = ${pyList(spec.categorical)}`,
   ];
