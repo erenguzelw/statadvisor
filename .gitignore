@@ -27,3 +27,6 @@ docs/statadvisor_cv_swot_analizi.md
 docs/sunum_hazirlik.md
 tools/add_competitor_slide.py
 tools/revise_presentation_flow.py
+
+# Yerel araç ayarları
+.claude/

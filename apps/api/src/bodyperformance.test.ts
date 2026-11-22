@@ -3,17 +3,15 @@
  * 13.393 satır, 4 sınıf) StatAdvisor'da baştan sona çalıştırılır ve raporun iddiaları denetlenir.
  *
  * Yavaştır (~90 sn) ve veri dosyası depoda bulunmaz; bu yüzden yalnızca şu koşullarla çalışır:
- *   STATADVISOR_SLOW=1 ve dosya mevcut (STATADVISOR_BODYPERFORMANCE ya da masaüstündeki statadvisor klasörü).
+ *   STATADVISOR_SLOW=1 ve STATADVISOR_BODYPERFORMANCE veri dosyasının yolunu gösteriyor (Kaggle: bodyPerformance.csv).
  */
 import { existsSync, readFileSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { join } from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import { buildApp } from './app.ts';
 
-const FILE = process.env.STATADVISOR_BODYPERFORMANCE ?? join(homedir(), 'OneDrive', 'Masaüstü', 'statadvisor', 'bodyPerformance.csv');
-const enabled = process.env.STATADVISOR_SLOW === '1' && existsSync(FILE);
-if (!enabled) console.warn('bodyPerformance kabul testi atlandı (STATADVISOR_SLOW=1 ve veri dosyası gerekir).');
+const FILE = process.env.STATADVISOR_BODYPERFORMANCE ?? '';
+const enabled = process.env.STATADVISOR_SLOW === '1' && FILE !== '' && existsSync(FILE);
+if (!enabled) console.warn('bodyPerformance kabul testi atlandı (STATADVISOR_SLOW=1 ve STATADVISOR_BODYPERFORMANCE gerekir).');
 
 (enabled ? describe : describe.skip)('bodyPerformance raporunun yeniden üretimi ve denetimi', () => {
   let app: FastifyInstance;
