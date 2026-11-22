@@ -4,6 +4,10 @@
 
 **English** · [Türkçe](#türkçe)
 
+![StatAdvisor demo: scale score with item analysis, the Decision Wizard recommending a test, and the generated R code](docs/img/demo.gif)
+
+<sub>Scale score with item analysis (a weak item is flagged) → the Decision Wizard checks the assumptions and recommends Welch's t-test → the R script that reproduces the result. Regenerate with `node tools/readme-demo.mjs`.</sub>
+
 ## English
 
 A local, privacy-first **survey data analysis assistant**. Upload your data (Excel `.xlsx`, SPSS `.sav` or CSV); the app checks data quality, tests the assumptions, **recommends the right statistical test (and explains why)**, runs it and interprets the result in plain language. It also fits linear and logistic regression, builds Likert scale scores with Cronbach's alpha and an item analysis that flags weak or miscoded items, screens careless responses, and generates **reproducible Python and R code** whose output matches the on-screen numbers line by line, plus HTML / PDF / DOCX reports. **Everything runs on your computer; your data never leaves it.**
@@ -62,6 +66,8 @@ The ML "model comparison" and factorial ANOVA pages are hidden from the menu (th
 ---
 
 ## Türkçe
+
+> Sayfanın başındaki demo (İngilizce arayüz): ölçek puanı ve madde analizi (zayıf madde işaretlenir) → karar sihirbazı varsayımlara bakıp Welch t-testini önerir → sonucu yeniden üreten R betiği.
 
 Anket verileri için **yerel çalışan** bir veri analizi asistanı. Verinizi (Excel `.xlsx`, SPSS `.sav` ya da CSV) yükleyin; uygulama veri kalitesini denetler, varsayımlara bakıp **doğru istatistiksel testi önerir** (nedenini açıklar), hesaplar ve sade bir dille yorumlar. Doğrusal ve lojistik regresyon kurar, Likert ölçek puanı ve Cronbach alfa hesaplar, madde analiziyle zayıf ya da yanlış kodlanmış maddeleri işaretler, dikkatsiz yanıtları tarar; ekrandaki sayıları birebir yeniden üreten **Python ve R kodunu** ve raporu (HTML, PDF, DOCX) üretir. **Her şey bu bilgisayarda çalışır; veriniz dışarı gönderilmez.** Arayüz, yorumlar, raporlar ve kod açıklamaları **Türkçe ve İngilizce** olarak sunulur (üst çubuktaki TR/EN düğmesi).
 
