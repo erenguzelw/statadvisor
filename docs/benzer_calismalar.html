@@ -106,7 +106,7 @@ footer { color: var(--muted); font-size: .85rem; }
   <section aria-labelledby="fark">
     <h2 id="fark">StatAdvisor'ı ayıran özellikler</h2>
     <div class="diff">
-      <div><strong>Veri bilgisayardan çıkmaz</strong><span>Çevrimiçi danışman araçlarının hepsi veriyi kendi sunucusunda işler. StatAdvisor yalnızca 127.0.0.1 üzerinde çalışır.</span></div>
+      <div><strong>Veri bilgisayardan çıkmaz</strong><span>StatAdvisor yalnızca 127.0.0.1 üzerinde çalışır. numiqo da hesaplamaları tarayıcıda yerel yapar; Julius AI yüklenen veriyi sunucuda saklar.</span></div>
       <div><strong>Türkçe ve Türk anketlerine uygun</strong><span>“2:Bazen katılıyorum” ve “1-3 saat” gibi etiketleri doğrudan sayıya çevirir. Rehberli araçların hiçbirinde Türkçe arayüz bulunamadı.</span></div>
       <div><strong>Anket temizliği tek akışta</strong><span>Düz çizgi yanıt, Mahalanobis taraması, ölçek puanı, Cronbach α ve puan normalliği aynı ekranda.</span></div>
       <div><strong>Kural tabanlı ve doğrulanmış</strong><span>Aynı veri her seferinde aynı kararı verir; üretilen Python kodunun sonucu scipy ile birebir karşılaştırılarak test edilir.</span></div>
@@ -138,7 +138,7 @@ footer { color: var(--muted); font-size: .85rem; }
         </thead>
         <tbody>
           <tr class="self">
-            <th scope="row">StatAdvisor AI<small>bu proje</small></th>
+            <th scope="row">StatAdvisor<small>bu proje</small></th>
             <td><span class="c y">var</span><span class="note">karar ağacı</span></td>
             <td><span class="c y">var</span><span class="note">Shapiro-Wilk ya da çarpıklık-basıklık</span></td>
             <td><span class="c y">var</span><span class="note">sade metin ve APA cümlesi</span></td>
@@ -153,7 +153,7 @@ footer { color: var(--muted); font-size: .85rem; }
             <td><span class="c y">var</span><span class="note">“yöntem seçimine destek”</span></td>
             <td><span class="c u">belirsiz</span></td>
             <td><span class="c y">var</span><span class="note">YZ yorumu varsayılan olarak kapalı</span></td>
-            <td><span class="c p">bulut</span><span class="note">kurum içi kurulum isteğe bağlı</span></td>
+            <td><span class="c y">yerelde</span><span class="note">tarayıcıda hesaplama; veri sunucuya gönderilmez</span></td>
             <td><span class="c n">yok</span><span class="note">EN, DE, ES, FR</span></td>
             <td><span class="c u">belirsiz</span></td>
             <td><span class="c u">belirsiz</span><span class="note">anket aracı var</span></td>
@@ -225,7 +225,7 @@ footer { color: var(--muted); font-size: .85rem; }
       <article class="tool">
         <div class="kind">en yakın benzer · tarayıcıda</div>
         <h3>numiqo (eski DATAtab)</h3>
-        <p>Tarayıcıda çalışan istatistik programı; yöntem seçiminde yardım ediyor ve sonuçları otomatik yorumluyor. DATAtab adı, Minitab'ın hukuki itirazı üzerine 2026'da numiqo olarak değiştirildi; datatab.net artık numiqo.com'a yönleniyor. Kurumlara kendi sunucularında çalıştırma seçeneği sunuluyor.</p>
+        <p>Tarayıcıda çalışan istatistik programı; yöntem seçiminde yardım ediyor ve sonuçları yorumluyor. Üreticinin açıklamasına göre hesaplamalar kullanıcının tarayıcısında yapılıyor ve veri sunucuya gönderilmiyor. Bu nedenle yerel veri işleme, StatAdvisor'a özgü bir fark değil.</p>
       </article>
       <article class="tool">
         <div class="kind">fikir olarak en yakın · ticari masaüstü</div>
@@ -253,7 +253,7 @@ footer { color: var(--muted); font-size: .85rem; }
   <section aria-labelledby="sunum">
     <h2 id="sunum">Sunum için tek cümle</h2>
     <div class="slide">
-      <blockquote>Mevcut araçlar ya veriyi buluta gönderiyor ya da test seçimini kullanıcıya bırakıyor. StatAdvisor, test seçimini kural tabanlı yapan, sonucu Türkçe anlatan ve veriyi bilgisayardan çıkarmayan bir danışman.</blockquote>
+      <blockquote>StatAdvisor, gerekçeli test seçimini Türkçe anlatımla, bilgisayarda yerel çalışmayla ve sonucu yeniden üreten Python koduyla birleştiriyor.</blockquote>
     </div>
   </section>
 
@@ -261,6 +261,7 @@ footer { color: var(--muted); font-size: .85rem; }
     <div class="fix">
       <h2 id="duzeltme">Önceki yanıttaki düzeltmeler</h2>
       <ul>
+        <li>numiqo hesaplamaları tarayıcıda yerel yaptığını ve veriyi sunucuya göndermediğini belirtiyor; önceki “bulut” sınıflandırması düzeltilmiştir.</li>
         <li>DATAtab'ın adı artık <strong>numiqo</strong>. Sitesinde Türkçe arayüz görünmüyor (İngilizce, Almanca, İspanyolca, Fransızca).</li>
         <li>jamovi'nin Türkçe çevirisi yaklaşık %10 düzeyinde ve geliştirme aşamasında; JASP için Türkçe desteği doğrulanamadı.</li>
       </ul>
@@ -270,6 +271,7 @@ footer { color: var(--muted); font-size: .85rem; }
   <section aria-labelledby="kaynak" class="sources">
     <h2 id="kaynak">Kaynaklar</h2>
     <ol>
+      <li><a href="https://numiqo.com/tutorial" target="_blank" rel="noopener">numiqo: ilk adımlar ve veri güvenliği</a></li>
       <li><a href="https://numiqo.com/pricing" target="_blank" rel="noopener">numiqo fiyatlandırma</a> ve <a href="https://numiqo.com/rebranding-to-numico" target="_blank" rel="noopener">DATAtab is now numiqo</a></li>
       <li><a href="https://metricgate.com/blogs/metricgate-vs-datatab/" target="_blank" rel="noopener">MetricGate vs DataTab</a> (rakip ürünün karşılaştırması)</li>
       <li><a href="https://www.minitab.com/en-us/products/minitab/assistant/" target="_blank" rel="noopener">Minitab: The Assistant</a> ve <a href="https://www.softwareadvice.com/bi/minitab-profile/" target="_blank" rel="noopener">Software Advice: Minitab fiyatı</a></li>
