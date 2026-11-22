@@ -12,3 +12,18 @@ apps/api/.data/
 !packages/shared/fixtures/
 apps/api/backups/
 video/out/
+
+# Yayın dışı: büyük medya, sunum ve yerel çıktılar
+outputs/
+sunum/
+video/public/
+video/.kontrol/
+*context-usage.txt
+tools/.i18n-*.json
+.claude/settings.local.json
+
+# Kişisel notlar ve sunuma bağlı yardımcı betikler
+docs/statadvisor_cv_swot_analizi.md
+docs/sunum_hazirlik.md
+tools/add_competitor_slide.py
+tools/revise_presentation_flow.py
