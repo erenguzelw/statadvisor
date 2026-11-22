@@ -25,7 +25,7 @@ export function factorialExpectedOutput(r: FactorialResult): string[] {
 
 export function generateFactorialCode(file: DatasetFile, spec: FactorialSpec, r: FactorialResult): GeneratedCode {
   const code = [
-    '# StatAdvisor AI tarafından üretildi. Veri dosyası betikle aynı klasörde olmalıdır.',
+    '# StatAdvisor tarafından üretildi. Veri dosyası betikle aynı klasörde olmalıdır.',
     '',
     'import itertools',
     'import numpy as np',

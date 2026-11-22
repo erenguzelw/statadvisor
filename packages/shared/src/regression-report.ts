@@ -188,7 +188,7 @@ export function generateRegressionCode(file: DatasetFile, spec: RegressionSpec, 
       .map(([k, v]) => `${py(k)}: ${Array.isArray(v) ? pyList(v) : py(v)}`)
       .join(', ')}}`;
   const lines: string[] = [
-    '# StatAdvisor AI tarafından üretildi. Veri dosyası betikle aynı klasörde olmalıdır.',
+    '# StatAdvisor tarafından üretildi. Veri dosyası betikle aynı klasörde olmalıdır.',
     '',
     'import numpy as np',
     'import pandas as pd',
@@ -315,7 +315,7 @@ const tbl = (header: string[], cells: string[][]) =>
 export function buildRegressionReport(d: RegressionReportData): string {
   const notes = d.narrative.notes.map((n) => `<p class="warn ${n.level === 'danger' ? 'bad' : n.level === 'info' ? 'info' : ''}"><strong>${esc(n.title)}.</strong> ${esc(n.text)}</p>`).join('');
   const body = `<h1>${esc(d.title)}</h1>
-<p class="muted">${esc(d.datasetName)} · ${esc(d.date)} · StatAdvisor AI</p>
+<p class="muted">${esc(d.datasetName)} · ${esc(d.date)} · StatAdvisor</p>
 <p>Bağımlı değişken: <strong>${esc(d.dependent)}</strong>. Yordayıcılar: ${d.predictors.map((p) => `<strong>${esc(p)}</strong>`).join(', ')}.</p>
 <section data-section="model"><h2>Model özeti</h2>${tbl(['Ölçüt', 'Değer'], d.model)}</section>
 <section data-section="coef"><h2>Katsayılar</h2>${tbl(d.coefficients.header, d.coefficients.rows)}<p class="muted">${esc(d.coefficientNote ?? LINEAR_COEFFICIENT_NOTE)}</p>${(d.extraTables ?? []).map((t) => `<p class="muted">${esc(t.title)}</p>${tbl(t.header, t.rows)}`).join('')}</section>
